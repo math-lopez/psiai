@@ -1,15 +1,67 @@
-import { Save, User, Shield, CreditCard, Bell } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Save, User, Shield, CreditCard, Bell, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { mockUser } from "@/lib/mockData";
-import { showSuccess } from "@/utils/toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { showSuccess, showError } from "@/utils/toast";
 
 const Settings = () => {
-  const handleSave = () => {
-    showSuccess("Configurações salvas!");
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [profile, setProfile] = useState({
+    full_name: "",
+    crp: "",
+    email: "",
+    phone: ""
+  });
+
+  useEffect(() => {
+    if (user) {
+      setProfile({
+        full_name: user.user_metadata?.full_name || "",
+        crp: user.user_metadata?.crp || "",
+        email: user.email || "",
+        phone: user.user_metadata?.phone || ""
+      });
+    }
+  }, [user]);
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      // Atualiza metadados no Auth
+      const { error: authError } = await supabase.auth.updateUser({
+        data: { 
+          full_name: profile.full_name,
+          crp: profile.crp,
+          phone: profile.phone
+        }
+      });
+
+      if (authError) throw authError;
+
+      // Atualiza tabela de profiles
+      const { error: dbError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: profile.full_name,
+          crp: profile.crp,
+          phone: profile.phone
+        })
+        .eq('id', user?.id);
+
+      if (dbError) throw dbError;
+
+      showSuccess("Configurações salvas com sucesso!");
+    } catch (error: any) {
+      showError(error.message || "Erro ao salvar configurações");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -45,19 +97,31 @@ const Settings = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nome Completo</Label>
-                  <Input id="name" defaultValue={mockUser.name} />
+                  <Input 
+                    id="name" 
+                    value={profile.full_name} 
+                    onChange={(e) => setProfile({...profile, full_name: e.target.value})}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="crp">CRP</Label>
-                  <Input id="crp" defaultValue={mockUser.crp} />
+                  <Input 
+                    id="crp" 
+                    value={profile.crp} 
+                    onChange={(e) => setProfile({...profile, crp: e.target.value})}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">E-mail Profissional</Label>
-                  <Input id="email" defaultValue={mockUser.email} />
+                  <Input id="email" value={profile.email} disabled className="bg-slate-50" />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="phone">Telefone</Label>
-                  <Input id="phone" defaultValue={mockUser.phone} />
+                  <Input 
+                    id="phone" 
+                    value={profile.phone} 
+                    onChange={(e) => setProfile({...profile, phone: e.target.value})}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -83,19 +147,17 @@ const Settings = () => {
                 </div>
                 <Switch defaultChecked />
               </div>
-              <div className="flex items-center justify-between border-t pt-6">
-                <div className="space-y-0.5">
-                  <Label>Resumo para o Paciente</Label>
-                  <p className="text-sm text-slate-500">Gerar sugestão de texto para enviar ao paciente pós-sessão.</p>
-                </div>
-                <Switch />
-              </div>
             </CardContent>
           </Card>
 
           <div className="flex justify-end">
-            <Button className="bg-indigo-600 hover:bg-indigo-700 gap-2" onClick={handleSave}>
-              <Save className="h-4 w-4" /> Salvar Configurações
+            <Button 
+              className="bg-indigo-600 hover:bg-indigo-700 gap-2" 
+              onClick={handleSave}
+              disabled={loading}
+            >
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              Salvar Configurações
             </Button>
           </div>
         </div>
