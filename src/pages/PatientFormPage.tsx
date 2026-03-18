@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { ChevronLeft, Save, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,8 +17,10 @@ import { showSuccess, showError } from "@/utils/toast";
 import { patientService } from "@/services/patientService";
 
 const PatientFormPage = () => {
+  const { id } = useParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(!!id);
   
   const [formData, setFormData] = useState({
     full_name: "",
@@ -29,23 +31,56 @@ const PatientFormPage = () => {
     phone: "",
     emergency_contact: "",
     notes: "",
-    status: "ativo" as const
+    status: "ativo" as "ativo" | "inativo"
   });
+
+  useEffect(() => {
+    if (id) {
+      patientService.getById(id).then(data => {
+        if (data) {
+          setFormData({
+            full_name: data.full_name || "",
+            birth_date: data.birth_date || "",
+            cpf: data.cpf || "",
+            gender: data.gender || "outro",
+            email: data.email || "",
+            phone: data.phone || "",
+            emergency_contact: data.emergency_contact || "",
+            notes: data.notes || "",
+            status: data.status || "ativo"
+          });
+        }
+        setFetching(false);
+      }).catch(() => {
+        showError("Erro ao carregar dados do paciente.");
+        navigate("/pacientes");
+      });
+    }
+  }, [id, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
     try {
-      await patientService.create(formData);
-      showSuccess("Paciente cadastrado com sucesso!");
+      if (id) {
+        await patientService.update(id, formData);
+        showSuccess("Paciente atualizado com sucesso!");
+      } else {
+        await patientService.create(formData);
+        showSuccess("Paciente cadastrado com sucesso!");
+      }
       navigate("/pacientes");
     } catch (error: any) {
-      showError(error.message || "Erro ao cadastrar paciente");
+      showError(error.message || "Erro ao salvar paciente");
     } finally {
       setLoading(false);
     }
   };
+
+  if (fetching) {
+    return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
+  }
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -54,8 +89,8 @@ const PatientFormPage = () => {
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Novo Paciente</h1>
-          <p className="text-slate-500">Preencha as informações para o prontuário.</p>
+          <h1 className="text-2xl font-bold text-slate-900">{id ? "Editar Paciente" : "Novo Paciente"}</h1>
+          <p className="text-slate-500">Informações completas para o prontuário.</p>
         </div>
       </div>
 
@@ -68,7 +103,6 @@ const PatientFormPage = () => {
                 <Label htmlFor="full_name">Nome Completo *</Label>
                 <Input 
                   id="full_name" 
-                  placeholder="Ex: João da Silva" 
                   required 
                   value={formData.full_name}
                   onChange={(e) => setFormData({...formData, full_name: e.target.value})}
@@ -88,7 +122,6 @@ const PatientFormPage = () => {
                 <Label htmlFor="cpf">CPF</Label>
                 <Input 
                   id="cpf" 
-                  placeholder="000.000.000-00" 
                   value={formData.cpf}
                   onChange={(e) => setFormData({...formData, cpf: e.target.value})}
                 />
@@ -100,7 +133,7 @@ const PatientFormPage = () => {
                   onValueChange={(value) => setFormData({...formData, gender: value})}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="masculino">Masculino</SelectItem>
@@ -118,7 +151,6 @@ const PatientFormPage = () => {
                 <Input 
                   id="email" 
                   type="email" 
-                  placeholder="email@exemplo.com" 
                   required 
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
@@ -128,29 +160,18 @@ const PatientFormPage = () => {
                 <Label htmlFor="phone">Telefone / WhatsApp *</Label>
                 <Input 
                   id="phone" 
-                  placeholder="(00) 00000-0000" 
                   required 
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
                 />
               </div>
-              <div className="space-y-2 md:col-span-2">
-                <Label htmlFor="emergency">Contato de Emergência (Nome e Telefone)</Label>
-                <Input 
-                  id="emergency" 
-                  placeholder="Ex: Maria Silva - (11) 98888-8888" 
-                  value={formData.emergency_contact}
-                  onChange={(e) => setFormData({...formData, emergency_contact: e.target.value})}
-                />
-              </div>
             </div>
 
-            <h3 className="font-semibold text-lg border-b pb-2 pt-4">Observações Adicionais</h3>
+            <h3 className="font-semibold text-lg border-b pb-2 pt-4">Observações</h3>
             <div className="space-y-2">
               <Label htmlFor="notes">Notas Gerais</Label>
               <Textarea 
                 id="notes" 
-                placeholder="Informações relevantes sobre o paciente, queixas principais, etc." 
                 className="min-h-[120px]"
                 value={formData.notes}
                 onChange={(e) => setFormData({...formData, notes: e.target.value})}
@@ -181,7 +202,7 @@ const PatientFormPage = () => {
           </Button>
           <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 gap-2" disabled={loading}>
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Salvar Paciente
+            {id ? "Atualizar Paciente" : "Salvar Paciente"}
           </Button>
         </div>
       </form>

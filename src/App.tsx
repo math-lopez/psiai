@@ -12,7 +12,7 @@ import Patients from "./pages/Patients";
 import PatientFormPage from "./pages/PatientFormPage";
 import PatientDetailPage from "./pages/PatientDetailPage";
 import Sessions from "./pages/Sessions";
-import NewSession from "./pages/NewSession";
+import SessionFormPage from "./pages/SessionFormPage";
 import SessionDetail from "./pages/SessionDetail";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
@@ -42,9 +42,11 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/pacientes" element={<Patients />} />
               <Route path="/pacientes/novo" element={<PatientFormPage />} />
+              <Route path="/pacientes/editar/:id" element={<PatientFormPage />} />
               <Route path="/pacientes/:id" element={<PatientDetailPage />} />
               <Route path="/sessoes" element={<Sessions />} />
-              <Route path="/sessoes/nova" element={<NewSession />} />
+              <Route path="/sessoes/nova" element={<SessionFormPage />} />
+              <Route path="/sessoes/editar/:id" element={<SessionFormPage />} />
               <Route path="/sessoes/:id" element={<SessionDetail />} />
               <Route path="/configuracoes" element={<Settings />} />
             </Route>

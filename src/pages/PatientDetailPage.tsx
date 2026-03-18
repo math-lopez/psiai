@@ -1,13 +1,36 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { ChevronLeft, Edit, Plus, Calendar, Mail, Phone, CalendarDays, Loader2 } from "lucide-react";
+import { 
+  ChevronLeft, 
+  Edit, 
+  Plus, 
+  Calendar, 
+  Mail, 
+  Phone, 
+  CalendarDays, 
+  Loader2, 
+  Trash2,
+  AlertTriangle 
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { patientService } from "@/services/patientService";
 import { sessionService } from "@/services/sessionService";
 import { Patient, Session } from "@/types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { showError, showSuccess } from "@/utils/toast";
 
 const PatientDetailPage = () => {
   const { id } = useParams();
@@ -15,6 +38,7 @@ const PatientDetailPage = () => {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -22,7 +46,7 @@ const PatientDetailPage = () => {
       try {
         const [pData, sData] = await Promise.all([
           patientService.getById(id),
-          sessionService.list() // No futuro, filtrar por patient_id no service
+          sessionService.list()
         ]);
         setPatient(pData);
         setSessions(sData.filter(s => s.patient_id === id));
@@ -33,29 +57,67 @@ const PatientDetailPage = () => {
     fetchData();
   }, [id]);
 
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      </div>
-    );
-  }
+  const handleDelete = async () => {
+    if (!id) return;
+    setDeleting(true);
+    try {
+      await patientService.delete(id);
+      showSuccess("Paciente removido com sucesso.");
+      navigate("/pacientes");
+    } catch (e: any) {
+      if (e.code === '23503') {
+        showError("Não é possível excluir: este paciente possui sessões registradas.");
+      } else {
+        showError("Erro ao excluir paciente.");
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
 
-  if (!patient) return <div>Paciente não encontrado.</div>;
+  if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
+  if (!patient) return <div className="p-10 text-center">Paciente não encontrado.</div>;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/pacientes")}>
             <ChevronLeft className="h-5 w-5" />
           </Button>
           <h1 className="text-2xl font-bold text-slate-900">{patient.full_name}</h1>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2">
-            <Edit className="h-4 w-4" /> Editar Perfil
-          </Button>
+          <Link to={`/pacientes/editar/${id}`}>
+            <Button variant="outline" size="sm" className="gap-2">
+              <Edit className="h-4 w-4" /> Editar
+            </Button>
+          </Link>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 text-red-600 hover:text-red-700">
+                <Trash2 className="h-4 w-4" /> Excluir
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-500" /> Excluir Prontuário
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem certeza que deseja excluir o paciente **{patient.full_name}**? Esta ação removerá todos os dados cadastrais. Se houver sessões vinculadas, a exclusão será impedida por segurança.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                  {deleting ? "Excluindo..." : "Confirmar Exclusão"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+
           <Link to="/sessoes/nova">
             <Button className="bg-indigo-600 hover:bg-indigo-700 gap-2" size="sm">
               <Plus className="h-4 w-4" /> Registrar Sessão
@@ -68,7 +130,7 @@ const PatientDetailPage = () => {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm uppercase text-slate-500">Informações de Contato</CardTitle>
+              <CardTitle className="text-sm uppercase text-slate-500 font-bold">Dados Cadastrais</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
@@ -83,15 +145,22 @@ const PatientDetailPage = () => {
                 <Calendar className="h-4 w-4 text-slate-400" />
                 <span className="text-sm">Nascido em {format(new Date(patient.birth_date), "dd/MM/yyyy")}</span>
               </div>
+              <div className="pt-2">
+                 <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                  patient.status === 'ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                }`}>
+                  Status: {patient.status}
+                </span>
+              </div>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-sm uppercase text-slate-500">Notas do Prontuário</CardTitle>
+              <CardTitle className="text-sm uppercase text-slate-500 font-bold">Observações do Prontuário</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-slate-600 leading-relaxed">
+              <p className="text-sm text-slate-600 leading-relaxed italic">
                 {patient.notes || "Sem observações registradas."}
               </p>
             </CardContent>

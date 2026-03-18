@@ -9,10 +9,7 @@ export const sessionService = {
       .order('session_date', { ascending: false });
     
     if (error) throw error;
-    return data.map(s => ({
-      ...s,
-      patientName: s.patient?.full_name || 'Desconhecido'
-    })) as Session[];
+    return data as Session[];
   },
 
   getById: async (id: string): Promise<Session | null> => {
@@ -23,10 +20,7 @@ export const sessionService = {
       .single();
     
     if (error) return null;
-    return {
-      ...data,
-      patientName: data.patient?.full_name || 'Desconhecido'
-    } as Session;
+    return data as Session;
   },
 
   create: async (session: any, audioFile?: File): Promise<Session> => {
@@ -66,18 +60,34 @@ export const sessionService = {
     return data as Session;
   },
 
-  // PREPARAÇÃO PARA AUTOMAÇÃO: Função que dispara o processamento
+  update: async (id: string, session: Partial<Session>): Promise<Session> => {
+    const { data, error } = await supabase
+      .from('sessions')
+      .update(session)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data as Session;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    const { error } = await supabase
+      .from('sessions')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  },
+
   processSession: async (sessionId: string): Promise<void> => {
-    // 1. Atualiza status localmente para 'queued'
     const { error: updateError } = await supabase
       .from('sessions')
       .update({ processing_status: 'queued' })
       .eq('id', sessionId);
 
     if (updateError) throw updateError;
-
-    // 2. Placeholder para chamada da Edge Function
-    // Futuramente: const { data, error } = await supabase.functions.invoke('process-audio', { body: { sessionId } });
     console.log(`[PsiAI] Disparando processamento para sessão: ${sessionId}`);
   },
 
@@ -93,10 +103,5 @@ export const sessionService = {
       pendingProcessing: pendingCount?.length || 0,
       completedSessions: completedCount?.length || 0
     };
-  },
-
-  getAudioUrl: (path: string) => {
-    const { data } = supabase.storage.from('session-audios').getPublicUrl(path);
-    return data.publicUrl;
   }
 };
