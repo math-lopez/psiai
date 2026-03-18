@@ -6,6 +6,7 @@ export interface Profile {
   id: string;
   full_name: string | null;
   crp: string | null;
+  email: string | null;
   phone: string | null;
   updated_at: string;
 }
@@ -43,7 +44,7 @@ export interface Session {
   additional_notes: string | null;
   created_at: string;
   updated_at: string;
-  // Campos vindos de Join
+  // Join fields
   patient?: {
     full_name: string;
   };
