@@ -29,7 +29,6 @@ export const sessionService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    // Garantir que campos de UUID não sejam strings vazias
     const cleanedData = {
       ...sessionData,
       patient_id: sessionData.patient_id === "" ? null : sessionData.patient_id,
@@ -61,7 +60,7 @@ export const sessionService = {
           .update({
             audio_file_name: uploadResult.name,
             audio_file_path: uploadResult.path,
-            processing_status: 'queued'
+            processing_status: 'draft' // Mantém como rascunho até o usuário clicar em processar
           })
           .eq('id', session.id)
           .select()
@@ -83,7 +82,6 @@ export const sessionService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    // Limpar dados para evitar UUID vazio
     const cleanedData = { ...sessionData };
     if (cleanedData.patient_id === "") delete cleanedData.patient_id;
 
@@ -107,8 +105,7 @@ export const sessionService = {
 
       audioInfo = {
         audio_file_name: uploadResult.name,
-        audio_file_path: uploadResult.path,
-        processing_status: 'queued'
+        audio_file_path: uploadResult.path
       };
     }
 
@@ -121,6 +118,15 @@ export const sessionService = {
     
     if (error) throw error;
     return data as Session;
+  },
+
+  processAudio: async (sessionId: string): Promise<any> => {
+    const { data, error } = await supabase.functions.invoke('process-session-audio', {
+      body: { sessionId }
+    });
+    
+    if (error) throw error;
+    return data;
   },
 
   removeAudio: async (sessionId: string): Promise<void> => {
@@ -137,7 +143,10 @@ export const sessionService = {
       .update({
         audio_file_name: null,
         audio_file_path: null,
-        processing_status: 'draft'
+        processing_status: 'draft',
+        transcript: null,
+        highlights: null,
+        next_steps: null
       })
       .eq('id', sessionId);
 

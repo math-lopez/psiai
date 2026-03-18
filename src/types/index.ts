@@ -38,6 +38,11 @@ export interface Session {
   audio_file_name: string | null;
   audio_file_path: string | null;
   processing_status: SessionStatus;
+  processing_requested_at?: string | null;
+  processing_started_at?: string | null;
+  processing_finished_at?: string | null;
+  processing_error?: string | null;
+  processing_attempts?: number;
   transcript: string | null;
   highlights: string[] | null;
   next_steps: string | null;
