@@ -29,11 +29,16 @@ export const sessionService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
+    // Lógica de status inicial:
+    // Se não tem áudio, já nasce como 'completed'
+    // Se tem áudio, nasce como 'draft' para indicar que falta processar a IA
+    const initialStatus = audioFile ? 'draft' : 'completed';
+
     const cleanedData = {
       ...sessionData,
       patient_id: sessionData.patient_id === "" ? null : sessionData.patient_id,
       psychologist_id: user.id,
-      processing_status: 'draft'
+      processing_status: initialStatus
     };
 
     if (!cleanedData.patient_id) throw new Error("Paciente é obrigatório");
@@ -60,7 +65,7 @@ export const sessionService = {
           .update({
             audio_file_name: uploadResult.name,
             audio_file_path: uploadResult.path,
-            processing_status: 'draft' // Mantém como rascunho até o usuário clicar em processar
+            processing_status: 'draft' 
           })
           .eq('id', session.id)
           .select()
@@ -85,7 +90,7 @@ export const sessionService = {
     const cleanedData = { ...sessionData };
     if (cleanedData.patient_id === "") delete cleanedData.patient_id;
 
-    let audioInfo = {};
+    let audioInfo: any = {};
     if (newAudioFile) {
       const currentSession = await sessionService.getById(id);
       if (currentSession?.audio_file_path) {
@@ -105,7 +110,9 @@ export const sessionService = {
 
       audioInfo = {
         audio_file_name: uploadResult.name,
-        audio_file_path: uploadResult.path
+        audio_file_path: uploadResult.path,
+        // Ao trocar o áudio, volta para rascunho pois precisa reprocessar
+        processing_status: 'draft'
       };
     }
 
@@ -143,7 +150,7 @@ export const sessionService = {
       .update({
         audio_file_name: null,
         audio_file_path: null,
-        processing_status: 'draft',
+        processing_status: 'completed', // Sem áudio, volta a estar completa (apenas manual)
         transcript: null,
         highlights: null,
         next_steps: null
