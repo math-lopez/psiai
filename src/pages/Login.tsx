@@ -16,6 +16,7 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
+  const [crp, setCrp] = useState("");
 
   useEffect(() => {
     if (session) {
@@ -50,11 +51,12 @@ const Login = () => {
         options: {
           data: {
             full_name: fullName,
+            crp: crp,
           },
         },
       });
       if (error) throw error;
-      showSuccess("Cadastro realizado! Verifique seu e-mail.");
+      showSuccess("Cadastro realizado! Verifique seu e-mail para confirmar.");
     } catch (error: any) {
       showError(error.message || "Erro ao cadastrar");
     } finally {
@@ -116,9 +118,19 @@ const Login = () => {
                   <Label htmlFor="reg-name">Nome Completo</Label>
                   <Input 
                     id="reg-name" 
-                    placeholder="Seu nome" 
+                    placeholder="Seu nome completo" 
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reg-crp">Número do CRP</Label>
+                  <Input 
+                    id="reg-crp" 
+                    placeholder="Ex: 06/123456" 
+                    value={crp}
+                    onChange={(e) => setCrp(e.target.value)}
                     required 
                   />
                 </div>
@@ -145,7 +157,7 @@ const Login = () => {
                 </div>
                 <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={loading}>
                   {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Criar Conta
+                  Criar Minha Conta
                 </Button>
               </form>
             </TabsContent>
