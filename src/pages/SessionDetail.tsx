@@ -1,5 +1,7 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
-import { useState, useEffect } from "react";
 import { 
   ChevronLeft, 
   Edit, 
@@ -111,8 +113,21 @@ const SessionDetail = () => {
     }
   };
 
-  if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
-  if (!session) return <div className="p-10 text-center">Sessão não encontrada.</div>;
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  if (!session) {
+    return (
+      <div className="p-10 text-center text-slate-500">
+        Sessão não encontrada.
+      </div>
+    );
+  }
 
   const isProcessing = ['queued', 'processing'].includes(session.processing_status);
 
@@ -331,7 +346,9 @@ const SessionDetail = () => {
                   <div>
                     <h4 className="text-sm font-bold text-emerald-800 uppercase mb-2">Pontos Importantes</h4>
                     <ul className="list-disc list-inside text-sm text-slate-700 space-y-1">
-                      {session.highlights.map((h, i) => <li key={i}>{h}</li>)}
+                      {session.highlights.map((h, i) => (
+                        <li key={i}>{h}</li>
+                      ))}
                     </ul>
                   </div>
                 )}
@@ -358,7 +375,7 @@ const SessionDetail = () => {
                 </p>
               </CardContent>
             </Card>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
