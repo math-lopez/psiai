@@ -1,20 +1,66 @@
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { BrainCircuit } from "lucide-react";
-import { Auth } from '@supabase/auth-ui-react';
-import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { BrainCircuit, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { showError, showSuccess } from "@/utils/toast";
 
 const Login = () => {
   const navigate = useNavigate();
   const { session } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
 
   useEffect(() => {
     if (session) {
       navigate("/");
     }
   }, [session, navigate]);
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+      showSuccess("Bem-vindo(a) de volta!");
+    } catch (error: any) {
+      showError(error.message || "Erro ao entrar");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            full_name: fullName,
+          },
+        },
+      });
+      if (error) throw error;
+      showSuccess("Cadastro realizado! Verifique seu e-mail.");
+    } catch (error: any) {
+      showError(error.message || "Erro ao cadastrar");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen flex">
@@ -28,51 +74,82 @@ const Login = () => {
             <p className="mt-2 text-slate-600">Sua assistente inteligente para gestão clínica</p>
           </div>
 
-          <div className="p-4 border rounded-xl shadow-sm">
-            <Auth
-              supabaseClient={supabase}
-              providers={[]}
-              appearance={{
-                theme: ThemeSupa,
-                variables: {
-                  default: {
-                    colors: {
-                      brand: '#4f46e5',
-                      brandAccent: '#4338ca',
-                    }
-                  }
-                }
-              }}
-              localization={{
-                variables: {
-                  sign_in: {
-                    email_label: 'E-mail',
-                    password_label: 'Senha',
-                    button_label: 'Entrar',
-                    loading_button_label: 'Entrando...',
-                    email_input_placeholder: 'seu@email.com',
-                    password_input_placeholder: 'Sua senha',
-                    link_text: 'Já tem uma conta? Entre',
-                  },
-                  sign_up: {
-                    email_label: 'E-mail',
-                    password_label: 'Senha',
-                    button_label: 'Cadastrar',
-                    loading_button_label: 'Cadastrando...',
-                    link_text: 'Não tem uma conta? Cadastre-se',
-                  },
-                  forgotten_password: {
-                    link_text: 'Esqueceu sua senha?',
-                    button_label: 'Recuperar senha',
-                    loading_button_label: 'Enviando instruções...',
-                    email_label: 'E-mail',
-                    email_input_placeholder: 'seu@email.com',
-                  }
-                }
-              }}
-              theme="light"
-            />
-          </div>
+          <Tabs defaultValue="login" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 mb-8">
+              <TabsTrigger value="login">Entrar</TabsTrigger>
+              <TabsTrigger value="register">Cadastrar</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="login">
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email">E-mail</Label>
+                  <Input 
+                    id="email" 
+                    type="email" 
+                    placeholder="seu@email.com" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Senha</Label>
+                  <Input 
+                    id="password" 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required 
+                  />
+                </div>
+                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Entrar
+                </Button>
+              </form>
+            </TabsContent>
+
+            <TabsContent value="register">
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="reg-name">Nome Completo</Label>
+                  <Input 
+                    id="reg-name" 
+                    placeholder="Seu nome" 
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reg-email">E-mail</Label>
+                  <Input 
+                    id="reg-email" 
+                    type="email" 
+                    placeholder="seu@email.com" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reg-password">Senha</Label>
+                  <Input 
+                    id="reg-password" 
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required 
+                  />
+                </div>
+                <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700" disabled={loading}>
+                  {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Criar Conta
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
 
           <p className="text-center text-sm text-slate-500">
             Segurança em conformidade com a LGPD e padrões éticos do CFP.
