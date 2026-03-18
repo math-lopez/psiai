@@ -8,6 +8,7 @@ import {
   BrainCircuit
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/" },
@@ -18,6 +19,7 @@ const menuItems = [
 
 export const Sidebar = () => {
   const location = useLocation();
+  const { signOut } = useAuth();
 
   return (
     <div className="flex h-screen w-64 flex-col border-r bg-white">
@@ -47,7 +49,10 @@ export const Sidebar = () => {
       </nav>
 
       <div className="p-4 border-t">
-        <button className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
+        <button 
+          onClick={() => signOut()}
+          className="flex w-full items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+        >
           <LogOut className="h-5 w-5" />
           Sair do sistema
         </button>

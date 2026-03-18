@@ -1,29 +1,23 @@
-import { useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { BrainCircuit, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { showSuccess } from "@/utils/toast";
+import { BrainCircuit } from "lucide-react";
+import { Auth } from '@supabase/auth-ui-react';
+import { ThemeSupa } from '@supabase/auth-ui-shared';
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Login = () => {
-  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { session } = useAuth();
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    // Simulação de login
-    setTimeout(() => {
-      setLoading(false);
-      showSuccess("Login realizado com sucesso!");
+  useEffect(() => {
+    if (session) {
       navigate("/");
-    }, 1500);
-  };
+    }
+  }, [session, navigate]);
 
   return (
     <div className="min-h-screen flex">
-      {/* Lado Esquerdo - Formulário */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8 bg-white">
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
@@ -34,25 +28,51 @@ const Login = () => {
             <p className="mt-2 text-slate-600">Sua assistente inteligente para gestão clínica</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="email">E-mail</Label>
-              <Input id="email" type="email" placeholder="seu@email.com" required />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Senha</Label>
-                <button type="button" className="text-sm font-medium text-indigo-600 hover:text-indigo-500">
-                  Esqueceu a senha?
-                </button>
-              </div>
-              <Input id="password" type="password" required />
-            </div>
-
-            <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 h-11" disabled={loading}>
-              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Entrar no sistema"}
-            </Button>
-          </form>
+          <div className="p-4 border rounded-xl shadow-sm">
+            <Auth
+              supabaseClient={supabase}
+              providers={[]}
+              appearance={{
+                theme: ThemeSupa,
+                variables: {
+                  default: {
+                    colors: {
+                      brand: '#4f46e5',
+                      brandAccent: '#4338ca',
+                    }
+                  }
+                }
+              }}
+              localization={{
+                variables: {
+                  sign_in: {
+                    email_label: 'E-mail',
+                    password_label: 'Senha',
+                    button_label: 'Entrar',
+                    loading_button_label: 'Entrando...',
+                    email_input_placeholder: 'seu@email.com',
+                    password_input_placeholder: 'Sua senha',
+                    link_text: 'Já tem uma conta? Entre',
+                  },
+                  sign_up: {
+                    email_label: 'E-mail',
+                    password_label: 'Senha',
+                    button_label: 'Cadastrar',
+                    loading_button_label: 'Cadastrando...',
+                    link_text: 'Não tem uma conta? Cadastre-se',
+                  },
+                  forgotten_password: {
+                    link_text: 'Esqueceu sua senha?',
+                    button_label: 'Recuperar senha',
+                    loading_button_label: 'Enviando instruções...',
+                    email_label: 'E-mail',
+                    email_input_placeholder: 'seu@email.com',
+                  }
+                }
+              }}
+              theme="light"
+            />
+          </div>
 
           <p className="text-center text-sm text-slate-500">
             Segurança em conformidade com a LGPD e padrões éticos do CFP.
@@ -60,7 +80,6 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Lado Direito - Visual */}
       <div className="hidden lg:flex lg:w-1/2 bg-indigo-600 items-center justify-center p-12 text-white relative overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-10 left-10 h-64 w-64 rounded-full border-4 border-white" />
