@@ -221,7 +221,7 @@ const SessionFormPage = () => {
                   <div className="relative">
                     <input 
                       type="file" 
-                      accept="audio/*"
+                      accept=".mp3,.wav,.m4a,.webm,audio/*"
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       onChange={handleFileChange}
                     />
