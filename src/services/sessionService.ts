@@ -66,6 +66,21 @@ export const sessionService = {
     return data as Session;
   },
 
+  // PREPARAÇÃO PARA AUTOMAÇÃO: Função que dispara o processamento
+  processSession: async (sessionId: string): Promise<void> => {
+    // 1. Atualiza status localmente para 'queued'
+    const { error: updateError } = await supabase
+      .from('sessions')
+      .update({ processing_status: 'queued' })
+      .eq('id', sessionId);
+
+    if (updateError) throw updateError;
+
+    // 2. Placeholder para chamada da Edge Function
+    // Futuramente: const { data, error } = await supabase.functions.invoke('process-audio', { body: { sessionId } });
+    console.log(`[PsiAI] Disparando processamento para sessão: ${sessionId}`);
+  },
+
   getStats: async (): Promise<DashboardStats> => {
     const { data: patientsCount } = await supabase.from('patients').select('id', { count: 'exact' });
     const { data: sessionsCount } = await supabase.from('sessions').select('id', { count: 'exact' });
