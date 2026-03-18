@@ -38,8 +38,10 @@ const Dashboard = () => {
           patientService.list()
         ]);
         setStats(s);
-        setSessions(sess);
-        setPatients(pats);
+        setSessions(sess || []);
+        setPatients(pats || []);
+      } catch (error) {
+        console.error("Erro no Dashboard:", error);
       } finally {
         setLoading(false);
       }
@@ -93,26 +95,28 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {sessions.slice(0, 4).map((session) => (
+              {sessions.length > 0 ? sessions.slice(0, 4).map((session) => (
                 <div key={session.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600">
-                      {session.patientName.charAt(0)}
+                      {session.patient?.full_name?.charAt(0) || "P"}
                     </div>
                     <div>
-                      <p className="font-medium text-slate-900">{session.patientName}</p>
+                      <p className="font-medium text-slate-900">{session.patient?.full_name}</p>
                       <p className="text-xs text-slate-500">
-                        {format(new Date(session.sessionDate), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
+                        {format(new Date(session.session_date), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}
                       </p>
                     </div>
                   </div>
                   <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
-                    session.processingStatus === 'concluido' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                    session.processing_status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
                   }`}>
-                    {session.processingStatus}
+                    {session.processing_status}
                   </div>
                 </div>
-              ))}
+              )) : (
+                <p className="text-center py-4 text-slate-500">Nenhuma sessão registrada.</p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -126,15 +130,15 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {patients.slice(0, 4).map((patient) => (
+              {patients.length > 0 ? patients.slice(0, 4).map((patient) => (
                 <div key={patient.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center font-bold text-indigo-600">
-                      {patient.fullName.charAt(0)}
+                      {patient.full_name?.charAt(0) || "P"}
                     </div>
                     <div>
-                      <p className="font-medium text-slate-900">{patient.fullName}</p>
-                      <p className="text-xs text-slate-500">Entrou em {format(new Date(patient.createdAt), "MMMM 'de' yyyy", { locale: ptBR })}</p>
+                      <p className="font-medium text-slate-900">{patient.full_name}</p>
+                      <p className="text-xs text-slate-500">Entrou em {format(new Date(patient.created_at), "MMMM 'de' yyyy", { locale: ptBR })}</p>
                     </div>
                   </div>
                   <div className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
@@ -143,7 +147,9 @@ const Dashboard = () => {
                     {patient.status}
                   </div>
                 </div>
-              ))}
+              )) : (
+                <p className="text-center py-4 text-slate-500">Nenhum paciente cadastrado.</p>
+              )}
             </div>
           </CardContent>
         </Card>
