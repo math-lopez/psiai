@@ -14,6 +14,7 @@ export const sessionService = {
   },
 
   getById: async (id: string): Promise<Session | null> => {
+    if (!id) return null;
     const { data, error } = await supabase
       .from('sessions')
       .select('*, patient:patients(full_name)')
@@ -28,20 +29,24 @@ export const sessionService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    // 1. Criar a sessão primeiro para obter o ID
+    // Garantir que campos de UUID não sejam strings vazias
+    const cleanedData = {
+      ...sessionData,
+      patient_id: sessionData.patient_id === "" ? null : sessionData.patient_id,
+      psychologist_id: user.id,
+      processing_status: 'draft'
+    };
+
+    if (!cleanedData.patient_id) throw new Error("Paciente é obrigatório");
+
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
-      .insert([{ 
-        ...sessionData, 
-        psychologist_id: user.id,
-        processing_status: 'draft'
-      }])
+      .insert([cleanedData])
       .select()
       .single();
     
     if (sessionError) throw sessionError;
 
-    // 2. Se houver áudio, fazer o upload e atualizar a sessão
     if (audioFile) {
       try {
         const uploadResult = await storageService.uploadSessionAudio(
@@ -65,7 +70,7 @@ export const sessionService = {
         if (updateError) throw updateError;
         return updatedSession as Session;
       } catch (error) {
-        console.error("Erro no upload do áudio, mas sessão foi criada:", error);
+        console.error("Erro no upload do áudio:", error);
         return session as Session;
       }
     }
@@ -74,25 +79,28 @@ export const sessionService = {
   },
 
   update: async (id: string, sessionData: Partial<Session>, newAudioFile?: File): Promise<Session> => {
+    if (!id) throw new Error("ID da sessão é necessário");
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    // Se houver novo áudio, precisamos lidar com o antigo primeiro
+    // Limpar dados para evitar UUID vazio
+    const cleanedData = { ...sessionData };
+    if (cleanedData.patient_id === "") delete cleanedData.patient_id;
+
     let audioInfo = {};
     if (newAudioFile) {
-      // Buscar sessão atual para ver se já existe áudio
       const currentSession = await sessionService.getById(id);
       if (currentSession?.audio_file_path) {
         try {
           await storageService.deleteFile(currentSession.audio_file_path);
         } catch (e) {
-          console.warn("Não foi possível excluir áudio antigo do storage:", e);
+          console.warn("Erro ao excluir áudio antigo:", e);
         }
       }
 
       const uploadResult = await storageService.uploadSessionAudio(
         user.id,
-        sessionData.patient_id || currentSession!.patient_id,
+        cleanedData.patient_id || currentSession!.patient_id,
         id,
         newAudioFile
       );
@@ -106,7 +114,7 @@ export const sessionService = {
 
     const { data, error } = await supabase
       .from('sessions')
-      .update({ ...sessionData, ...audioInfo })
+      .update({ ...cleanedData, ...audioInfo })
       .eq('id', id)
       .select()
       .single();
@@ -116,6 +124,7 @@ export const sessionService = {
   },
 
   removeAudio: async (sessionId: string): Promise<void> => {
+    if (!sessionId) return;
     const session = await sessionService.getById(sessionId);
     if (!session) throw new Error("Sessão não encontrada");
 
@@ -136,13 +145,13 @@ export const sessionService = {
   },
 
   delete: async (id: string): Promise<void> => {
-    // Buscar sessão para apagar áudio do storage se existir
+    if (!id) return;
     const session = await sessionService.getById(id);
     if (session?.audio_file_path) {
       try {
         await storageService.deleteFile(session.audio_file_path);
       } catch (e) {
-        console.warn("Erro ao apagar arquivo no storage durante exclusão da sessão:", e);
+        console.warn("Erro ao apagar arquivo no storage:", e);
       }
     }
 

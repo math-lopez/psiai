@@ -83,6 +83,13 @@ const SessionFormPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validação extra para evitar erro de UUID vazio
+    if (!formData.patient_id || formData.patient_id === "") {
+      showError("Por favor, selecione um paciente.");
+      return;
+    }
+
     setSubmitting(true);
     try {
       if (id) {
