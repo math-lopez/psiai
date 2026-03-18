@@ -4,7 +4,7 @@ import { ChevronLeft, Edit, Plus, Calendar, Mail, Phone, CalendarDays, Loader2 }
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { patientService } from "@/services/patientService";
-import { sessionService } from "@/services/sessionService";
+import { supabase } from "@/integrations/supabase/client";
 import { Patient, Session } from "@/types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -20,12 +20,17 @@ const PatientDetailPage = () => {
     const fetchData = async () => {
       if (!id) return;
       try {
-        const [pData, sData] = await Promise.all([
-          patientService.getById(id),
-          sessionService.list() // No futuro, filtrar por patient_id no service
-        ]);
+        const pData = await patientService.getById(id);
+        
+        // Busca sessões específicas deste paciente
+        const { data: sData } = await supabase
+          .from('sessions')
+          .select('*')
+          .eq('patient_id', id)
+          .order('session_date', { ascending: false });
+
         setPatient(pData);
-        setSessions(sData.filter(s => s.patient_id === id));
+        setSessions(sData as Session[] || []);
       } finally {
         setLoading(false);
       }

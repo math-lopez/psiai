@@ -9,10 +9,7 @@ export const sessionService = {
       .order('session_date', { ascending: false });
     
     if (error) throw error;
-    return data.map(s => ({
-      ...s,
-      patientName: s.patient?.full_name || 'Desconhecido'
-    })) as Session[];
+    return data as Session[];
   },
 
   getById: async (id: string): Promise<Session | null> => {
@@ -23,10 +20,7 @@ export const sessionService = {
       .single();
     
     if (error) return null;
-    return {
-      ...data,
-      patientName: data.patient?.full_name || 'Desconhecido'
-    } as Session;
+    return data as Session;
   },
 
   create: async (session: any, audioFile?: File): Promise<Session> => {
@@ -66,32 +60,34 @@ export const sessionService = {
     return data as Session;
   },
 
-  // PREPARAÇÃO PARA AUTOMAÇÃO: Função que dispara o processamento
   processSession: async (sessionId: string): Promise<void> => {
-    // 1. Atualiza status localmente para 'queued'
     const { error: updateError } = await supabase
       .from('sessions')
       .update({ processing_status: 'queued' })
       .eq('id', sessionId);
 
     if (updateError) throw updateError;
-
-    // 2. Placeholder para chamada da Edge Function
-    // Futuramente: const { data, error } = await supabase.functions.invoke('process-audio', { body: { sessionId } });
     console.log(`[PsiAI] Disparando processamento para sessão: ${sessionId}`);
   },
 
   getStats: async (): Promise<DashboardStats> => {
-    const { data: patientsCount } = await supabase.from('patients').select('id', { count: 'exact' });
-    const { data: sessionsCount } = await supabase.from('sessions').select('id', { count: 'exact' });
-    const { data: pendingCount } = await supabase.from('sessions').select('id', { count: 'exact' }).in('processing_status', ['queued', 'processing']);
-    const { data: completedCount } = await supabase.from('sessions').select('id', { count: 'exact' }).eq('processing_status', 'completed');
+    const [
+      { count: totalPatients },
+      { count: totalSessions },
+      { count: pendingProcessing },
+      { count: completedSessions }
+    ] = await Promise.all([
+      supabase.from('patients').select('*', { count: 'exact', head: true }),
+      supabase.from('sessions').select('*', { count: 'exact', head: true }),
+      supabase.from('sessions').select('*', { count: 'exact', head: true }).in('processing_status', ['queued', 'processing']),
+      supabase.from('sessions').select('*', { count: 'exact', head: true }).eq('processing_status', 'completed')
+    ]);
 
     return {
-      totalPatients: patientsCount?.length || 0,
-      totalSessions: sessionsCount?.length || 0,
-      pendingProcessing: pendingCount?.length || 0,
-      completedSessions: completedCount?.length || 0
+      totalPatients: totalPatients || 0,
+      totalSessions: totalSessions || 0,
+      pendingProcessing: pendingProcessing || 0,
+      completedSessions: completedSessions || 0
     };
   },
 
