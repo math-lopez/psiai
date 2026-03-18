@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, Save, Upload, Mic, FileText, Loader2 } from "lucide-react";
+import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,7 @@ import { patientService } from "@/services/patientService";
 import { sessionService } from "@/services/sessionService";
 import { Patient, SessionRecordType } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
+import { validateAudioFile } from "@/lib/file-utils";
 
 const SessionFormPage = () => {
   const { id } = useParams();
@@ -35,6 +36,7 @@ const SessionFormPage = () => {
   });
   
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [existingAudioName, setExistingAudioName] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -52,6 +54,7 @@ const SessionFormPage = () => {
               manual_notes: session.manual_notes || "",
             });
             setRecordType(session.record_type);
+            setExistingAudioName(session.audio_file_name);
           }
         }
       } catch (e) {
@@ -63,6 +66,21 @@ const SessionFormPage = () => {
     loadData();
   }, [id]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const validation = validateAudioFile(file);
+    if (!validation.valid) {
+      showError(validation.error!);
+      e.target.value = '';
+      return;
+    }
+
+    setAudioFile(file);
+    setExistingAudioName(null);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -71,14 +89,14 @@ const SessionFormPage = () => {
         await sessionService.update(id, {
           ...formData,
           record_type: recordType,
-        });
-        showSuccess("Sessão atualizada!");
+        }, audioFile || undefined);
+        showSuccess("Sessão atualizada com sucesso!");
       } else {
         await sessionService.create({
           ...formData,
           record_type: recordType,
         }, audioFile || undefined);
-        showSuccess("Sessão registrada!");
+        showSuccess("Sessão registrada com sucesso!");
       }
       navigate("/sessoes");
     } catch (error: any) {
@@ -98,7 +116,7 @@ const SessionFormPage = () => {
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{id ? "Editar Sessão" : "Nova Sessão"}</h1>
-          <p className="text-slate-500">Gerencie os detalhes do atendimento.</p>
+          <p className="text-slate-500">Gerencie os detalhes do atendimento e arquivos de áudio.</p>
         </div>
       </div>
 
@@ -143,13 +161,12 @@ const SessionFormPage = () => {
               </div>
             </div>
 
-            <div className="space-y-4 pt-4">
+            <div className="space-y-4 pt-4 border-t">
               <Label>Tipo de Registro</Label>
               <RadioGroup 
                 value={recordType} 
                 className="flex flex-col md:flex-row gap-4"
                 onValueChange={(v: any) => setRecordType(v)}
-                disabled={!!id && !!audioFile} // Evita mudar tipo se já tem áudio processando
               >
                 <div className="flex items-center space-x-2 border p-4 rounded-lg flex-1 cursor-pointer">
                   <RadioGroupItem value="manual" id="manual" />
@@ -166,32 +183,65 @@ const SessionFormPage = () => {
               </RadioGroup>
             </div>
 
-            {!id && (recordType === 'audio' || recordType === 'ambos') && (
+            {(recordType === 'audio' || recordType === 'ambos') && (
               <div className="space-y-4 pt-4 border-t">
                 <Label className="flex items-center gap-2 text-indigo-600 font-semibold">
-                  <Upload className="h-4 w-4" /> Upload de Áudio
+                  <Music className="h-4 w-4" /> Arquivo de Áudio
                 </Label>
-                <div className="relative">
-                  <input 
-                    type="file" 
-                    accept="audio/*"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
-                  />
-                  <div className="border-2 border-dashed border-slate-200 rounded-lg p-10 text-center hover:bg-slate-50 transition-colors">
-                    <p className="text-slate-500">
-                      {audioFile ? audioFile.name : "Clique para selecionar o áudio da sessão"}
-                    </p>
+                
+                {existingAudioName || audioFile ? (
+                  <div className="flex items-center justify-between p-4 bg-indigo-50 border border-indigo-100 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-indigo-100 rounded-full">
+                        <Mic className="h-4 w-4 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-indigo-900">
+                          {audioFile ? audioFile.name : existingAudioName}
+                        </p>
+                        <p className="text-xs text-indigo-500">
+                          {audioFile ? `${(audioFile.size / (1024 * 1024)).toFixed(2)} MB` : "Arquivo já enviado"}
+                        </p>
+                      </div>
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm" 
+                      className="text-indigo-600 hover:text-indigo-800"
+                      onClick={() => {
+                        setAudioFile(null);
+                        setExistingAudioName(null);
+                      }}
+                    >
+                      <X className="h-4 w-4 mr-1" /> Substituir
+                    </Button>
                   </div>
-                </div>
+                ) : (
+                  <div className="relative">
+                    <input 
+                      type="file" 
+                      accept="audio/*"
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      onChange={handleFileChange}
+                    />
+                    <div className="border-2 border-dashed border-slate-200 rounded-lg p-10 text-center hover:bg-slate-50 transition-colors">
+                      <div className="flex flex-col items-center gap-2">
+                        <Upload className="h-8 w-8 text-slate-400" />
+                        <p className="text-slate-500 font-medium">Clique para selecionar ou arraste o áudio</p>
+                        <p className="text-xs text-slate-400">Formatos aceitos: MP3, WAV, M4A, WebM (Max 50MB)</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             <div className="space-y-4 pt-4 border-t">
               <Label className="font-semibold text-slate-700">Anotações do Psicólogo</Label>
               <Textarea 
-                placeholder="Escreva livremente..." 
-                className="min-h-[250px]"
+                placeholder="Escreva livremente sobre a sessão..." 
+                className="min-h-[250px] resize-none"
                 value={formData.manual_notes}
                 onChange={(e) => setFormData({...formData, manual_notes: e.target.value})}
               />
@@ -204,8 +254,17 @@ const SessionFormPage = () => {
             Cancelar
           </Button>
           <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 gap-2 h-11 px-8" disabled={submitting}>
-            {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />}
-            {id ? "Atualizar" : "Salvar Registro"}
+            {submitting ? (
+              <>
+                <Loader2 className="animate-spin h-4 w-4" />
+                Enviando...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                {id ? "Salvar Alterações" : "Salvar Sessão"}
+              </>
+            )}
           </Button>
         </div>
       </form>

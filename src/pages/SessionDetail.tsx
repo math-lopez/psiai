@@ -9,9 +9,11 @@ import {
   User, 
   FileText,
   Sparkles,
-  PlayCircle,
   Loader2,
-  AlertTriangle
+  AlertTriangle,
+  Music,
+  Download,
+  ExternalLink
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +29,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { sessionService } from "@/services/sessionService";
+import { storageService } from "@/services/storageService";
 import { Session } from "@/types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -38,19 +41,21 @@ const SessionDetail = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [removingAudio, setRemovingAudio] = useState(false);
 
   useEffect(() => {
-    const fetchSession = async () => {
-      if (!id) return;
-      try {
-        const data = await sessionService.getById(id);
-        setSession(data);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchSession();
   }, [id]);
+
+  const fetchSession = async () => {
+    if (!id) return;
+    try {
+      const data = await sessionService.getById(id);
+      setSession(data);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDelete = async () => {
     if (!id) return;
@@ -63,6 +68,30 @@ const SessionDetail = () => {
       showError("Não foi possível excluir a sessão.");
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleRemoveAudio = async () => {
+    if (!id) return;
+    setRemovingAudio(true);
+    try {
+      await sessionService.removeAudio(id);
+      showSuccess("Áudio removido com sucesso.");
+      fetchSession();
+    } catch (e) {
+      showError("Erro ao remover áudio.");
+    } finally {
+      setRemovingAudio(false);
+    }
+  };
+
+  const handleDownloadAudio = async () => {
+    if (!session?.audio_file_path) return;
+    try {
+      const url = await storageService.getSignedUrl(session.audio_file_path);
+      window.open(url, '_blank');
+    } catch (e) {
+      showError("Erro ao gerar link para o áudio.");
     }
   };
 
@@ -102,7 +131,7 @@ const SessionDetail = () => {
                   <AlertTriangle className="h-5 w-5 text-red-500" /> Confirmar Exclusão
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Esta ação não pode ser desfeita. Isso excluirá permanentemente o registro da sessão e quaisquer arquivos de áudio vinculados.
+                  Esta ação não pode ser desfeita. Isso excluirá permanentemente o registro da sessão e quaisquer arquivos de áudio vinculados no storage.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -139,13 +168,76 @@ const SessionDetail = () => {
               </div>
               <div className="pt-4 border-t">
                 <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase w-fit ${
-                  session.processing_status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                  session.processing_status === 'completed' 
+                    ? 'bg-emerald-100 text-emerald-700' 
+                    : session.processing_status === 'queued' || session.processing_status === 'processing'
+                    ? 'bg-blue-100 text-blue-700'
+                    : 'bg-amber-100 text-amber-700'
                 }`}>
-                  Status: {session.processing_status}
+                  Status: {session.processing_status === 'completed' ? 'concluído' : 
+                          session.processing_status === 'queued' ? 'aguardando IA' : 
+                          session.processing_status === 'processing' ? 'processando' : 'rascunho'}
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {session.audio_file_path && (
+            <Card className="border-indigo-100 bg-indigo-50/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-indigo-900 text-sm font-bold uppercase">
+                  <Music className="h-4 w-4 text-indigo-500" /> Áudio Anexado
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-white p-3 rounded-lg border border-indigo-100">
+                  <p className="text-sm font-medium text-slate-900 truncate" title={session.audio_file_name || ''}>
+                    {session.audio_file_name}
+                  </p>
+                  <p className="text-[10px] text-slate-400 mt-1 uppercase">Arquivo Privado</p>
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full gap-2 border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                    onClick={handleDownloadAudio}
+                  >
+                    <ExternalLink className="h-4 w-4" /> Ouvir Áudio
+                  </Button>
+                  
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-full gap-2 text-red-500 hover:text-red-600 hover:bg-red-50"
+                        disabled={removingAudio}
+                      >
+                        {removingAudio ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        Remover Áudio
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Remover arquivo de áudio?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          O arquivo será permanentemente excluído do armazenamento. Você poderá anexar um novo arquivo editando a sessão.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleRemoveAudio} className="bg-red-600 hover:bg-red-700">
+                          Sim, Remover
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         <div className="lg:col-span-2 space-y-6">
@@ -162,15 +254,39 @@ const SessionDetail = () => {
             </CardContent>
           </Card>
 
-          {session.processing_status === 'completed' && (
+          {session.processing_status === 'completed' ? (
+            <Card className="border-emerald-100 bg-emerald-50/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-emerald-900">
+                  <Sparkles className="h-5 w-5 text-emerald-500" /> Resultados da IA
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <h4 className="text-sm font-bold text-emerald-800 uppercase mb-2">Transcrição</h4>
+                  <p className="text-slate-700 text-sm leading-relaxed">{session.transcript}</p>
+                </div>
+                {session.highlights && session.highlights.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-bold text-emerald-800 uppercase mb-2">Pontos Importantes</h4>
+                    <ul className="list-disc list-inside text-sm text-slate-700 space-y-1">
+                      {session.highlights.map((h, i) => <li key={i}>{h}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : session.audio_file_path && (
             <Card className="border-indigo-100 bg-indigo-50/30">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-indigo-900">
-                  <Sparkles className="h-5 w-5 text-indigo-500" /> Insights da IA (Exemplo)
+                  <Sparkles className="h-5 w-5 text-indigo-500 animate-pulse" /> Processamento Pendente
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-slate-600 italic">Insights processados aparecerão aqui após a integração com a Edge Function.</p>
+                <p className="text-sm text-indigo-700">
+                  O áudio da sessão está na fila para processamento. Em breve a IA extrairá os insights e a transcrição automaticamente.
+                </p>
               </CardContent>
             </Card>
           )}

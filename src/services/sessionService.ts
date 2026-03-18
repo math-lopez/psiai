@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Session, DashboardStats } from "@/types";
+import { storageService } from "./storageService";
 
 export const sessionService = {
   list: async (): Promise<Session[]> => {
@@ -23,47 +24,89 @@ export const sessionService = {
     return data as Session;
   },
 
-  create: async (session: any, audioFile?: File): Promise<Session> => {
+  create: async (sessionData: any, audioFile?: File): Promise<Session> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    let audioPath = null;
-    let audioName = null;
-
-    if (audioFile) {
-      audioName = audioFile.name;
-      const fileExt = audioFile.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `${user.id}/${session.patient_id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('session-audios')
-        .upload(filePath, audioFile);
-
-      if (uploadError) throw uploadError;
-      audioPath = filePath;
-    }
-
-    const { data, error } = await supabase
+    // 1. Criar a sessão primeiro para obter o ID
+    const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .insert([{ 
-        ...session, 
+        ...sessionData, 
         psychologist_id: user.id,
-        audio_file_name: audioName,
-        audio_file_path: audioPath,
-        processing_status: audioFile ? 'queued' : 'draft'
+        processing_status: 'draft'
       }])
       .select()
       .single();
     
-    if (error) throw error;
-    return data as Session;
+    if (sessionError) throw sessionError;
+
+    // 2. Se houver áudio, fazer o upload e atualizar a sessão
+    if (audioFile) {
+      try {
+        const uploadResult = await storageService.uploadSessionAudio(
+          user.id,
+          session.patient_id,
+          session.id,
+          audioFile
+        );
+
+        const { data: updatedSession, error: updateError } = await supabase
+          .from('sessions')
+          .update({
+            audio_file_name: uploadResult.name,
+            audio_file_path: uploadResult.path,
+            processing_status: 'queued'
+          })
+          .eq('id', session.id)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        return updatedSession as Session;
+      } catch (error) {
+        console.error("Erro no upload do áudio, mas sessão foi criada:", error);
+        return session as Session;
+      }
+    }
+
+    return session as Session;
   },
 
-  update: async (id: string, session: Partial<Session>): Promise<Session> => {
+  update: async (id: string, sessionData: Partial<Session>, newAudioFile?: File): Promise<Session> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado");
+
+    // Se houver novo áudio, precisamos lidar com o antigo primeiro
+    let audioInfo = {};
+    if (newAudioFile) {
+      // Buscar sessão atual para ver se já existe áudio
+      const currentSession = await sessionService.getById(id);
+      if (currentSession?.audio_file_path) {
+        try {
+          await storageService.deleteFile(currentSession.audio_file_path);
+        } catch (e) {
+          console.warn("Não foi possível excluir áudio antigo do storage:", e);
+        }
+      }
+
+      const uploadResult = await storageService.uploadSessionAudio(
+        user.id,
+        sessionData.patient_id || currentSession!.patient_id,
+        id,
+        newAudioFile
+      );
+
+      audioInfo = {
+        audio_file_name: uploadResult.name,
+        audio_file_path: uploadResult.path,
+        processing_status: 'queued'
+      };
+    }
+
     const { data, error } = await supabase
       .from('sessions')
-      .update(session)
+      .update({ ...sessionData, ...audioInfo })
       .eq('id', id)
       .select()
       .single();
@@ -72,23 +115,43 @@ export const sessionService = {
     return data as Session;
   },
 
+  removeAudio: async (sessionId: string): Promise<void> => {
+    const session = await sessionService.getById(sessionId);
+    if (!session) throw new Error("Sessão não encontrada");
+
+    if (session.audio_file_path) {
+      await storageService.deleteFile(session.audio_file_path);
+    }
+
+    const { error } = await supabase
+      .from('sessions')
+      .update({
+        audio_file_name: null,
+        audio_file_path: null,
+        processing_status: 'draft'
+      })
+      .eq('id', sessionId);
+
+    if (error) throw error;
+  },
+
   delete: async (id: string): Promise<void> => {
+    // Buscar sessão para apagar áudio do storage se existir
+    const session = await sessionService.getById(id);
+    if (session?.audio_file_path) {
+      try {
+        await storageService.deleteFile(session.audio_file_path);
+      } catch (e) {
+        console.warn("Erro ao apagar arquivo no storage durante exclusão da sessão:", e);
+      }
+    }
+
     const { error } = await supabase
       .from('sessions')
       .delete()
       .eq('id', id);
     
     if (error) throw error;
-  },
-
-  processSession: async (sessionId: string): Promise<void> => {
-    const { error: updateError } = await supabase
-      .from('sessions')
-      .update({ processing_status: 'queued' })
-      .eq('id', sessionId);
-
-    if (updateError) throw updateError;
-    console.log(`[PsiAI] Disparando processamento para sessão: ${sessionId}`);
   },
 
   getStats: async (): Promise<DashboardStats> => {
