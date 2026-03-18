@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Search, Plus, Filter, MoreHorizontal } from "lucide-react";
+import { Search, Plus, Filter, MoreHorizontal, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -17,13 +17,28 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
-import { mockPatients } from "@/lib/mockData";
+import { patientService } from "@/services/patientService";
+import { Patient } from "@/types";
 import { format } from "date-fns";
 
 const Patients = () => {
   const [searchTerm, setSearchTerm] = useState("");
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredPatients = mockPatients.filter(p => 
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const data = await patientService.list();
+        setPatients(data);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPatients();
+  }, []);
+
+  const filteredPatients = patients.filter(p => 
     p.fullName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -57,55 +72,61 @@ const Patients = () => {
       </div>
 
       <div className="bg-white rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Nome</TableHead>
-              <TableHead>E-mail</TableHead>
-              <TableHead>Telefone</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Criado em</TableHead>
-              <TableHead className="w-[100px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredPatients.map((patient) => (
-              <TableRow key={patient.id} className="cursor-pointer hover:bg-slate-50">
-                <TableCell className="font-medium">
-                  <Link to={`/pacientes/${patient.id}`} className="hover:text-indigo-600">
-                    {patient.fullName}
-                  </Link>
-                </TableCell>
-                <TableCell>{patient.email}</TableCell>
-                <TableCell>{patient.phone}</TableCell>
-                <TableCell>
-                  <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                    patient.status === 'ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
-                  }`}>
-                    {patient.status}
-                  </span>
-                </TableCell>
-                <TableCell>{format(new Date(patient.createdAt), "dd/MM/yyyy")}</TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem asChild>
-                        <Link to={`/pacientes/${patient.id}`}>Ver detalhes</Link>
-                      </DropdownMenuItem>
-                      <DropdownMenuItem>Editar</DropdownMenuItem>
-                      <DropdownMenuItem className="text-red-600">Excluir</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
+        {loading ? (
+          <div className="p-20 flex justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>E-mail</TableHead>
+                <TableHead>Telefone</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Criado em</TableHead>
+                <TableHead className="w-[100px]"></TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filteredPatients.map((patient) => (
+                <TableRow key={patient.id} className="cursor-pointer hover:bg-slate-50">
+                  <TableCell className="font-medium">
+                    <Link to={`/pacientes/${patient.id}`} className="hover:text-indigo-600">
+                      {patient.fullName}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{patient.email}</TableCell>
+                  <TableCell>{patient.phone}</TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                      patient.status === 'ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                    }`}>
+                      {patient.status}
+                    </span>
+                  </TableCell>
+                  <TableCell>{format(new Date(patient.createdAt), "dd/MM/yyyy")}</TableCell>
+                  <TableCell>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem asChild>
+                          <Link to={`/pacientes/${patient.id}`}>Ver detalhes</Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>Editar</DropdownMenuItem>
+                        <DropdownMenuItem className="text-red-600">Excluir</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </div>
     </div>
   );

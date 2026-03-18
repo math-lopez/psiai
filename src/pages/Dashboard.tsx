@@ -1,15 +1,11 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { 
-  Users, 
-  Calendar, 
-  Clock, 
-  CheckCircle2, 
-  Plus, 
-  ArrowRight 
-} from "lucide-react";
+import { Users, Calendar, Clock, CheckCircle2, Plus, ArrowRight, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { mockStats, mockSessions, mockPatients } from "@/lib/mockData";
+import { sessionService } from "@/services/sessionService";
+import { patientService } from "@/services/patientService";
+import { DashboardStats, Session, Patient } from "@/types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -28,6 +24,37 @@ const StatCard = ({ title, value, icon: Icon, color }: any) => (
 );
 
 const Dashboard = () => {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [sessions, setSessions] = useState<Session[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [s, sess, pats] = await Promise.all([
+          sessionService.getStats(),
+          sessionService.list(),
+          patientService.list()
+        ]);
+        setStats(s);
+        setSessions(sess);
+        setPatients(pats);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -50,14 +77,13 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Total de Pacientes" value={mockStats.totalPatients} icon={Users} color="bg-blue-500" />
-        <StatCard title="Total de Sessões" value={mockStats.totalSessions} icon={Calendar} color="bg-indigo-500" />
-        <StatCard title="Aguardando Processamento" value={mockStats.pendingProcessing} icon={Clock} color="bg-amber-500" />
-        <StatCard title="Sessões Concluídas" value={mockStats.completedSessions} icon={CheckCircle2} color="bg-emerald-500" />
+        <StatCard title="Total de Pacientes" value={stats?.totalPatients} icon={Users} color="bg-blue-500" />
+        <StatCard title="Total de Sessões" value={stats?.totalSessions} icon={Calendar} color="bg-indigo-500" />
+        <StatCard title="Aguardando Processamento" value={stats?.pendingProcessing} icon={Clock} color="bg-amber-500" />
+        <StatCard title="Sessões Concluídas" value={stats?.completedSessions} icon={CheckCircle2} color="bg-emerald-500" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Sessões Recentes */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg font-semibold">Sessões Recentes</CardTitle>
@@ -67,7 +93,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockSessions.slice(0, 4).map((session) => (
+              {sessions.slice(0, 4).map((session) => (
                 <div key={session.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600">
@@ -91,7 +117,6 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Pacientes Recentes */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-lg font-semibold">Pacientes Recentes</CardTitle>
@@ -101,7 +126,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {mockPatients.slice(0, 4).map((patient) => (
+              {patients.slice(0, 4).map((patient) => (
                 <div key={patient.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-4">
                     <div className="h-10 w-10 rounded-full bg-indigo-50 flex items-center justify-center font-bold text-indigo-600">
