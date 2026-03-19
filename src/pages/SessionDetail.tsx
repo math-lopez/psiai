@@ -16,7 +16,8 @@ import {
   Music,
   ExternalLink,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,6 +57,8 @@ const SessionDetail = () => {
     try {
       const data = await sessionService.getById(id);
       setSession(data);
+    } catch (e) {
+      showError("Erro ao carregar dados da sessão.");
     } finally {
       setLoading(false);
     }
@@ -66,10 +69,11 @@ const SessionDetail = () => {
     setProcessing(true);
     try {
       await sessionService.processAudio(id);
-      showSuccess("Processamento iniciado com sucesso!");
+      showSuccess("Processamento solicitado à IA!");
+      // Recarrega os dados para mostrar o status 'queued' ou 'processing'
       fetchSession();
     } catch (e: any) {
-      showError(e.message || "Erro ao iniciar processamento.");
+      showError(e.message || "Erro ao iniciar processamento de áudio.");
     } finally {
       setProcessing(false);
     }
@@ -94,7 +98,7 @@ const SessionDetail = () => {
     setRemovingAudio(true);
     try {
       await sessionService.removeAudio(id);
-      showSuccess("Áudio removido com sucesso.");
+      showSuccess("Arquivo de áudio removido.");
       fetchSession();
     } catch (e) {
       showError("Erro ao remover áudio.");
@@ -109,7 +113,7 @@ const SessionDetail = () => {
       const url = await storageService.getSignedUrl(session.audio_file_path);
       window.open(url, '_blank');
     } catch (e) {
-      showError("Erro ao gerar link para o áudio.");
+      showError("Erro ao acessar o arquivo de áudio.");
     }
   };
 
@@ -123,16 +127,19 @@ const SessionDetail = () => {
 
   if (!session) {
     return (
-      <div className="p-10 text-center text-slate-500">
-        Sessão não encontrada.
+      <div className="p-10 text-center">
+        <p className="text-slate-500 mb-4">Sessão não encontrada.</p>
+        <Button onClick={() => navigate("/sessoes")}>Voltar para a Lista</Button>
       </div>
     );
   }
 
   const isProcessing = ['queued', 'processing'].includes(session.processing_status);
+  const canProcess = session.audio_file_path && !isProcessing;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={() => navigate("/sessoes")}>
@@ -164,7 +171,7 @@ const SessionDetail = () => {
                   <AlertTriangle className="h-5 w-5 text-red-500" /> Confirmar Exclusão
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Esta ação não pode ser desfeita. Isso excluirá permanentemente o registro da sessão e quaisquer arquivos de áudio vinculados no storage.
+                  Esta ação excluirá permanentemente o registro da sessão e o áudio armazenado. Não pode ser desfeita.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -178,15 +185,23 @@ const SessionDetail = () => {
         </div>
       </div>
 
+      {/* Alerta de Erro de Processamento */}
       {session.processing_status === 'error' && (
         <Card className="border-red-200 bg-red-50">
           <CardContent className="p-4 flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
             <div className="flex-1">
               <p className="text-sm font-bold text-red-900">Erro no Processamento de IA</p>
-              <p className="text-sm text-red-700">{session.processing_error}</p>
+              <p className="text-sm text-red-700">{session.processing_error || "Houve um problema ao processar o áudio. Tente novamente."}</p>
             </div>
-            <Button size="sm" variant="outline" className="border-red-200 hover:bg-red-100" onClick={handleProcessAudio} disabled={processing}>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="border-red-200 hover:bg-red-100 whitespace-nowrap" 
+              onClick={handleProcessAudio} 
+              disabled={processing}
+            >
+              {processing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
               Tentar Novamente
             </Button>
           </CardContent>
@@ -194,10 +209,11 @@ const SessionDetail = () => {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Coluna Esquerda: Informações e Arquivo */}
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-xs uppercase tracking-wider text-slate-500 font-bold">Resumo da Sessão</CardTitle>
+              <CardTitle className="text-xs uppercase tracking-wider text-slate-500 font-bold">Informações</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3">
@@ -215,7 +231,7 @@ const SessionDetail = () => {
                 </div>
               </div>
               <div className="pt-4 border-t">
-                <div className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase w-fit ${
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase w-fit ${
                   session.processing_status === 'completed' 
                     ? 'bg-emerald-100 text-emerald-700' 
                     : isProcessing
@@ -224,10 +240,14 @@ const SessionDetail = () => {
                     ? 'bg-red-100 text-red-700'
                     : 'bg-amber-100 text-amber-700'
                 }`}>
-                  Status: {session.processing_status === 'completed' ? 'concluído' : 
-                          session.processing_status === 'queued' ? 'aguardando IA' : 
-                          session.processing_status === 'processing' ? 'processando' : 
-                          session.processing_status === 'error' ? 'erro' : 'rascunho'}
+                  {isProcessing && <Loader2 className="h-3 w-3 animate-spin" />}
+                  {session.processing_status === 'completed' && <CheckCircle2 className="h-3 w-3" />}
+                  Status: {
+                    session.processing_status === 'completed' ? 'concluído' : 
+                    session.processing_status === 'queued' ? 'aguardando' : 
+                    session.processing_status === 'processing' ? 'processando' : 
+                    session.processing_status === 'error' ? 'erro' : 'rascunho'
+                  }
                 </div>
               </div>
             </CardContent>
@@ -237,7 +257,7 @@ const SessionDetail = () => {
             <Card className="border-indigo-100 bg-indigo-50/20">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-indigo-900 text-sm font-bold uppercase">
-                  <Music className="h-4 w-4 text-indigo-500" /> Áudio Anexado
+                  <Music className="h-4 w-4 text-indigo-500" /> Áudio da Sessão
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -258,121 +278,156 @@ const SessionDetail = () => {
                     <ExternalLink className="h-4 w-4" /> Ouvir Áudio
                   </Button>
 
-                  {session.processing_status !== 'completed' && !isProcessing && (
+                  {canProcess && (
                     <Button 
-                      className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700"
+                      className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 shadow-sm"
                       size="sm"
                       onClick={handleProcessAudio}
                       disabled={processing}
                     >
                       {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                      Processar com IA
+                      {session.processing_status === 'completed' ? "Reprocessar IA" : "Processar com IA"}
                     </Button>
                   )}
 
-                  {session.processing_status === 'completed' && (
-                    <Button 
-                      variant="ghost"
-                      className="w-full gap-2 text-indigo-600 hover:bg-indigo-50"
-                      size="sm"
-                      onClick={handleProcessAudio}
-                      disabled={processing}
-                    >
-                      <RefreshCw className={`h-4 w-4 ${processing ? 'animate-spin' : ''}`} />
-                      Reprocessar IA
-                    </Button>
+                  {!isProcessing && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="w-full gap-2 text-red-500 hover:text-red-600 hover:bg-red-50"
+                          disabled={removingAudio}
+                        >
+                          {removingAudio ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          Remover Áudio
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remover arquivo?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Isso apagará o arquivo permanentemente e limpará os resultados gerados pela IA.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                          <AlertDialogAction onClick={handleRemoveAudio} className="bg-red-600 hover:bg-red-700">
+                            Sim, Remover
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
-                  
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="w-full gap-2 text-red-500 hover:text-red-600 hover:bg-red-50"
-                        disabled={removingAudio || isProcessing}
-                      >
-                        {removingAudio ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                        Remover Áudio
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Remover arquivo de áudio?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          O arquivo será permanentemente excluído do armazenamento e os resultados da IA serão limpos.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleRemoveAudio} className="bg-red-600 hover:bg-red-700">
-                          Sim, Remover
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
                 </div>
               </CardContent>
             </Card>
           )}
         </div>
 
+        {/* Coluna Direita: Resultados */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Notas Manuais */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-700">
-                <FileText className="h-5 w-5 text-slate-400" /> Anotações do Psicólogo
+            <CardHeader className="pb-3 border-b mb-4">
+              <CardTitle className="flex items-center gap-2 text-slate-700 text-lg">
+                <FileText className="h-5 w-5 text-slate-400" /> Notas Clínicas
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
-                {session.manual_notes || "Nenhuma anotação manual registrada."}
-              </p>
+              <div className="prose prose-slate max-w-none">
+                <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
+                  {session.manual_notes || "Nenhuma anotação manual registrada para esta sessão."}
+                </p>
+              </div>
             </CardContent>
           </Card>
 
+          {/* Resultados da IA */}
           {session.processing_status === 'completed' ? (
-            <Card className="border-emerald-100 bg-emerald-50/20">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-emerald-900">
-                  <Sparkles className="h-5 w-5 text-emerald-500" /> Resultados da IA
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
+            <div className="space-y-6">
+              <Card className="border-emerald-100 bg-emerald-50/10 shadow-sm">
+                <CardHeader className="pb-3 border-b border-emerald-100 mb-4">
+                  <CardTitle className="flex items-center gap-2 text-emerald-900 text-lg">
+                    <Sparkles className="h-5 w-5 text-emerald-500" /> Transcrição da Sessão
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
+                    {session.transcript || "Transcrição vazia ou não gerada."}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="border-indigo-100 bg-white">
+                  <CardHeader className="pb-3 border-b border-indigo-50 mb-4">
+                    <CardTitle className="text-sm font-bold text-indigo-900 uppercase tracking-wider">Pontos Relevantes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {session.highlights && session.highlights.length > 0 ? (
+                      <ul className="space-y-3">
+                        {session.highlights.map((h, i) => (
+                          <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
+                            <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
+                            {h}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-slate-400 italic">Nenhum destaque identificado.</p>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border-amber-100 bg-white">
+                  <CardHeader className="pb-3 border-b border-amber-50 mb-4">
+                    <CardTitle className="text-sm font-bold text-amber-900 uppercase tracking-wider">Próximos Passos</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      {session.next_steps || "Nenhuma sugestão de próximos passos gerada."}
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          ) : isProcessing ? (
+            <Card className="border-indigo-100 bg-indigo-50/30 py-12">
+              <CardContent className="flex flex-col items-center text-center gap-4">
+                <Loader2 className="h-10 w-10 text-indigo-500 animate-spin" />
                 <div>
-                  <h4 className="text-sm font-bold text-emerald-800 uppercase mb-2">Transcrição</h4>
-                  <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.transcript}</p>
+                  <h3 className="text-lg font-bold text-indigo-900">A IA está analisando sua sessão...</h3>
+                  <p className="text-sm text-indigo-700 max-w-md mx-auto mt-2">
+                    Estamos transcrevendo o áudio e identificando os pontos terapêuticos mais importantes. 
+                    Isso pode levar alguns minutos. Você pode sair desta página e voltar mais tarde.
+                  </p>
                 </div>
-                {session.highlights && session.highlights.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-bold text-emerald-800 uppercase mb-2">Pontos Importantes</h4>
-                    <ul className="list-disc list-inside text-sm text-slate-700 space-y-1">
-                      {session.highlights.map((h, i) => (
-                        <li key={i}>{h}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {session.next_steps && (
-                  <div>
-                    <h4 className="text-sm font-bold text-emerald-800 uppercase mb-2">Próximos Passos Sugeridos</h4>
-                    <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.next_steps}</p>
-                  </div>
-                )}
+                <Button variant="outline" size="sm" onClick={fetchSession} className="mt-2">
+                  <RefreshCw className="h-4 w-4 mr-2" /> Atualizar Status
+                </Button>
               </CardContent>
             </Card>
-          ) : isProcessing ? (
-            <Card className="border-indigo-100 bg-indigo-50/30">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-indigo-900">
-                  <Loader2 className="h-5 w-5 text-indigo-500 animate-spin" /> 
-                  IA está trabalhando...
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-indigo-700">
-                  O áudio está sendo processado. Isso pode levar alguns minutos dependendo da duração da sessão. 
-                  Você pode navegar pelo sistema e voltar mais tarde.
-                </p>
+          ) : session.audio_file_path && session.processing_status === 'draft' ? (
+            <Card className="border-dashed border-slate-300 bg-slate-50 py-12">
+              <CardContent className="flex flex-col items-center text-center gap-4">
+                <div className="p-3 bg-white rounded-full shadow-sm">
+                  <Sparkles className="h-8 w-8 text-indigo-500" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900">Pronto para processar</h3>
+                  <p className="text-sm text-slate-500 max-w-md mx-auto mt-2">
+                    O áudio da sessão foi carregado com sucesso. Clique no botão abaixo para gerar a transcrição e os insights automáticos.
+                  </p>
+                </div>
+                <Button 
+                  className="bg-indigo-600 hover:bg-indigo-700 gap-2 px-8" 
+                  onClick={handleProcessAudio}
+                  disabled={processing}
+                >
+                  {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  Iniciar Processamento de IA
+                </Button>
               </CardContent>
             </Card>
           ) : null}

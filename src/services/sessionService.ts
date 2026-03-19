@@ -29,9 +29,7 @@ export const sessionService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    // Lógica de status inicial:
-    // Se não tem áudio, já nasce como 'completed'
-    // Se tem áudio, nasce como 'draft' para indicar que falta processar a IA
+    // Lógica de status inicial: sessões com áudio começam como rascunho
     const initialStatus = audioFile ? 'draft' : 'completed';
 
     const cleanedData = {
@@ -64,8 +62,7 @@ export const sessionService = {
           .from('sessions')
           .update({
             audio_file_name: uploadResult.name,
-            audio_file_path: uploadResult.path,
-            processing_status: 'draft' 
+            audio_file_path: uploadResult.path
           })
           .eq('id', session.id)
           .select()
@@ -111,8 +108,7 @@ export const sessionService = {
       audioInfo = {
         audio_file_name: uploadResult.name,
         audio_file_path: uploadResult.path,
-        // Ao trocar o áudio, volta para rascunho pois precisa reprocessar
-        processing_status: 'draft'
+        processing_status: 'draft' // Volta para rascunho ao trocar áudio
       };
     }
 
@@ -127,6 +123,7 @@ export const sessionService = {
     return data as Session;
   },
 
+  // Método definitivo para chamar a Edge Function
   processAudio: async (sessionId: string): Promise<any> => {
     const { data, error } = await supabase.functions.invoke('process-session-audio', {
       body: { sessionId }
@@ -150,7 +147,7 @@ export const sessionService = {
       .update({
         audio_file_name: null,
         audio_file_path: null,
-        processing_status: 'completed', // Sem áudio, volta a estar completa (apenas manual)
+        processing_status: 'completed',
         transcript: null,
         highlights: null,
         next_steps: null
