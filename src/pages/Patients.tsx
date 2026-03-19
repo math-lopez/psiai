@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Search, Plus, Filter, MoreHorizontal, Loader2 } from "lucide-react";
+import { Search, Plus, Filter, MoreHorizontal, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -17,31 +17,64 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { patientService } from "@/services/patientService";
 import { Patient } from "@/types";
 import { format } from "date-fns";
+import { showSuccess, showError } from "@/utils/toast";
 
 const Patients = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
-    const fetchPatients = async () => {
-      try {
-        const data = await patientService.list();
-        setPatients(data || []);
-      } catch (error) {
-        console.error("Erro ao buscar pacientes:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchPatients();
   }, []);
 
+  const fetchPatients = async () => {
+    try {
+      const data = await patientService.list();
+      setPatients(data || []);
+    } catch (error) {
+      console.error("Erro ao buscar pacientes:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingId) return;
+    try {
+      await patientService.delete(deletingId);
+      showSuccess("Paciente excluído com sucesso.");
+      fetchPatients();
+    } catch (error: any) {
+      if (error.code === '23503') {
+        showError("Não é possível excluir: este paciente possui sessões registradas.");
+      } else {
+        showError("Erro ao excluir paciente.");
+      }
+    } finally {
+      setDeletingId(null);
+      setIsDeleteDialogOpen(false);
+    }
+  };
+
   const filteredPatients = patients.filter(p => 
-    p.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -62,7 +95,7 @@ const Patients = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input 
-            placeholder="Buscar paciente por nome..." 
+            placeholder="Buscar paciente por nome ou e-mail..." 
             className="pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -120,8 +153,18 @@ const Patients = () => {
                           <DropdownMenuItem asChild>
                             <Link to={`/pacientes/${patient.id}`}>Ver detalhes</Link>
                           </DropdownMenuItem>
-                          <DropdownMenuItem>Editar</DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">Excluir</DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to={`/pacientes/editar/${patient.id}`}>Editar</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            className="text-red-600 focus:text-red-600"
+                            onClick={() => {
+                              setDeletingId(patient.id);
+                              setIsDeleteDialogOpen(true);
+                            }}
+                          >
+                            Excluir
+                          </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -138,6 +181,24 @@ const Patients = () => {
           </Table>
         )}
       </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir paciente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Todos os dados cadastrais serão removidos.
+              Se o paciente possuir sessões registradas, a exclusão será bloqueada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+              Confirmar Exclusão
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

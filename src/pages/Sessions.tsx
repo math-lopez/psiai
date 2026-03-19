@@ -35,10 +35,20 @@ const Sessions = () => {
     fetchSessions();
   }, []);
 
-  const filteredSessions = sessions.filter(s => 
-    s.patient?.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    format(new Date(s.session_date), "dd/MM/yyyy").includes(searchTerm)
-  );
+  const filteredSessions = sessions.filter(s => {
+    const search = searchTerm.toLowerCase();
+    const patientName = s.patient?.full_name?.toLowerCase() || "";
+    
+    // Tenta formatar a data da sessão para comparação se o termo de busca parecer uma data
+    let dateStr = "";
+    try {
+      dateStr = format(new Date(s.session_date), "dd/MM/yyyy");
+    } catch (e) {
+      dateStr = "";
+    }
+
+    return patientName.includes(search) || dateStr.includes(search);
+  });
 
   return (
     <div className="space-y-6">
@@ -58,7 +68,7 @@ const Sessions = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input 
-            placeholder="Buscar por paciente ou data..." 
+            placeholder="Buscar por nome do paciente ou data (dd/mm/aaaa)..." 
             className="pl-10" 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
