@@ -29,14 +29,11 @@ export const sessionService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    // Lógica de status inicial: sessões com áudio começam como rascunho
-    const initialStatus = audioFile ? 'draft' : 'completed';
-
     const cleanedData = {
       ...sessionData,
       patient_id: sessionData.patient_id === "" ? null : sessionData.patient_id,
       psychologist_id: user.id,
-      processing_status: initialStatus
+      // Removido processing_status: inicial. O banco de dados assume o default 'draft'.
     };
 
     if (!cleanedData.patient_id) throw new Error("Paciente é obrigatório");
@@ -63,6 +60,7 @@ export const sessionService = {
           .update({
             audio_file_name: uploadResult.name,
             audio_file_path: uploadResult.path
+            // Removido update de status.
           })
           .eq('id', session.id)
           .select()
@@ -87,6 +85,13 @@ export const sessionService = {
     const cleanedData = { ...sessionData };
     if (cleanedData.patient_id === "") delete cleanedData.patient_id;
 
+    // Garantir que o frontend não envie campos de processamento no update manual
+    delete (cleanedData as any).processing_status;
+    delete (cleanedData as any).processing_error;
+    delete (cleanedData as any).transcript;
+    delete (cleanedData as any).highlights;
+    delete (cleanedData as any).next_steps;
+
     let audioInfo: any = {};
     if (newAudioFile) {
       const currentSession = await sessionService.getById(id);
@@ -107,8 +112,9 @@ export const sessionService = {
 
       audioInfo = {
         audio_file_name: uploadResult.name,
-        audio_file_path: uploadResult.path,
-        processing_status: 'draft' // Volta para rascunho ao trocar áudio
+        audio_file_path: uploadResult.path
+        // Removido reset de status. O backend tratará isso se necessário ou 
+        // a lógica de negócio dirá que o usuário deve clicar em "Processar" novamente.
       };
     }
 
@@ -123,8 +129,8 @@ export const sessionService = {
     return data as Session;
   },
 
-  // Método definitivo para chamar a Edge Function
   processAudio: async (sessionId: string): Promise<any> => {
+    // Esta é a ÚNICA forma permitida de alterar o status de processamento (via Edge Function)
     const { data, error } = await supabase.functions.invoke('process-session-audio', {
       body: { sessionId }
     });
@@ -147,7 +153,8 @@ export const sessionService = {
       .update({
         audio_file_name: null,
         audio_file_path: null,
-        processing_status: 'completed',
+        // Limpamos os dados gerados, mas não alteramos o status diretamente.
+        // O banco de dados ou a próxima ação decidirão o status.
         transcript: null,
         highlights: null,
         next_steps: null
