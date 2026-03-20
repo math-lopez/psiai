@@ -11,7 +11,6 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
-  
   const stripe = new Stripe(stripeKey || '', {
     apiVersion: '2023-10-16',
     httpClient: Stripe.createFetchHttpClient(),
@@ -19,34 +18,48 @@ serve(async (req) => {
 
   const supabaseClient = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
   )
 
   try {
-    if (!stripeKey) {
-      throw new Error("A variável de ambiente STRIPE_SECRET_KEY não foi configurada no Supabase.");
-    }
-
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) throw new Error('Não autorizado: Cabeçalho ausente')
+    if (!authHeader) throw new Error('Não autorizado')
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''))
-    if (authError || !user) throw new Error('Usuário inválido ou sessão expirada')
+    if (authError || !user) throw new Error('Usuário inválido')
+
+    // 1. Verificar se o usuário já tem stripe_customer_id no perfil
+    const { data: profile } = await supabaseClient
+      .from('profiles')
+      .select('stripe_customer_id')
+      .eq('id', user.id)
+      .single();
 
     const { tier, priceId, successUrl, cancelUrl } = await req.json()
 
-    console.log(`[create-checkout-session] Criando checkout para ${user.email} - Plano: ${tier} - PriceID: ${priceId}`);
+    // 2. Se o usuário JÁ É um cliente Stripe, abrimos o PORTAL de gerenciamento
+    if (profile?.stripe_customer_id) {
+      console.log(`[billing] Usuário ${user.email} já é cliente. Criando sessão de portal.`);
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: profile.stripe_customer_id,
+        return_url: successUrl,
+      });
 
+      return new Response(JSON.stringify({ url: portalSession.url }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
+    // 3. Se NÃO é cliente, criamos o CHECKOUT inicial
+    console.log(`[billing] Criando checkout inicial para ${user.email}`);
     const session = await stripe.checkout.sessions.create({
       customer_email: user.email,
       line_items: [{ price: priceId, quantity: 1 }],
       mode: 'subscription',
       success_url: successUrl,
       cancel_url: cancelUrl,
-      metadata: {
-        userId: user.id,
-        tier: tier
-      }
+      metadata: { userId: user.id, tier: tier }
     });
 
     return new Response(JSON.stringify({ url: session.url }), {
@@ -54,7 +67,6 @@ serve(async (req) => {
       status: 200,
     })
   } catch (error) {
-    console.error(`[create-checkout-session] ERRO: ${error.message}`);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
