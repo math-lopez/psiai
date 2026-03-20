@@ -13,7 +13,7 @@ import { showSuccess, showError } from "@/utils/toast";
 // MAPEAMENTO DE IDs DE PREÇO DO STRIPE (Substitua pelos seus IDs reais do Dashboard do Stripe)
 const STRIPE_PRICE_IDS: Record<string, string> = {
   basic: "prod_UBEAgDzNMifEcG",
-  pro: "price_pro_id_here",
+  pro: "prod_UBEDYfdMsYPhvy",
   ultra: "price_ultra_id_here",
 };
 
