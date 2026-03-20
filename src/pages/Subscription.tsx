@@ -15,7 +15,7 @@ import { showSuccess, showError } from "@/utils/toast";
 // ========================================================
 const STRIPE_PRICE_IDS: Record<string, string> = {
   basic: "prod_UBEAgDzNMifEcG", // EXEMPLO: SUBSTITUA PELO SEU
-  pro: "prod_UBEDYfdMsYPhvy",   // EXEMPLO: SUBSTITUA PELO SEU
+  pro: "price_1TCrkm2LdLLLIxeHJcrSxfam",   // EXEMPLO: SUBSTITUA PELO SEU
   ultra: "price_1TCrm22LdLLLIxeH8tvbj2Nb", // EXEMPLO: SUBSTITUA PELO SEU
 };
 // ========================================================
