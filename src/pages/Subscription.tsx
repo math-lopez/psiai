@@ -1,17 +1,16 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Check, Loader2, Rocket, Zap, Shield, Sparkles, X, Lock, ExternalLink } from "lucide-react";
+import { Check, Loader2, Rocket, Zap, Shield, Sparkles, ExternalLink } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
-import { showSuccess, showError } from "@/utils/toast";
+import { showError } from "@/utils/toast";
 
 // ========================================================
-// IDs DO STRIPE (price_...)
+// IDs DO STRIPE (price_...) - SUBSTITUA PELOS SEUS DE PRODUÇÃO
 // ========================================================
 const STRIPE_PRICE_IDS: Record<string, string> = {
   basic: "price_1TCriP2LdLLLIxeHYXAtYEFW", 
@@ -48,7 +47,8 @@ const Subscription = () => {
   }, [user]);
 
   const handleAction = async (tierId: SubscriptionTier) => {
-    // Se clicar no plano que já tem e for assinante, redireciona pro portal
+    // Se clicar no plano Free e já for assinante, abre o portal para cancelar
+    // Se clicar em qualquer plano e já for assinante, abre o portal para upgrade/downgrade
     setSubmitting(tierId);
     try {
       const priceId = STRIPE_PRICE_IDS[tierId];
@@ -86,8 +86,8 @@ const Subscription = () => {
         <h1 className="text-3xl font-bold text-slate-900">Assinatura e Planos</h1>
         <p className="text-slate-500 max-w-2xl mx-auto">
           {hasSubscription 
-            ? "Gerencie sua assinatura atual, mude de plano ou atualize sua forma de pagamento." 
-            : "Escolha o melhor plano para sua prática clínica."}
+            ? "Gerencie sua assinatura, mude de plano ou atualize sua forma de pagamento através do portal seguro." 
+            : "Escolha o melhor plano para sua prática clínica e comece agora."}
         </p>
       </div>
 
@@ -97,16 +97,17 @@ const Subscription = () => {
             <div className="bg-white/20 p-3 rounded-xl"><Sparkles className="h-6 w-6" /></div>
             <div>
               <p className="text-indigo-100 text-sm font-medium uppercase tracking-wider">Assinatura Ativa</p>
-              <h3 className="text-xl font-bold">Seu plano atual é: {PLAN_LIMITS[currentTier].name}</h3>
+              <h3 className="text-xl font-bold">Plano: {PLAN_LIMITS[currentTier].name}</h3>
+              <p className="text-indigo-100 text-xs mt-1 italic">Qualquer alteração feita no portal respeitará seu ciclo de faturamento atual.</p>
             </div>
           </div>
           <Button 
-            className="bg-white text-indigo-600 hover:bg-indigo-50 font-bold px-8 gap-2"
+            className="bg-white text-indigo-600 hover:bg-indigo-50 font-bold px-8 gap-2 shrink-0"
             onClick={() => handleAction(currentTier)}
             disabled={submitting !== null}
           >
             {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
-            Gerenciar no Stripe
+            Gerenciar Assinatura
           </Button>
         </div>
       )}
@@ -117,8 +118,12 @@ const Subscription = () => {
           const isCurrent = currentTier === plan.id;
           const PlanIcon = plan.icon;
 
+          // Se já é assinante, qualquer botão de plano diferente do atual 
+          // deve também levar ao portal para garantir o controle de downgrade/upgrade
+          const buttonText = isCurrent ? 'Plano Ativo' : (hasSubscription ? 'Alterar Plano' : 'Escolher Plano');
+
           return (
-            <Card key={plan.id} className={`relative flex flex-col ${isCurrent ? 'border-indigo-600 ring-2 ring-indigo-600/20' : ''}`}>
+            <Card key={plan.id} className={`relative flex flex-col ${isCurrent ? 'border-indigo-600 ring-2 ring-indigo-600/20 shadow-lg' : ''}`}>
               <CardHeader className="text-center pb-2">
                 <div className={`mx-auto p-3 rounded-full bg-slate-50 w-fit mb-4 ${plan.color}`}>
                   <PlanIcon className="h-6 w-6" />
@@ -132,16 +137,16 @@ const Subscription = () => {
               <CardContent className="flex-1 space-y-4 pt-4">
                 <ul className="space-y-3">
                   <li className="flex items-center gap-3 text-sm">
-                    <Check className="h-4 w-4 text-emerald-500" />
-                    <span>{details.maxPatients === Infinity ? 'Ilimitados' : details.maxPatients} pacientes</span>
+                    <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span>{details.maxPatients === Infinity ? 'Ilimitados' : `${details.maxPatients} pacientes`}</span>
                   </li>
                   <li className="flex items-center gap-3 text-sm">
-                    <Check className="h-4 w-4 text-emerald-500" />
-                    <span>Transcrições: {details.maxTranscriptionsPerMonth === Infinity ? 'Ilimitadas' : details.maxTranscriptionsPerMonth}</span>
+                    <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span>{details.maxTranscriptionsPerMonth === Infinity ? 'Ilimitadas' : `${details.maxTranscriptionsPerMonth}`} transcrições</span>
                   </li>
                   {details.hasTherapeuticInsights && (
                     <li className="flex items-center gap-3 text-sm font-bold text-indigo-700">
-                      <Sparkles className="h-4 w-4 text-indigo-500" />
+                      <Sparkles className="h-4 w-4 text-indigo-500 shrink-0" />
                       <span>Insights Terapêuticos</span>
                     </li>
                   )}
@@ -149,11 +154,12 @@ const Subscription = () => {
               </CardContent>
               <CardFooter className="pt-6">
                 <Button 
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-100"
-                  disabled={isCurrent || submitting !== null}
+                  className={`w-full ${isCurrent ? 'bg-slate-100 text-slate-500' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                  variant={isCurrent ? "secondary" : "default"}
+                  disabled={(isCurrent && hasSubscription) || (plan.id === 'free' && !hasSubscription) || submitting !== null}
                   onClick={() => handleAction(plan.id)}
                 >
-                  {submitting === plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : isCurrent ? 'Plano Ativo' : 'Escolher Plano'}
+                  {submitting === plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : buttonText}
                 </Button>
               </CardFooter>
             </Card>
