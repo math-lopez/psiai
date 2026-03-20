@@ -19,11 +19,9 @@ export const useNotifications = () => {
   useEffect(() => {
     if (!user) return;
 
-    console.log("[useNotifications] Iniciando subscrição em tempo real para o usuário:", user.id);
-
-    // Canal para ouvir mudanças nas sessões do usuário logado
+    // Escuta mudanças na tabela sessions filtrando pelo usuário logado
     const channel = supabase
-      .channel(`user-notifications-${user.id}`)
+      .channel(`realtime-sessions-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -35,7 +33,6 @@ export const useNotifications = () => {
         (payload) => {
           const newStatus = payload.new.processing_status;
           
-          // Notifica se o status mudou para concluído ou erro
           if (newStatus === 'completed' || newStatus === 'error') {
             const isSuccess = newStatus === 'completed';
             const title = isSuccess ? "Processamento Concluído" : "Erro no Processamento";
@@ -52,17 +49,15 @@ export const useNotifications = () => {
               createdAt: new Date(),
             };
 
+            // Adiciona ao topo da lista de notificações que o Header consome
             setNotifications(prev => [newNotif, ...prev]);
             
-            // Também mostramos um toast para feedback imediato
             if (isSuccess) showSuccess(message);
             else showError(message);
           }
         }
       )
-      .subscribe((status) => {
-        console.log("[useNotifications] Status da subscrição:", status);
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);

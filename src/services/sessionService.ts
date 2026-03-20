@@ -138,20 +138,21 @@ export const sessionService = {
     if (!session) return;
 
     if (session.audio_file_path) {
-      // Disparamos o processamento e NÃO usamos await na resposta final da IA.
-      // O Supabase iniciará o processo. O frontend pode seguir em frente.
+      // 1. Atualiza para queued imediatamente para o UI refletir a mudança
+      await supabase
+        .from('sessions')
+        .update({ processing_status: 'queued' })
+        .eq('id', id);
+
+      // 2. Dispara o processamento em background
       sessionService.processAudio(id).catch(err => {
-        console.error("Erro ao iniciar processamento em segundo plano:", err);
+        console.error("Erro ao iniciar processamento:", err);
       });
-      
-      // Damos um pequeno tempo para a função começar a atualizar os status no banco
-      await new Promise(resolve => setTimeout(resolve, 800));
     } else {
-      const { error } = await supabase
+      await supabase
         .from('sessions')
         .update({ processing_status: 'completed' })
         .eq('id', id);
-      if (error) throw error;
     }
   },
 
