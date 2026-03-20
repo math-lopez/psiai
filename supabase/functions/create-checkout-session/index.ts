@@ -10,7 +10,9 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
-  const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+  const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
+  
+  const stripe = new Stripe(stripeKey || '', {
     apiVersion: '2023-10-16',
     httpClient: Stripe.createFetchHttpClient(),
   });
@@ -21,15 +23,19 @@ serve(async (req) => {
   )
 
   try {
+    if (!stripeKey) {
+      throw new Error("A variável de ambiente STRIPE_SECRET_KEY não foi configurada no Supabase.");
+    }
+
     const authHeader = req.headers.get('Authorization')
-    if (!authHeader) throw new Error('Não autorizado')
+    if (!authHeader) throw new Error('Não autorizado: Cabeçalho ausente')
 
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''))
-    if (authError || !user) throw new Error('Usuário inválido')
+    if (authError || !user) throw new Error('Usuário inválido ou sessão expirada')
 
     const { tier, priceId, successUrl, cancelUrl } = await req.json()
 
-    console.log(`[create-checkout-session] Criando checkout para ${user.email} - Plano: ${tier}`);
+    console.log(`[create-checkout-session] Criando checkout para ${user.email} - Plano: ${tier} - PriceID: ${priceId}`);
 
     const session = await stripe.checkout.sessions.create({
       customer_email: user.email,
@@ -48,6 +54,7 @@ serve(async (req) => {
       status: 200,
     })
   } catch (error) {
+    console.error(`[create-checkout-session] ERRO: ${error.message}`);
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 400,
