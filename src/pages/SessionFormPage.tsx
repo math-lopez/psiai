@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2, Lock } from "lucide-react";
+import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2, Lock, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -45,8 +45,19 @@ const SessionFormPage = () => {
     const loadData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        const { data: profile } = await supabase.from('profiles').select('subscription_tier').eq('id', user?.id).single();
-        setTier(profile?.subscription_tier as SubscriptionTier || "free");
+        
+        // Busca resiliente: se a coluna não existir, o erro é tratado
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('*') // Buscamos tudo para evitar erro 406/400 se a coluna específica faltar
+          .eq('id', user?.id)
+          .maybeSingle();
+        
+        if (!profileError && profile?.subscription_tier) {
+          setTier(profile.subscription_tier as SubscriptionTier);
+        } else {
+          setTier("free");
+        }
 
         const pats = await patientService.list();
         setPatients(pats);
@@ -65,7 +76,7 @@ const SessionFormPage = () => {
           }
         }
       } catch (e) {
-        showError("Erro ao carregar dados.");
+        console.error("Erro ao carregar dados:", e);
       } finally {
         setLoading(false);
       }
