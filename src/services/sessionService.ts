@@ -14,7 +14,7 @@ import { showSuccess, showError } from "@/utils/toast";
 const STRIPE_PRICE_IDS: Record<string, string> = {
   basic: "prod_UBEAgDzNMifEcG",
   pro: "prod_UBEDYfdMsYPhvy",
-  ultra: "price_ultra_id_here",
+  ultra: "prod_UBEEcVuyNti71A",
 };
 
 const Subscription = () => {
