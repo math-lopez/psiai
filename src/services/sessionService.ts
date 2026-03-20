@@ -1,6 +1,8 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Session, DashboardStats } from "@/types";
 import { storageService } from "./storageService";
+import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
+import { startOfMonth, endOfMonth } from "date-fns";
 
 export const sessionService = {
   list: async (): Promise<Session[]> => {
@@ -28,6 +30,29 @@ export const sessionService = {
   create: async (sessionData: any, audioFile?: File): Promise<Session> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
+
+    // Verificar Limites do Plano (Sessões Mensais)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('subscription_tier')
+      .eq('id', user.id)
+      .single();
+
+    const tier = (profile?.subscription_tier as SubscriptionTier) || 'free';
+    const limit = PLAN_LIMITS[tier].maxSessionsPerMonth;
+
+    const start = startOfMonth(new Date()).toISOString();
+    const end = endOfMonth(new Date()).toISOString();
+
+    const { count } = await supabase
+      .from('sessions')
+      .select('*', { count: 'exact', head: true })
+      .gte('created_at', start)
+      .lte('created_at', end);
+
+    if (count !== null && count >= limit) {
+      throw new Error(`Limite mensal atingido! Seu plano ${PLAN_LIMITS[tier].name} permite ${limit} sessões por mês. Faça um upgrade para continuar.`);
+    }
 
     const cleanedData = {
       ...sessionData,
@@ -138,13 +163,11 @@ export const sessionService = {
     if (!session) return;
 
     if (session.audio_file_path) {
-      // 1. Atualiza para queued imediatamente para o UI refletir a mudança
       await supabase
         .from('sessions')
         .update({ processing_status: 'queued' })
         .eq('id', id);
 
-      // 2. Dispara o processamento em background
       sessionService.processAudio(id).catch(err => {
         console.error("Erro ao iniciar processamento:", err);
       });

@@ -15,6 +15,7 @@ import Sessions from "./pages/Sessions";
 import SessionFormPage from "./pages/SessionFormPage";
 import SessionDetail from "./pages/SessionDetail";
 import Settings from "./pages/Settings";
+import Subscription from "./pages/Subscription";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/sessoes/editar/:id" element={<SessionFormPage />} />
               <Route path="/sessoes/:id" element={<SessionDetail />} />
               <Route path="/configuracoes" element={<Settings />} />
+              <Route path="/assinatura" element={<Subscription />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />

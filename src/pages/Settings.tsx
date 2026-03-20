@@ -1,19 +1,23 @@
 import { useState, useEffect } from "react";
-import { Save, User, Shield, CreditCard, Bell, Loader2, Lock, Eye, EyeOff } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Save, User, Shield, CreditCard, Bell, Loader2, Lock, Eye, EyeOff, Sparkles, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { cn } from "@/lib/utils";
+import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
 
 type SettingsTab = "profile" | "security" | "notifications" | "billing";
 
 const Settings = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [loading, setLoading] = useState(false);
   
@@ -22,7 +26,8 @@ const Settings = () => {
     full_name: "",
     crp: "",
     email: "",
-    phone: ""
+    phone: "",
+    subscription_tier: "free" as SubscriptionTier
   });
 
   // Estados para Segurança
@@ -40,14 +45,26 @@ const Settings = () => {
   });
 
   useEffect(() => {
-    if (user) {
-      setProfile({
-        full_name: user.user_metadata?.full_name || "",
-        crp: user.user_metadata?.crp || "",
-        email: user.email || "",
-        phone: user.user_metadata?.phone || ""
-      });
-    }
+    const fetchProfile = async () => {
+      if (user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+        
+        if (data) {
+          setProfile({
+            full_name: data.full_name || user.user_metadata?.full_name || "",
+            crp: data.crp || user.user_metadata?.crp || "",
+            email: user.email || "",
+            phone: data.phone || user.user_metadata?.phone || "",
+            subscription_tier: data.subscription_tier as SubscriptionTier || "free"
+          });
+        }
+      }
+    };
+    fetchProfile();
   }, [user]);
 
   const handleSaveProfile = async () => {
@@ -105,13 +122,7 @@ const Settings = () => {
     }
   };
 
-  const handleSaveNotifs = () => {
-    setLoading(true);
-    setTimeout(() => {
-      showSuccess("Preferências de notificação salvas!");
-      setLoading(false);
-    }, 500);
-  };
+  const currentPlan = PLAN_LIMITS[profile.subscription_tier];
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -254,74 +265,67 @@ const Settings = () => {
             </div>
           )}
 
-          {activeTab === "notifications" && (
+          {activeTab === "billing" && (
             <div className="space-y-6">
-              <Card>
+              <Card className="overflow-hidden">
+                <div className="h-2 bg-indigo-600 w-full" />
                 <CardHeader>
-                  <CardTitle>Alertas de E-mail</CardTitle>
-                  <CardDescription>Escolha quais notificações deseja receber em seu e-mail.</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Plano Atual</CardTitle>
+                      <CardDescription>Gerencie sua assinatura e limites.</CardDescription>
+                    </div>
+                    <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200">
+                      {currentPlan.name}
+                    </Badge>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Sessão Concluída</Label>
-                      <p className="text-sm text-slate-500">Receber e-mail quando a IA terminar de transcrever.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-4 rounded-xl bg-slate-50 border space-y-2">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Limite de Pacientes</p>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {currentPlan.maxPatients === Infinity ? 'Ilimitado' : currentPlan.maxPatients}
+                      </p>
                     </div>
-                    <Switch 
-                      checked={notifs.emailSession} 
-                      onCheckedChange={(v) => setNotifs({...notifs, emailSession: v})} 
-                    />
+                    <div className="p-4 rounded-xl bg-slate-50 border space-y-2">
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sessões Mensais</p>
+                      <p className="text-2xl font-bold text-slate-900">
+                        {currentPlan.maxSessionsPerMonth === Infinity ? 'Ilimitadas' : currentPlan.maxSessionsPerMonth}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between border-t pt-6">
-                    <div className="space-y-0.5">
-                      <Label>Insights Terapêuticos</Label>
-                      <p className="text-sm text-slate-500">Resumo semanal de padrões identificados pela IA.</p>
+
+                  <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="h-12 w-12 rounded-full bg-white flex items-center justify-center shadow-sm">
+                        <Sparkles className="h-6 w-6 text-indigo-600" />
+                      </div>
+                      <div>
+                        <h4 className="font-bold text-indigo-900">Precisa de mais espaço?</h4>
+                        <p className="text-sm text-indigo-700">Aumente seus limites e tenha acesso a recursos exclusivos.</p>
+                      </div>
                     </div>
-                    <Switch 
-                      checked={notifs.emailInsights} 
-                      onCheckedChange={(v) => setNotifs({...notifs, emailInsights: v})} 
-                    />
+                    <Button 
+                      className="bg-indigo-600 hover:bg-indigo-700 gap-2"
+                      onClick={() => navigate("/assinatura")}
+                    >
+                      Ver Planos <ArrowRight className="h-4 w-4" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Notificações no Navegador</CardTitle>
-                  <CardDescription>Alertas em tempo real enquanto você usa o sistema.</CardDescription>
+                  <CardTitle>Histórico de Pagamentos</CardTitle>
+                  <CardDescription>Consulte suas faturas anteriores.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>Alertas Push</Label>
-                      <p className="text-sm text-slate-500">Notificações de sistema na área de trabalho.</p>
-                    </div>
-                    <Switch 
-                      checked={notifs.browserAlerts} 
-                      onCheckedChange={(v) => setNotifs({...notifs, browserAlerts: v})} 
-                    />
-                  </div>
+                <CardContent className="py-8 text-center text-slate-500 italic">
+                  Nenhuma fatura encontrada.
                 </CardContent>
               </Card>
-              <div className="flex justify-end">
-                <Button className="bg-indigo-600 hover:bg-indigo-700 gap-2" onClick={handleSaveNotifs} disabled={loading}>
-                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Salvar Preferências
-                </Button>
-              </div>
             </div>
-          )}
-
-          {activeTab === "billing" && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Plano Atual</CardTitle>
-                <CardDescription>Você está no Plano Profissional (Mensal).</CardDescription>
-              </CardHeader>
-              <CardContent className="py-10 text-center">
-                <p className="text-slate-500 italic">Módulo de faturamento em desenvolvimento.</p>
-              </CardContent>
-            </Card>
           )}
         </div>
       </div>

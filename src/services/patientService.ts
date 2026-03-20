@@ -1,5 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
-import { Patient, PatientStatus } from "@/types";
+import { Patient } from "@/types";
+import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
 
 export const patientService = {
   list: async (): Promise<Patient[]> => {
@@ -26,6 +27,24 @@ export const patientService = {
   create: async (patient: Omit<Patient, 'id' | 'created_at' | 'updated_at' | 'psychologist_id'>): Promise<Patient> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
+
+    // Verificar Limites do Plano
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('subscription_tier')
+      .eq('id', user.id)
+      .single();
+
+    const tier = (profile?.subscription_tier as SubscriptionTier) || 'free';
+    const limit = PLAN_LIMITS[tier].maxPatients;
+
+    const { count } = await supabase
+      .from('patients')
+      .select('*', { count: 'exact', head: true });
+
+    if (count !== null && count >= limit) {
+      throw new Error(`Limite atingido! Seu plano ${PLAN_LIMITS[tier].name} permite apenas ${limit} pacientes. Faça um upgrade para continuar.`);
+    }
 
     const { data, error } = await supabase
       .from('patients')
