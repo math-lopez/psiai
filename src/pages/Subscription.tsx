@@ -36,7 +36,13 @@ const Subscription = () => {
           .maybeSingle();
         
         if (data) {
-          setCurrentTier(data.subscription_tier as SubscriptionTier || 'free');
+          // Garantir que o tier existe no nosso objeto PLAN_LIMITS
+          const tierFromDb = data.subscription_tier as SubscriptionTier;
+          if (PLAN_LIMITS[tierFromDb]) {
+            setCurrentTier(tierFromDb);
+          } else {
+            setCurrentTier('free');
+          }
           setHasSubscription(!!data.stripe_customer_id);
         }
       } finally {
@@ -47,8 +53,6 @@ const Subscription = () => {
   }, [user]);
 
   const handleAction = async (tierId: SubscriptionTier) => {
-    // Se clicar no plano Free e já for assinante, abre o portal para cancelar
-    // Se clicar em qualquer plano e já for assinante, abre o portal para upgrade/downgrade
     setSubmitting(tierId);
     try {
       const priceId = STRIPE_PRICE_IDS[tierId];
@@ -80,6 +84,9 @@ const Subscription = () => {
     { id: 'ultra', icon: Sparkles, color: 'text-purple-600' },
   ];
 
+  // Dados do plano atual para o cabeçalho
+  const currentPlanDetails = PLAN_LIMITS[currentTier] || PLAN_LIMITS.free;
+
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       <div className="text-center space-y-2">
@@ -97,7 +104,7 @@ const Subscription = () => {
             <div className="bg-white/20 p-3 rounded-xl"><Sparkles className="h-6 w-6" /></div>
             <div>
               <p className="text-indigo-100 text-sm font-medium uppercase tracking-wider">Assinatura Ativa</p>
-              <h3 className="text-xl font-bold">Plano: {PLAN_LIMITS[currentTier].name}</h3>
+              <h3 className="text-xl font-bold">Plano: {currentPlanDetails.name}</h3>
               <p className="text-indigo-100 text-xs mt-1 italic">Qualquer alteração feita no portal respeitará seu ciclo de faturamento atual.</p>
             </div>
           </div>
@@ -118,8 +125,6 @@ const Subscription = () => {
           const isCurrent = currentTier === plan.id;
           const PlanIcon = plan.icon;
 
-          // Se já é assinante, qualquer botão de plano diferente do atual 
-          // deve também levar ao portal para garantir o controle de downgrade/upgrade
           const buttonText = isCurrent ? 'Plano Ativo' : (hasSubscription ? 'Alterar Plano' : 'Escolher Plano');
 
           return (
