@@ -47,7 +47,6 @@ export const sessionService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    // 1. Criar a sessão no banco
     const { data, error } = await supabase
       .from('sessions')
       .insert([{ ...session, psychologist_id: user.id, processing_status: 'draft' }])
@@ -56,7 +55,6 @@ export const sessionService = {
     
     if (error) throw error;
 
-    // 2. Se houver áudio, fazer o upload
     if (audioFile && data) {
       const upload = await storageService.uploadSessionAudio(user.id, data.patient_id, data.id, audioFile);
       const { data: updated } = await supabase
@@ -97,10 +95,18 @@ export const sessionService = {
     return data as Session;
   },
 
+  delete: async (id: string): Promise<void> => {
+    const { error } = await supabase
+      .from('sessions')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+  },
+
   finishSession: async (id: string): Promise<void> => {
     const { data: session } = await supabase.from('sessions').select('*').eq('id', id).single();
     
-    // Se tiver áudio e não estiver processado, movemos para 'queued'
     const nextStatus = (session?.audio_file_path && session?.processing_status === 'draft') ? 'queued' : 'completed';
 
     const { error } = await supabase
@@ -110,14 +116,12 @@ export const sessionService = {
     
     if (error) throw error;
 
-    // Se estiver na fila, chamamos a IA
     if (nextStatus === 'queued') {
       sessionService.processAudio(id);
     }
   },
 
   processAudio: async (sessionId: string): Promise<void> => {
-    // Chama a Edge Function para transcrição via IA
     const { error } = await supabase.functions.invoke('process-session-audio', {
       body: { sessionId }
     });

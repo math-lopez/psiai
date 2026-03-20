@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, Filter, Mic, FileText, Loader2, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Search, Filter, Mic, FileText, Loader2, X, ChevronLeft, ChevronRight, MoreHorizontal, Trash2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -16,12 +16,29 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { sessionService } from "@/services/sessionService";
 import { Session, SessionStatus, SessionRecordType } from "@/types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { showSuccess, showError } from "@/utils/toast";
 
 const ITEMS_PER_PAGE = 10;
 
@@ -30,24 +47,41 @@ const Sessions = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   
   // Estados para filtros
   const [statusFilters, setStatusFilters] = useState<SessionStatus[]>([]);
   const [typeFilters, setTypeFilters] = useState<SessionRecordType[]>([]);
 
+  const fetchSessions = async () => {
+    try {
+      const data = await sessionService.list();
+      setSessions(data || []);
+    } catch (error) {
+      console.error("Erro ao buscar sessões:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchSessions = async () => {
-      try {
-        const data = await sessionService.list();
-        setSessions(data || []);
-      } catch (error) {
-        console.error("Erro ao buscar sessões:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchSessions();
   }, []);
+
+  const handleDelete = async () => {
+    if (!deletingId) return;
+    try {
+      await sessionService.delete(deletingId);
+      showSuccess("Sessão excluída com sucesso.");
+      fetchSessions();
+    } catch (error) {
+      showError("Erro ao excluir sessão.");
+    } finally {
+      setDeletingId(null);
+      setIsDeleteDialogOpen(false);
+    }
+  };
 
   const toggleStatusFilter = (status: SessionStatus) => {
     setStatusFilters(prev => 
@@ -86,7 +120,6 @@ const Sessions = () => {
     return matchesSearch && matchesStatus && matchesType;
   });
 
-  // Paginação
   const totalPages = Math.ceil(filteredSessions.length / ITEMS_PER_PAGE);
   const paginatedSessions = filteredSessions.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -177,20 +210,6 @@ const Sessions = () => {
                   ))}
                 </div>
               </div>
-
-              {(statusFilters.length > 0 || typeFilters.length > 0) && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="w-full text-indigo-600 text-xs mt-2"
-                  onClick={() => {
-                    setStatusFilters([]);
-                    setTypeFilters([]);
-                  }}
-                >
-                  Limpar Filtros
-                </Button>
-              )}
             </div>
           </PopoverContent>
         </Popover>
@@ -217,15 +236,15 @@ const Sessions = () => {
                   <TableHead>Tipo</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Duração</TableHead>
-                  <TableHead className="w-[100px]"></TableHead>
+                  <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedSessions.length > 0 ? (
                   paginatedSessions.map((session) => (
-                    <TableRow key={session.id} className="cursor-pointer hover:bg-slate-50">
+                    <TableRow key={session.id} className="hover:bg-slate-50">
                       <TableCell className="font-medium">
-                        <Link to={`/sessoes/${session.id}`} className="hover:text-indigo-600">
+                        <Link to={`/sessoes/${session.id}`} className="hover:text-indigo-600 transition-colors">
                           {session.patient?.full_name || "Paciente Removido"}
                         </Link>
                       </TableCell>
@@ -260,11 +279,29 @@ const Sessions = () => {
                       </TableCell>
                       <TableCell>{session.duration_minutes} min</TableCell>
                       <TableCell>
-                        <Link to={`/sessoes/${session.id}`}>
-                          <Button variant="ghost" size="sm" className="text-indigo-600">
-                            Ver detalhes
-                          </Button>
-                        </Link>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link to={`/sessoes/${session.id}`} className="flex items-center gap-2">
+                                <Eye className="h-4 w-4" /> Ver detalhes
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-red-600 focus:text-red-600 flex items-center gap-2"
+                              onClick={() => {
+                                setDeletingId(session.id);
+                                setIsDeleteDialogOpen(true);
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" /> Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))
@@ -319,6 +356,23 @@ const Sessions = () => {
           </>
         )}
       </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir sessão?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. O registro da sessão e sua respectiva transcrição serão removidos permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+              Confirmar Exclusão
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { sessionService } from "@/services/sessionService";
-import { storageService } from "@/services/storageService";
 import { supabase } from "@/integrations/supabase/client";
 import { Session } from "@/types";
 import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
@@ -25,10 +24,6 @@ const SessionDetail = () => {
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    fetchData();
-  }, [id]);
 
   const fetchData = async () => {
     if (!id) return;
@@ -46,6 +41,10 @@ const SessionDetail = () => {
     }
   };
 
+  useEffect(() => {
+    fetchData();
+  }, [id]);
+
   const handleProcessAudio = async () => {
     setProcessing(true);
     try {
@@ -56,6 +55,20 @@ const SessionDetail = () => {
       showError(e.message);
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!id) return;
+    setDeleting(true);
+    try {
+      await sessionService.delete(id);
+      showSuccess("Sessão excluída com sucesso.");
+      navigate("/sessoes");
+    } catch (e) {
+      showError("Erro ao excluir sessão.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -77,6 +90,30 @@ const SessionDetail = () => {
         </div>
         <div className="flex gap-2">
           <Link to={`/sessoes/editar/${id}`}><Button variant="outline" size="sm" className="gap-2"><Edit className="h-4 w-4" /> Editar</Button></Link>
+          
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 text-red-600 hover:text-red-700">
+                <Trash2 className="h-4 w-4" /> Excluir
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-red-500" /> Excluir Sessão
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  Tem certeza que deseja excluir esta sessão de **{session.patient?.full_name}**? Esta ação é permanente e removerá todas as notas e transcrições vinculadas.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+                  {deleting ? "Excluindo..." : "Confirmar Exclusão"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -86,8 +123,19 @@ const SessionDetail = () => {
             <CardHeader><CardTitle className="text-xs uppercase font-bold text-slate-500">Informações</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3"><Clock className="h-4 w-4 text-slate-400" /><p className="text-sm font-semibold">{session.duration_minutes} min</p></div>
-              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase w-fit ${session.processing_status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
-                {session.processing_status}
+              <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase w-fit ${
+                session.processing_status === 'completed' 
+                  ? 'bg-emerald-100 text-emerald-700' 
+                  : ['queued', 'processing'].includes(session.processing_status)
+                  ? 'bg-blue-100 text-blue-700'
+                  : session.processing_status === 'error'
+                  ? 'bg-red-100 text-red-700'
+                  : 'bg-amber-100 text-amber-700'
+              }`}>
+                {session.processing_status === 'completed' ? 'concluído' : 
+                 session.processing_status === 'processing' ? 'processando' :
+                 session.processing_status === 'queued' ? 'na fila' : 
+                 session.processing_status === 'error' ? 'erro' : 'rascunho'}
               </div>
             </CardContent>
           </Card>
