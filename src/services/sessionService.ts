@@ -134,15 +134,19 @@ export const sessionService = {
   },
 
   finishSession: async (id: string): Promise<void> => {
-    // Busca os dados atuais para saber se tem áudio
     const session = await sessionService.getById(id);
     if (!session) return;
 
     if (session.audio_file_path) {
-      // Se tem áudio, dispara a Edge Function que cuida de todo o status (queued -> processing -> completed)
-      await sessionService.processAudio(id);
+      // Disparamos o processamento e NÃO usamos await na resposta final da IA.
+      // O Supabase iniciará o processo. O frontend pode seguir em frente.
+      sessionService.processAudio(id).catch(err => {
+        console.error("Erro ao iniciar processamento em segundo plano:", err);
+      });
+      
+      // Damos um pequeno tempo para a função começar a atualizar os status no banco
+      await new Promise(resolve => setTimeout(resolve, 800));
     } else {
-      // Se NÃO tem áudio, apenas marca como concluído no banco
       const { error } = await supabase
         .from('sessions')
         .update({ processing_status: 'completed' })
@@ -168,7 +172,7 @@ export const sessionService = {
         transcript: null,
         highlights: null,
         next_steps: null,
-        processing_status: 'draft' // Volta para rascunho ao remover áudio
+        processing_status: 'draft'
       })
       .eq('id', sessionId);
 
