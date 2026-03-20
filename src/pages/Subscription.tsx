@@ -19,44 +19,61 @@ const Subscription = () => {
   useEffect(() => {
     const fetchTier = async () => {
       if (!user) return;
-      const { data } = await supabase
-        .from('profiles')
-        .select('subscription_tier')
-        .eq('id', user.id)
-        .single();
-      
-      if (data) setCurrentTier(data.subscription_tier as SubscriptionTier);
-      setLoading(false);
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('subscription_tier')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (error) {
+          console.error("Erro ao carregar plano:", error);
+          // Se der erro 400, provavelmente a coluna não existe. Mantemos 'free'.
+          return;
+        }
+
+        if (data?.subscription_tier) {
+          setCurrentTier(data.subscription_tier as SubscriptionTier);
+        }
+      } catch (e) {
+        console.error("Erro inesperado:", e);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchTier();
   }, [user]);
 
-  const handleSubscribe = async (tier: SubscriptionTier) => {
-    if (tier === currentTier) return;
+  const handleSubscribe = async (tierId: SubscriptionTier) => {
+    if (tierId === currentTier) return;
     
-    setSubmitting(tier);
+    setSubmitting(tierId);
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ subscription_tier: tier })
+        .update({ subscription_tier: tierId })
         .eq('id', user?.id);
 
       if (error) throw error;
 
-      setCurrentTier(tier);
-      showSuccess(`Plano ${PLAN_LIMITS[tier].name} ativado com sucesso!`);
+      setCurrentTier(tierId);
+      showSuccess(`Plano ${PLAN_LIMITS[tierId].name} ativado com sucesso!`);
     } catch (e: any) {
-      showError(e.message || "Erro ao processar assinatura.");
+      showError("Erro ao processar assinatura. Verifique se a coluna 'subscription_tier' existe no banco.");
     } finally {
       setSubmitting(null);
     }
   };
 
   if (loading) {
-    return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    );
   }
 
-  const plans: { id: SubscriptionTier; icon: any; color: string }[] = [
+  const planCards: { id: SubscriptionTier; icon: any; color: string }[] = [
     { id: 'free', icon: Shield, color: 'text-slate-400' },
     { id: 'basic', icon: Zap, color: 'text-amber-500' },
     { id: 'pro', icon: Rocket, color: 'text-indigo-600' },
@@ -74,10 +91,10 @@ const Subscription = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {plans.map((plan) => {
+        {planCards.map((plan) => {
           const details = PLAN_LIMITS[plan.id];
           const isCurrent = currentTier === plan.id;
-          const Icon = plan.icon;
+          const PlanIcon = plan.icon;
 
           return (
             <Card key={plan.id} className={`relative flex flex-col ${isCurrent ? 'border-indigo-600 shadow-indigo-100 shadow-xl' : ''}`}>
@@ -88,7 +105,7 @@ const Subscription = () => {
               )}
               <CardHeader className="text-center pb-2">
                 <div className={`mx-auto p-3 rounded-full bg-slate-50 w-fit mb-4 ${plan.color}`}>
-                  <Icon className="h-6 w-6" />
+                  <PlanIcon className="h-6 w-6" />
                 </div>
                 <CardTitle className="text-xl">{details.name}</CardTitle>
                 <div className="mt-4">
@@ -127,7 +144,7 @@ const Subscription = () => {
                     </li>
                   ) : (
                     <li className="flex items-center gap-3 text-sm text-slate-400">
-                      <Lock className="h-4 w-4 text-slate-300 shrink-0" />
+                      <X className="h-4 w-4 text-slate-300 shrink-0" />
                       <span>Insights de IA bloqueados</span>
                     </li>
                   )}
