@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Check, Loader2, Rocket, Zap, Shield, Sparkles } from "lucide-react";
+import { Check, Loader2, Rocket, Zap, Shield, Sparkles, X } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,7 +36,6 @@ const Subscription = () => {
     
     setSubmitting(tier);
     try {
-      // Aqui integraria com Stripe/Pagar.me. Para o MVP, vamos apenas atualizar no banco.
       const { error } = await supabase
         .from('profiles')
         .update({ subscription_tier: tier })
@@ -70,7 +69,7 @@ const Subscription = () => {
         <h1 className="text-3xl font-bold text-slate-900">Escolha seu Plano</h1>
         <p className="text-slate-500 max-w-2xl mx-auto">
           Potencialize sua prática clínica com inteligência artificial. 
-          Escolha o plano que melhor se adapta ao volume do seu consultório.
+          A transcrição de áudio é o seu braço direito no prontuário.
         </p>
       </div>
 
@@ -98,7 +97,7 @@ const Subscription = () => {
                 </div>
               </CardHeader>
               <CardContent className="flex-1 space-y-4 pt-4">
-                <p className="text-sm text-slate-500 text-center italic">{details.description}</p>
+                <p className="text-sm text-slate-500 text-center italic mb-4">{details.description}</p>
                 <ul className="space-y-3">
                   <li className="flex items-center gap-3 text-sm">
                     <Check className="h-4 w-4 text-emerald-500 shrink-0" />
@@ -106,15 +105,26 @@ const Subscription = () => {
                   </li>
                   <li className="flex items-center gap-3 text-sm">
                     <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span><strong>{details.maxSessionsPerMonth === Infinity ? 'Ilimitadas' : details.maxSessionsPerMonth}</strong> sessões / mês</span>
+                    <span><strong>{details.maxSessionsPerMonth === Infinity ? 'Ilimitadas' : details.maxSessionsPerMonth}</strong> sessões/mês</span>
                   </li>
+                  
+                  {details.maxTranscriptionsPerMonth === 0 ? (
+                    <li className="flex items-center gap-3 text-sm text-slate-400">
+                      <X className="h-4 w-4 text-red-400 shrink-0" />
+                      <span>Sem transcrição de áudio</span>
+                    </li>
+                  ) : (
+                    <li className="flex items-center gap-3 text-sm">
+                      <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                      <span>
+                        <strong>{details.maxTranscriptionsPerMonth === Infinity ? 'Transcrições Ilimitadas' : `${details.maxTranscriptionsPerMonth} transcrições/mês`}</strong>
+                      </span>
+                    </li>
+                  )}
+
                   <li className="flex items-center gap-3 text-sm">
                     <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span>Transcrição com IA inclusa</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-sm">
-                    <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span>Suporte prioritário</span>
+                    <span>Insights terapêuticos com IA</span>
                   </li>
                 </ul>
               </CardContent>
@@ -131,23 +141,6 @@ const Subscription = () => {
             </Card>
           );
         })}
-      </div>
-
-      <div className="bg-slate-50 p-8 rounded-2xl border border-slate-200 mt-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-          <div>
-            <h4 className="font-bold text-slate-900 mb-2">Segurança de Dados</h4>
-            <p className="text-sm text-slate-500">Seus dados são criptografados e seguem rigorosamente a LGPD.</p>
-          </div>
-          <div>
-            <h4 className="font-bold text-slate-900 mb-2">Sem Fidelidade</h4>
-            <p className="text-sm text-slate-500">Cancele ou altere seu plano a qualquer momento sem taxas extras.</p>
-          </div>
-          <div>
-            <h4 className="font-bold text-slate-900 mb-2">Suporte Especializado</h4>
-            <p className="text-sm text-slate-500">Time pronto para ajudar você a tirar o melhor proveito da IA.</p>
-          </div>
-        </div>
       </div>
     </div>
   );

@@ -27,19 +27,10 @@ export const sessionService = {
     return data as Session;
   },
 
-  create: async (sessionData: any, audioFile?: File): Promise<Session> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Não autenticado");
-
-    // Verificar Limites do Plano (Sessões Mensais)
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('subscription_tier')
-      .eq('id', user.id)
-      .single();
-
-    const tier = (profile?.subscription_tier as SubscriptionTier) || 'free';
-    const limit = PLAN_LIMITS[tier].maxSessionsPerMonth;
+  checkTranscriptionLimit: async (userId: string, tier: SubscriptionTier): Promise<boolean> => {
+    const limit = PLAN_LIMITS[tier].maxTranscriptionsPerMonth;
+    if (limit === Infinity) return true;
+    if (limit === 0) return false;
 
     const start = startOfMonth(new Date()).toISOString();
     const end = endOfMonth(new Date()).toISOString();
@@ -47,11 +38,53 @@ export const sessionService = {
     const { count } = await supabase
       .from('sessions')
       .select('*', { count: 'exact', head: true })
+      .eq('psychologist_id', userId)
+      .not('audio_file_path', 'is', null)
+      .in('processing_status', ['completed', 'processing', 'queued'])
       .gte('created_at', start)
       .lte('created_at', end);
 
-    if (count !== null && count >= limit) {
-      throw new Error(`Limite mensal atingido! Seu plano ${PLAN_LIMITS[tier].name} permite ${limit} sessões por mês. Faça um upgrade para continuar.`);
+    return (count || 0) < limit;
+  },
+
+  create: async (sessionData: any, audioFile?: File): Promise<Session> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado");
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('subscription_tier')
+      .eq('id', user.id)
+      .single();
+
+    const tier = (profile?.subscription_tier as SubscriptionTier) || 'free';
+    
+    // Validar limite de sessões mensais
+    const sessionLimit = PLAN_LIMITS[tier].maxSessionsPerMonth;
+    const start = startOfMonth(new Date()).toISOString();
+    const end = endOfMonth(new Date()).toISOString();
+
+    const { count: sessionCount } = await supabase
+      .from('sessions')
+      .select('*', { count: 'exact', head: true })
+      .eq('psychologist_id', user.id)
+      .gte('created_at', start)
+      .lte('created_at', end);
+
+    if (sessionCount !== null && sessionCount >= sessionLimit) {
+      throw new Error(`Limite de sessões atingido! Seu plano ${PLAN_LIMITS[tier].name} permite ${sessionLimit} sessões/mês.`);
+    }
+
+    // Validar limite de transcrição se houver áudio
+    if (audioFile) {
+      const canTranscribe = await sessionService.checkTranscriptionLimit(user.id, tier);
+      if (!canTranscribe) {
+        throw new Error(
+          tier === 'free' 
+            ? "O plano Gratuito não inclui transcrição de áudio. Faça um upgrade para usar este recurso." 
+            : `Limite de transcrições mensais atingido (${PLAN_LIMITS[tier].maxTranscriptionsPerMonth}). Faça um upgrade para o plano Profissional.`
+        );
+      }
     }
 
     const cleanedData = {
@@ -59,8 +92,6 @@ export const sessionService = {
       patient_id: sessionData.patient_id === "" ? null : sessionData.patient_id,
       psychologist_id: user.id,
     };
-
-    if (!cleanedData.patient_id) throw new Error("Paciente é obrigatório");
 
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
@@ -71,85 +102,60 @@ export const sessionService = {
     if (sessionError) throw sessionError;
 
     if (audioFile) {
-      try {
-        const uploadResult = await storageService.uploadSessionAudio(
-          user.id,
-          session.patient_id,
-          session.id,
-          audioFile
-        );
-
-        const { data: updatedSession, error: updateError } = await supabase
-          .from('sessions')
-          .update({
-            audio_file_name: uploadResult.name,
-            audio_file_path: uploadResult.path
-          })
-          .eq('id', session.id)
-          .select()
-          .single();
-
-        if (updateError) throw updateError;
-        return updatedSession as Session;
-      } catch (error) {
-        console.error("Erro no upload do áudio:", error);
-        return session as Session;
-      }
+      const uploadResult = await storageService.uploadSessionAudio(user.id, session.patient_id, session.id, audioFile);
+      const { data: updatedSession } = await supabase
+        .from('sessions')
+        .update({ audio_file_name: uploadResult.name, audio_file_path: uploadResult.path })
+        .eq('id', session.id)
+        .select()
+        .single();
+      return updatedSession as Session;
     }
 
     return session as Session;
   },
 
   update: async (id: string, sessionData: Partial<Session>, newAudioFile?: File): Promise<Session> => {
-    if (!id) throw new Error("ID da sessão é necessário");
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    const cleanedData = { ...sessionData };
-    if (cleanedData.patient_id === "") delete cleanedData.patient_id;
-
-    delete (cleanedData as any).processing_status;
-    delete (cleanedData as any).processing_error;
-    delete (cleanedData as any).transcript;
-    delete (cleanedData as any).highlights;
-    delete (cleanedData as any).next_steps;
-
-    let audioInfo: any = {};
     if (newAudioFile) {
-      const currentSession = await sessionService.getById(id);
-      if (currentSession?.audio_file_path) {
-        try {
-          await storageService.deleteFile(currentSession.audio_file_path);
-        } catch (e) {
-          console.warn("Erro ao excluir áudio antigo:", e);
-        }
-      }
-
-      const uploadResult = await storageService.uploadSessionAudio(
-        user.id,
-        cleanedData.patient_id || currentSession!.patient_id,
-        id,
-        newAudioFile
-      );
-
-      audioInfo = {
-        audio_file_name: uploadResult.name,
-        audio_file_path: uploadResult.path
-      };
+      const { data: profile } = await supabase.from('profiles').select('subscription_tier').eq('id', user.id).single();
+      const tier = (profile?.subscription_tier as SubscriptionTier) || 'free';
+      const canTranscribe = await sessionService.checkTranscriptionLimit(user.id, tier);
+      if (!canTranscribe) throw new Error("Limite de transcrições atingido ou não disponível no seu plano.");
     }
 
     const { data, error } = await supabase
       .from('sessions')
-      .update({ ...cleanedData, ...audioInfo })
+      .update(sessionData)
       .eq('id', id)
       .select()
       .single();
     
     if (error) throw error;
+
+    if (newAudioFile) {
+      const uploadResult = await storageService.uploadSessionAudio(user.id, data.patient_id, id, newAudioFile);
+      const { data: updated } = await supabase
+        .from('sessions')
+        .update({ audio_file_name: uploadResult.name, audio_file_path: uploadResult.path })
+        .eq('id', id)
+        .select()
+        .single();
+      return updated as Session;
+    }
+
     return data as Session;
   },
 
   processAudio: async (sessionId: string): Promise<any> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data: profile } = await supabase.from('profiles').select('subscription_tier').eq('id', user?.id).single();
+    const tier = (profile?.subscription_tier as SubscriptionTier) || 'free';
+    
+    if (tier === 'free') throw new Error("O plano Gratuito não permite processamento de áudio.");
+
     const { data, error } = await supabase.functions.invoke('process-session-audio', {
       body: { sessionId }
     });
@@ -163,63 +169,29 @@ export const sessionService = {
     if (!session) return;
 
     if (session.audio_file_path) {
-      await supabase
-        .from('sessions')
-        .update({ processing_status: 'queued' })
-        .eq('id', id);
-
-      sessionService.processAudio(id).catch(err => {
-        console.error("Erro ao iniciar processamento:", err);
-      });
+      try {
+        await sessionService.processAudio(id);
+        await supabase.from('sessions').update({ processing_status: 'queued' }).eq('id', id);
+      } catch (e) {
+        console.warn("Processamento automático não disponível:", e);
+      }
     } else {
-      await supabase
-        .from('sessions')
-        .update({ processing_status: 'completed' })
-        .eq('id', id);
+      await supabase.from('sessions').update({ processing_status: 'completed' }).eq('id', id);
     }
   },
 
   removeAudio: async (sessionId: string): Promise<void> => {
-    if (!sessionId) return;
     const session = await sessionService.getById(sessionId);
-    if (!session) throw new Error("Sessão não encontrada");
-
-    if (session.audio_file_path) {
-      await storageService.deleteFile(session.audio_file_path);
-    }
-
-    const { error } = await supabase
-      .from('sessions')
-      .update({
-        audio_file_name: null,
-        audio_file_path: null,
-        transcript: null,
-        highlights: null,
-        next_steps: null,
-        processing_status: 'draft'
-      })
-      .eq('id', sessionId);
-
-    if (error) throw error;
+    if (session?.audio_file_path) await storageService.deleteFile(session.audio_file_path);
+    await supabase.from('sessions').update({
+      audio_file_name: null, audio_file_path: null, transcript: null, highlights: null, next_steps: null, processing_status: 'draft'
+    }).eq('id', sessionId);
   },
 
   delete: async (id: string): Promise<void> => {
-    if (!id) return;
     const session = await sessionService.getById(id);
-    if (session?.audio_file_path) {
-      try {
-        await storageService.deleteFile(session.audio_file_path);
-      } catch (e) {
-        console.warn("Erro ao apagar arquivo no storage:", e);
-      }
-    }
-
-    const { error } = await supabase
-      .from('sessions')
-      .delete()
-      .eq('id', id);
-    
-    if (error) throw error;
+    if (session?.audio_file_path) await storageService.deleteFile(session.audio_file_path);
+    await supabase.from('sessions').delete().eq('id', id);
   },
 
   getStats: async (): Promise<DashboardStats> => {

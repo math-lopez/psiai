@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2 } from "lucide-react";
+import { useNavigate, useParams, Link } from "react-router-dom";
+import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,8 @@ import { sessionService } from "@/services/sessionService";
 import { Patient, SessionRecordType } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
 import { validateAudioFile } from "@/lib/file-utils";
+import { supabase } from "@/integrations/supabase/client";
+import { SubscriptionTier } from "@/config/plans";
 
 const SessionFormPage = () => {
   const { id } = useParams();
@@ -27,6 +29,7 @@ const SessionFormPage = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [recordType, setRecordType] = useState<SessionRecordType>("ambos");
+  const [tier, setTier] = useState<SubscriptionTier>("free");
   
   const [formData, setFormData] = useState({
     patient_id: "",
@@ -41,6 +44,10 @@ const SessionFormPage = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: profile } = await supabase.from('profiles').select('subscription_tier').eq('id', user?.id).single();
+        setTier(profile?.subscription_tier as SubscriptionTier || "free");
+
         const pats = await patientService.list();
         setPatients(pats);
 
@@ -67,6 +74,11 @@ const SessionFormPage = () => {
   }, [id]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (tier === 'free') {
+      showError("Seu plano atual não permite transcrição de áudio.");
+      e.target.value = '';
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -83,8 +95,7 @@ const SessionFormPage = () => {
 
   const handleSave = async (e: React.FormEvent, shouldFinish: boolean = false) => {
     e.preventDefault();
-    
-    if (!formData.patient_id || formData.patient_id === "") {
+    if (!formData.patient_id) {
       showError("Por favor, selecione um paciente.");
       return;
     }
@@ -92,28 +103,18 @@ const SessionFormPage = () => {
     setSubmitting(true);
     try {
       let savedSession;
-      
-      // 1. Salva/Atualiza os dados (sempre fica rascunho por padrão no backend)
       if (id) {
-        savedSession = await sessionService.update(id, {
-          ...formData,
-          record_type: recordType,
-        }, audioFile || undefined);
+        savedSession = await sessionService.update(id, { ...formData, record_type: recordType }, audioFile || undefined);
       } else {
-        savedSession = await sessionService.create({
-          ...formData,
-          record_type: recordType,
-        }, audioFile || undefined);
+        savedSession = await sessionService.create({ ...formData, record_type: recordType }, audioFile || undefined);
       }
 
-      // 2. Se for para finalizar, dispara a lógica de conclusão
       if (shouldFinish) {
         await sessionService.finishSession(savedSession.id);
         showSuccess(audioFile || existingAudioName ? "Sessão enviada para processamento!" : "Sessão finalizada com sucesso!");
       } else {
         showSuccess("Rascunho salvo com sucesso!");
       }
-
       navigate("/sessoes");
     } catch (error: any) {
       showError(error.message || "Erro ao salvar sessão");
@@ -182,7 +183,13 @@ const SessionFormPage = () => {
               <RadioGroup 
                 value={recordType} 
                 className="flex flex-col md:flex-row gap-4"
-                onValueChange={(v: any) => setRecordType(v)}
+                onValueChange={(v: any) => {
+                  if (v === 'ambos' && tier === 'free') {
+                    showError("Upgrade necessário para gravar áudio.");
+                    return;
+                  }
+                  setRecordType(v);
+                }}
               >
                 <div className="flex items-center space-x-2 border p-4 rounded-lg flex-1 cursor-pointer">
                   <RadioGroupItem value="manual" id="manual" />
@@ -190,16 +197,26 @@ const SessionFormPage = () => {
                     <FileText className="h-4 w-4" /> Apenas Anotações
                   </Label>
                 </div>
-                <div className="flex items-center space-x-2 border p-4 rounded-lg flex-1 cursor-pointer">
-                  <RadioGroupItem value="ambos" id="ambos" />
+                <div className={`flex items-center space-x-2 border p-4 rounded-lg flex-1 cursor-pointer relative ${tier === 'free' ? 'opacity-60 bg-slate-50' : ''}`}>
+                  <RadioGroupItem value="ambos" id="ambos" disabled={tier === 'free'} />
                   <Label htmlFor="ambos" className="flex items-center gap-2 cursor-pointer">
                     <Mic className="h-4 w-4" /> Áudio + Notas
+                    {tier === 'free' && <Lock className="h-3 w-3 text-slate-400" />}
                   </Label>
                 </div>
               </RadioGroup>
+              
+              {tier === 'free' && (
+                <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg flex items-center gap-3">
+                  <Sparkles className="h-4 w-4 text-amber-600" />
+                  <p className="text-xs text-amber-700">
+                    O plano gratuito não permite gravação de áudio. <Link to="/assinatura" className="font-bold underline">Faça upgrade</Link> para transcrever suas sessões.
+                  </p>
+                </div>
+              )}
             </div>
 
-            {(recordType === 'audio' || recordType === 'ambos') && (
+            {(recordType === 'audio' || recordType === 'ambos') && tier !== 'free' && (
               <div className="space-y-4 pt-4 border-t">
                 <Label className="flex items-center gap-2 text-indigo-600 font-semibold">
                   <Music className="h-4 w-4" /> Arquivo de Áudio
@@ -269,27 +286,12 @@ const SessionFormPage = () => {
           <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={submitting}>
             Cancelar
           </Button>
-          <Button 
-            type="button" 
-            variant="secondary" 
-            className="gap-2" 
-            disabled={submitting}
-            onClick={(e) => handleSave(e, false)}
-          >
+          <Button type="button" variant="secondary" className="gap-2" disabled={submitting} onClick={(e) => handleSave(e, false)}>
             {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />}
             Salvar Rascunho
           </Button>
-          <Button 
-            type="button" 
-            className="bg-indigo-600 hover:bg-indigo-700 gap-2 h-11 px-8" 
-            disabled={submitting}
-            onClick={(e) => handleSave(e, true)}
-          >
-            {submitting ? (
-              <Loader2 className="animate-spin h-4 w-4" />
-            ) : (
-              <CheckCircle2 className="h-4 w-4" />
-            )}
+          <Button type="button" className="bg-indigo-600 hover:bg-indigo-700 gap-2 h-11 px-8" disabled={submitting} onClick={(e) => handleSave(e, true)}>
+            {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
             Finalizar Sessão
           </Button>
         </div>

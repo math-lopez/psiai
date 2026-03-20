@@ -5,6 +5,7 @@ export interface PlanLimits {
   price: number;
   maxPatients: number;
   maxSessionsPerMonth: number;
+  maxTranscriptionsPerMonth: number; // Novo limite
   description: string;
 }
 
@@ -14,6 +15,7 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
     price: 0,
     maxPatients: 10,
     maxSessionsPerMonth: 10,
+    maxTranscriptionsPerMonth: 0, // Sem transcrição
     description: 'Ideal para quem está começando.'
   },
   basic: {
@@ -21,6 +23,7 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
     price: 19.90,
     maxPatients: 100,
     maxSessionsPerMonth: 1000,
+    maxTranscriptionsPerMonth: 10, // 10 transcrições/mês
     description: 'Para profissionais em crescimento.'
   },
   pro: {
@@ -28,13 +31,15 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
     price: 37.90,
     maxPatients: 1000,
     maxSessionsPerMonth: 10000,
+    maxTranscriptionsPerMonth: Infinity, // Ilimitado
     description: 'Gestão completa para clínicas médias.'
   },
   ultra: {
     name: 'Ultra',
-    price: 59.90, // Sugestão de valor para o ilimitado
+    price: 59.90,
     maxPatients: Infinity,
     maxSessionsPerMonth: Infinity,
+    maxTranscriptionsPerMonth: Infinity, // Ilimitado
     description: 'Liberdade total sem limites.'
   }
 };
