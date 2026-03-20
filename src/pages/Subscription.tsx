@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Check, Loader2, Rocket, Zap, Shield, Sparkles, X } from "lucide-react";
+import { Check, Loader2, Rocket, Zap, Shield, Sparkles, X, Lock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
 import { showSuccess, showError } from "@/utils/toast";
+
+// MAPEAMENTO DE IDs DE PREÇO DO STRIPE (Substitua pelos seus IDs reais do Dashboard do Stripe)
+const STRIPE_PRICE_IDS: Record<string, string> = {
+  basic: "price_basic_id_here",
+  pro: "price_pro_id_here",
+  ultra: "price_ultra_id_here",
+};
 
 const Subscription = () => {
   const { user } = useAuth();
@@ -20,23 +27,17 @@ const Subscription = () => {
     const fetchTier = async () => {
       if (!user) return;
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('profiles')
           .select('subscription_tier')
           .eq('id', user.id)
           .maybeSingle();
         
-        if (error) {
-          console.error("Erro ao carregar plano:", error);
-          // Se der erro 400, provavelmente a coluna não existe. Mantemos 'free'.
-          return;
-        }
-
         if (data?.subscription_tier) {
           setCurrentTier(data.subscription_tier as SubscriptionTier);
         }
       } catch (e) {
-        console.error("Erro inesperado:", e);
+        console.error("Erro ao carregar plano:", e);
       } finally {
         setLoading(false);
       }
@@ -47,30 +48,52 @@ const Subscription = () => {
   const handleSubscribe = async (tierId: SubscriptionTier) => {
     if (tierId === currentTier) return;
     
+    // Plano gratuito apenas atualiza no banco (se permitido voltar atrás)
+    if (tierId === 'free') {
+      setSubmitting('free');
+      await supabase.from('profiles').update({ subscription_tier: 'free' }).eq('id', user?.id);
+      setCurrentTier('free');
+      setSubmitting(null);
+      return;
+    }
+
     setSubmitting(tierId);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ subscription_tier: tierId })
-        .eq('id', user?.id);
+      const priceId = STRIPE_PRICE_IDS[tierId];
+      if (!priceId || priceId.includes("_id_here")) {
+        throw new Error("ID do preço não configurado. Por favor, configure o Stripe Price ID.");
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: { 
+          tier: tierId, 
+          priceId: priceId,
+          successUrl: window.location.origin + "/assinatura?success=true",
+          cancelUrl: window.location.origin + "/assinatura?canceled=true",
+        }
+      });
 
       if (error) throw error;
-
-      setCurrentTier(tierId);
-      showSuccess(`Plano ${PLAN_LIMITS[tierId].name} ativado com sucesso!`);
+      if (data?.url) {
+        window.location.href = data.url; // Redireciona para o Stripe
+      }
     } catch (e: any) {
-      showError("Erro ao processar assinatura. Verifique se a coluna 'subscription_tier' existe no banco.");
-    } finally {
+      showError(e.message || "Erro ao iniciar pagamento.");
       setSubmitting(null);
     }
   };
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('success')) {
+      showSuccess("Pagamento recebido! Seu plano será atualizado em instantes.");
+      // Limpa a URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
   if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      </div>
-    );
+    return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
   }
 
   const planCards: { id: SubscriptionTier; icon: any; color: string }[] = [
@@ -86,7 +109,7 @@ const Subscription = () => {
         <h1 className="text-3xl font-bold text-slate-900">Escolha seu Plano</h1>
         <p className="text-slate-500 max-w-2xl mx-auto">
           Potencialize sua prática clínica com inteligência artificial. 
-          Desbloqueie o poder máximo da análise terapêutica no plano Ultra.
+          Assinatura mensal recorrente com cobrança automática via Stripe.
         </p>
       </div>
 
@@ -144,7 +167,7 @@ const Subscription = () => {
                     </li>
                   ) : (
                     <li className="flex items-center gap-3 text-sm text-slate-400">
-                      <X className="h-4 w-4 text-slate-300 shrink-0" />
+                      <Lock className="h-4 w-4 text-slate-300 shrink-0" />
                       <span>Insights de IA bloqueados</span>
                     </li>
                   )}
@@ -157,7 +180,7 @@ const Subscription = () => {
                   disabled={isCurrent || submitting !== null}
                   onClick={() => handleSubscribe(plan.id)}
                 >
-                  {submitting === plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : isCurrent ? 'Plano Ativo' : 'Escolher Plano'}
+                  {submitting === plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : isCurrent ? 'Plano Ativo' : 'Assinar Agora'}
                 </Button>
               </CardFooter>
             </Card>
