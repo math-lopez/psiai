@@ -69,7 +69,7 @@ const Subscription = () => {
         <h1 className="text-3xl font-bold text-slate-900">Escolha seu Plano</h1>
         <p className="text-slate-500 max-w-2xl mx-auto">
           Potencialize sua prática clínica com inteligência artificial. 
-          A transcrição de áudio é o seu braço direito no prontuário.
+          Desbloqueie o poder máximo da análise terapêutica no plano Ultra.
         </p>
       </div>
 
@@ -105,7 +105,7 @@ const Subscription = () => {
                   </li>
                   <li className="flex items-center gap-3 text-sm">
                     <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span><strong>{details.maxSessionsPerMonth === Infinity ? 'Ilimitadas' : details.maxSessionsPerMonth}</strong> sessões/mês</span>
+                    <span>Sessões: <strong>{details.maxSessionsPerMonth === Infinity ? 'Ilimitadas' : details.maxSessionsPerMonth}</strong></span>
                   </li>
                   
                   {details.maxTranscriptionsPerMonth === 0 ? (
@@ -116,16 +116,21 @@ const Subscription = () => {
                   ) : (
                     <li className="flex items-center gap-3 text-sm">
                       <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                      <span>
-                        <strong>{details.maxTranscriptionsPerMonth === Infinity ? 'Transcrições Ilimitadas' : `${details.maxTranscriptionsPerMonth} transcrições/mês`}</strong>
-                      </span>
+                      <span>Transcrições: <strong>{details.maxTranscriptionsPerMonth === Infinity ? 'Ilimitadas' : details.maxTranscriptionsPerMonth}</strong></span>
                     </li>
                   )}
 
-                  <li className="flex items-center gap-3 text-sm">
-                    <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span>Insights terapêuticos com IA</span>
-                  </li>
+                  {details.hasTherapeuticInsights ? (
+                    <li className="flex items-center gap-3 text-sm font-bold text-indigo-700">
+                      <Sparkles className="h-4 w-4 text-indigo-500 shrink-0" />
+                      <span>Insights Terapêuticos inclusos</span>
+                    </li>
+                  ) : (
+                    <li className="flex items-center gap-3 text-sm text-slate-400">
+                      <Lock className="h-4 w-4 text-slate-300 shrink-0" />
+                      <span>Insights de IA bloqueados</span>
+                    </li>
+                  )}
                 </ul>
               </CardContent>
               <CardFooter className="pt-6">

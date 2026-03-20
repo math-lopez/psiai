@@ -5,7 +5,8 @@ export interface PlanLimits {
   price: number;
   maxPatients: number;
   maxSessionsPerMonth: number;
-  maxTranscriptionsPerMonth: number; // Novo limite
+  maxTranscriptionsPerMonth: number;
+  hasTherapeuticInsights: boolean; // Novo campo
   description: string;
 }
 
@@ -15,7 +16,8 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
     price: 0,
     maxPatients: 10,
     maxSessionsPerMonth: 10,
-    maxTranscriptionsPerMonth: 0, // Sem transcrição
+    maxTranscriptionsPerMonth: 0,
+    hasTherapeuticInsights: false,
     description: 'Ideal para quem está começando.'
   },
   basic: {
@@ -23,7 +25,8 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
     price: 19.90,
     maxPatients: 100,
     maxSessionsPerMonth: 1000,
-    maxTranscriptionsPerMonth: 10, // 10 transcrições/mês
+    maxTranscriptionsPerMonth: 10,
+    hasTherapeuticInsights: false,
     description: 'Para profissionais em crescimento.'
   },
   pro: {
@@ -31,7 +34,8 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
     price: 37.90,
     maxPatients: 1000,
     maxSessionsPerMonth: 10000,
-    maxTranscriptionsPerMonth: Infinity, // Ilimitado
+    maxTranscriptionsPerMonth: Infinity,
+    hasTherapeuticInsights: false,
     description: 'Gestão completa para clínicas médias.'
   },
   ultra: {
@@ -39,7 +43,8 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
     price: 59.90,
     maxPatients: Infinity,
     maxSessionsPerMonth: Infinity,
-    maxTranscriptionsPerMonth: Infinity, // Ilimitado
-    description: 'Liberdade total sem limites.'
+    maxTranscriptionsPerMonth: Infinity,
+    hasTherapeuticInsights: true, // Apenas Ultra tem insights
+    description: 'Liberdade total e inteligência máxima.'
   }
 };
