@@ -10,12 +10,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
 import { showSuccess, showError } from "@/utils/toast";
 
-// MAPEAMENTO DE IDs DE PREÇO DO STRIPE (Substitua pelos seus IDs reais do Dashboard do Stripe)
+// ========================================================
+// COLE SEUS IDs DO STRIPE AQUI (price_...)
+// ========================================================
 const STRIPE_PRICE_IDS: Record<string, string> = {
-  basic: "price_basic_id_here",
-  pro: "price_pro_id_here",
-  ultra: "price_ultra_id_here",
+  basic: "price_1RAfF0L5e3X7h4rP9s2t1u0v", // EXEMPLO: SUBSTITUA PELO SEU
+  pro: "price_1RAfF0L5e3X7h4rP9s2t1u0w",   // EXEMPLO: SUBSTITUA PELO SEU
+  ultra: "price_1RAfF0L5e3X7h4rP9s2t1u0x", // EXEMPLO: SUBSTITUA PELO SEU
 };
+// ========================================================
 
 const Subscription = () => {
   const { user } = useAuth();
@@ -48,22 +51,30 @@ const Subscription = () => {
   const handleSubscribe = async (tierId: SubscriptionTier) => {
     if (tierId === currentTier) return;
     
-    // Plano gratuito apenas atualiza no banco (se permitido voltar atrás)
     if (tierId === 'free') {
       setSubmitting('free');
-      await supabase.from('profiles').update({ subscription_tier: 'free' }).eq('id', user?.id);
-      setCurrentTier('free');
-      setSubmitting(null);
+      try {
+        await supabase.from('profiles').update({ subscription_tier: 'free' }).eq('id', user?.id);
+        setCurrentTier('free');
+        showSuccess("Plano alterado para Gratuito.");
+      } catch (e) {
+        showError("Erro ao alterar plano.");
+      } finally {
+        setSubmitting(null);
+      }
       return;
     }
 
     setSubmitting(tierId);
     try {
       const priceId = STRIPE_PRICE_IDS[tierId];
-      if (!priceId || priceId.includes("_id_here")) {
-        throw new Error("ID do preço não configurado. Por favor, configure o Stripe Price ID.");
+      
+      // Validação simples para evitar erro se o usuário não trocou o ID de exemplo
+      if (!priceId || priceId === "" || priceId.startsWith("price_1RAfF")) {
+        throw new Error(`O ID de preço para o plano ${tierId} não foi configurado corretamente no código.`);
       }
 
+      // Chama a Edge Function para criar a sessão do Stripe
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: { 
           tier: tierId, 
@@ -75,10 +86,11 @@ const Subscription = () => {
 
       if (error) throw error;
       if (data?.url) {
-        window.location.href = data.url; // Redireciona para o Stripe
+        window.location.href = data.url; 
       }
     } catch (e: any) {
       showError(e.message || "Erro ao iniciar pagamento.");
+    } finally {
       setSubmitting(null);
     }
   };
@@ -87,7 +99,6 @@ const Subscription = () => {
     const params = new URLSearchParams(window.location.search);
     if (params.get('success')) {
       showSuccess("Pagamento recebido! Seu plano será atualizado em instantes.");
-      // Limpa a URL
       window.history.replaceState({}, '', window.location.pathname);
     }
   }, []);
