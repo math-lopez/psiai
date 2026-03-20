@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { showSuccess, showError } from "@/utils/toast";
 
 export interface Notification {
   id: string;
@@ -19,9 +18,8 @@ export const useNotifications = () => {
   useEffect(() => {
     if (!user) return;
 
-    // Escuta mudanças na tabela sessions filtrando pelo usuário logado
     const channel = supabase
-      .channel(`realtime-sessions-${user.id}`)
+      .channel(`notifs-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -35,25 +33,16 @@ export const useNotifications = () => {
           
           if (newStatus === 'completed' || newStatus === 'error') {
             const isSuccess = newStatus === 'completed';
-            const title = isSuccess ? "Processamento Concluído" : "Erro no Processamento";
-            const message = isSuccess 
-              ? `A IA finalizou a transcrição de uma sessão.` 
-              : `Houve um erro ao processar o áudio de uma sessão.`;
-
             const newNotif: Notification = {
               id: Math.random().toString(36).substr(2, 9),
-              title,
-              message,
+              title: isSuccess ? "Sessão Processada" : "Erro no Processamento",
+              message: isSuccess ? "A transcrição da sua sessão está pronta." : "Ocorreu um erro ao processar o áudio.",
               type: isSuccess ? 'success' : 'error',
               read: false,
               createdAt: new Date(),
             };
 
-            // Adiciona ao topo da lista de notificações que o Header consome
             setNotifications(prev => [newNotif, ...prev]);
-            
-            if (isSuccess) showSuccess(message);
-            else showError(message);
           }
         }
       )

@@ -20,7 +20,6 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    // 1. Autenticação do Usuário
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ success: false, error: 'Não autorizado' }), { 
@@ -35,7 +34,6 @@ serve(async (req) => {
       });
     }
 
-    // 2. Extração e Validação do Body (apenas uma vez)
     const body = await req.json();
     sessionId = body.sessionId;
 
@@ -45,9 +43,6 @@ serve(async (req) => {
       });
     }
 
-    console.log(`[process-session-audio] Iniciando para sessão ${sessionId} (User: ${user.id})`);
-
-    // 3. Busca da Sessão e Validação de Propriedade
     const { data: session, error: fetchError } = await supabase
       .from('sessions')
       .select('*')
@@ -60,63 +55,37 @@ serve(async (req) => {
       });
     }
 
-    if (session.psychologist_id !== user.id) {
-      return new Response(JSON.stringify({ success: false, error: 'Acesso negado' }), { 
-        status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      });
-    }
-
-    if (!session.audio_file_path) {
-      return new Response(JSON.stringify({ success: false, error: 'Sessão sem arquivo de áudio' }), { 
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      });
-    }
-
-    // 4. Verificação de Status de Processamento
-    if (['queued', 'processing'].includes(session.processing_status)) {
-      return new Response(JSON.stringify({ 
-        success: true, 
-        sessionId, 
-        status: session.processing_status,
-        message: 'Já em processamento' 
-      }), { 
+    // Bloqueia apenas se já estiver em processamento ativo (evita duplicidade)
+    if (session.processing_status === 'processing') {
+      return new Response(JSON.stringify({ success: true, message: 'Já processando' }), { 
         status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       });
     }
 
-    // 5. Início do Fluxo de Status (Queued -> Processing)
-    await supabase.from('sessions').update({
-      processing_status: 'queued',
-      processing_requested_at: new Date().toISOString(),
-      processing_error: null
-    }).eq('id', sessionId);
-
+    // 5. Início do Fluxo
     await supabase.from('sessions').update({
       processing_status: 'processing',
       processing_started_at: new Date().toISOString(),
-      processing_attempts: (session.processing_attempts || 0) + 1
+      processing_attempts: (session.processing_attempts || 0) + 1,
+      processing_error: null
     }).eq('id', sessionId);
 
-    // 6. Download do Áudio do Storage
-    console.log(`[process-session-audio] Baixando áudio: ${session.audio_file_path}`);
     const { data: audioBlob, error: downloadError } = await supabase.storage
       .from('session-files')
       .download(session.audio_file_path);
 
     if (downloadError || !audioBlob) {
-      throw new Error(`Erro no download do storage: ${downloadError?.message || 'Arquivo não encontrado'}`);
+      throw new Error(`Erro no download: ${downloadError?.message}`);
     }
 
-    // 7. Chamada ao Serviço Externo de IA
     if (!serviceUrl || !serviceToken) {
-      throw new Error('Serviço de IA não configurado no servidor');
+      throw new Error('Serviço de IA não configurado');
     }
 
     const formData = new FormData();
     formData.append('file', audioBlob, session.audio_file_name || 'audio.mp3');
     formData.append('sessionId', sessionId);
 
-    console.log(`[process-session-audio] Enviando para serviço externo: ${serviceUrl}`);
     const serviceResponse = await fetch(serviceUrl, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${serviceToken}` },
@@ -125,42 +94,26 @@ serve(async (req) => {
 
     if (!serviceResponse.ok) {
       const errorText = await serviceResponse.text();
-      throw new Error(`Serviço de IA falhou (${serviceResponse.status}): ${errorText}`);
+      throw new Error(`Serviço de IA falhou: ${errorText}`);
     }
 
     const result = await serviceResponse.json();
 
-    // 8. Validação da Resposta da IA
-    if (!result.success || typeof result.text !== 'string') {
-      throw new Error('Serviço de IA retornou uma resposta inválida ou incompleta');
-    }
-
-    // 9. Sucesso: Atualização Final dos Dados
     const { error: updateError } = await supabase.from('sessions').update({
       processing_status: 'completed',
       processing_finished_at: new Date().toISOString(),
       transcript: result.text,
       highlights: Array.isArray(result.highlights) ? result.highlights : [],
       next_steps: result.next_steps || '',
-      processing_error: null
     }).eq('id', sessionId);
 
     if (updateError) throw updateError;
 
-    console.log(`[process-session-audio] Sessão ${sessionId} processada com sucesso`);
-
-    return new Response(JSON.stringify({
-      success: true,
-      sessionId,
-      status: 'completed'
-    }), { 
+    return new Response(JSON.stringify({ success: true, status: 'completed' }), { 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
 
   } catch (err: any) {
-    console.error(`[process-session-audio] Erro crítico: ${err.message}`);
-    
-    // 10. Tratamento de Erro e Atualização de Status no Banco
     if (sessionId) {
       await supabase.from('sessions').update({
         processing_status: 'error',
@@ -168,11 +121,7 @@ serve(async (req) => {
         processing_error: err.message
       }).eq('id', sessionId);
     }
-
-    return new Response(JSON.stringify({
-      success: false,
-      error: err.message
-    }), { 
+    return new Response(JSON.stringify({ success: false, error: err.message }), { 
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
   }
