@@ -15,6 +15,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { showSuccess, showError } from "@/utils/toast";
 import { patientService } from "@/services/patientService";
+import { maskCPF, maskPhone } from "@/lib/utils";
 
 const PatientFormPage = () => {
   const { id } = useParams();
@@ -123,7 +124,8 @@ const PatientFormPage = () => {
                 <Input 
                   id="cpf" 
                   value={formData.cpf}
-                  onChange={(e) => setFormData({...formData, cpf: e.target.value})}
+                  placeholder="000.000.000-00"
+                  onChange={(e) => setFormData({...formData, cpf: maskCPF(e.target.value)})}
                 />
               </div>
               <div className="space-y-2">
@@ -162,7 +164,8 @@ const PatientFormPage = () => {
                   id="phone" 
                   required 
                   value={formData.phone}
-                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  placeholder="(00) 00000-0000"
+                  onChange={(e) => setFormData({...formData, phone: maskPhone(e.target.value)})}
                 />
               </div>
             </div>

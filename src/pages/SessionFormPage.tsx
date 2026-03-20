@@ -21,6 +21,7 @@ import { showSuccess, showError } from "@/utils/toast";
 import { validateAudioFile } from "@/lib/file-utils";
 import { supabase } from "@/integrations/supabase/client";
 import { SubscriptionTier } from "@/config/plans";
+import { getLocalDateTime } from "@/lib/utils";
 
 const SessionFormPage = () => {
   const { id } = useParams();
@@ -33,7 +34,7 @@ const SessionFormPage = () => {
   
   const [formData, setFormData] = useState({
     patient_id: "",
-    session_date: new Date().toISOString().slice(0, 16),
+    session_date: getLocalDateTime(),
     duration_minutes: 50,
     manual_notes: "",
   });
@@ -46,10 +47,9 @@ const SessionFormPage = () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         
-        // Busca resiliente: se a coluna não existir, o erro é tratado
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('*') // Buscamos tudo para evitar erro 406/400 se a coluna específica faltar
+          .select('*')
           .eq('id', user?.id)
           .maybeSingle();
         
