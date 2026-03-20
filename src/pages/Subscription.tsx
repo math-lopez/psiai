@@ -1,13 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Check, Loader2, Rocket, Zap, Shield, Sparkles, ExternalLink } from "lucide-react";
+import { Check, Loader2, Rocket, Zap, Shield, Sparkles, ExternalLink, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
 import { showError } from "@/utils/toast";
+import { Link } from "react-router-dom";
 
 // ========================================================
 // IDs DO STRIPE (price_...) - SUBSTITUA PELOS SEUS DE PRODUÇÃO
@@ -36,13 +37,8 @@ const Subscription = () => {
           .maybeSingle();
         
         if (data) {
-          // Garantir que o tier existe no nosso objeto PLAN_LIMITS
           const tierFromDb = data.subscription_tier as SubscriptionTier;
-          if (PLAN_LIMITS[tierFromDb]) {
-            setCurrentTier(tierFromDb);
-          } else {
-            setCurrentTier('free');
-          }
+          setCurrentTier(PLAN_LIMITS[tierFromDb] ? tierFromDb : 'free');
           setHasSubscription(!!data.stripe_customer_id);
         }
       } finally {
@@ -56,7 +52,6 @@ const Subscription = () => {
     setSubmitting(tierId);
     try {
       const priceId = STRIPE_PRICE_IDS[tierId];
-      
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: { 
           tier: tierId, 
@@ -77,102 +72,160 @@ const Subscription = () => {
 
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
 
-  const planCards: { id: SubscriptionTier; icon: any; color: string }[] = [
-    { id: 'free', icon: Shield, color: 'text-slate-400' },
-    { id: 'basic', icon: Zap, color: 'text-amber-500' },
-    { id: 'pro', icon: Rocket, color: 'text-indigo-600' },
-    { id: 'ultra', icon: Sparkles, color: 'text-purple-600' },
-  ];
-
-  // Dados do plano atual para o cabeçalho
-  const currentPlanDetails = PLAN_LIMITS[currentTier] || PLAN_LIMITS.free;
+  const currentPlan = PLAN_LIMITS[currentTier];
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-slate-900">Assinatura e Planos</h1>
-        <p className="text-slate-500 max-w-2xl mx-auto">
-          {hasSubscription 
-            ? "Gerencie sua assinatura, mude de plano ou atualize sua forma de pagamento através do portal seguro." 
-            : "Escolha o melhor plano para sua prática clínica e comece agora."}
-        </p>
+    <div className="max-w-5xl mx-auto space-y-8 py-4">
+      <div className="flex items-center gap-4 mb-2">
+         <Link to="/configuracoes">
+          <Button variant="ghost" size="icon"><ArrowLeft className="h-5 w-5" /></Button>
+         </Link>
+         <h1 className="text-3xl font-bold text-slate-900">Assinatura</h1>
       </div>
 
-      {hasSubscription && (
-        <div className="bg-indigo-600 rounded-2xl p-6 text-white flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg shadow-indigo-100 mb-10">
-          <div className="flex items-center gap-4">
-            <div className="bg-white/20 p-3 rounded-xl"><Sparkles className="h-6 w-6" /></div>
-            <div>
-              <p className="text-indigo-100 text-sm font-medium uppercase tracking-wider">Assinatura Ativa</p>
-              <h3 className="text-xl font-bold">Plano: {currentPlanDetails.name}</h3>
-              <p className="text-indigo-100 text-xs mt-1 italic">Qualquer alteração feita no portal respeitará seu ciclo de faturamento atual.</p>
-            </div>
-          </div>
-          <Button 
-            className="bg-white text-indigo-600 hover:bg-indigo-50 font-bold px-8 gap-2 shrink-0"
-            onClick={() => handleAction(currentTier)}
-            disabled={submitting !== null}
-          >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
-            Gerenciar Assinatura
-          </Button>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {planCards.map((plan) => {
-          const details = PLAN_LIMITS[plan.id];
-          const isCurrent = currentTier === plan.id;
-          const PlanIcon = plan.icon;
-
-          const buttonText = isCurrent ? 'Plano Ativo' : (hasSubscription ? 'Alterar Plano' : 'Escolher Plano');
-
-          return (
-            <Card key={plan.id} className={`relative flex flex-col ${isCurrent ? 'border-indigo-600 ring-2 ring-indigo-600/20 shadow-lg' : ''}`}>
-              <CardHeader className="text-center pb-2">
-                <div className={`mx-auto p-3 rounded-full bg-slate-50 w-fit mb-4 ${plan.color}`}>
-                  <PlanIcon className="h-6 w-6" />
+      {hasSubscription && currentTier !== 'free' ? (
+        /* VISÃO PARA ASSINANTES: Mostra apenas o plano atual */
+        <div className="space-y-6">
+          <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
+            <div className="h-2 bg-indigo-600 w-full" />
+            <div className="p-8 md:p-12 flex flex-col md:flex-row gap-8 items-start justify-between">
+              <div className="space-y-6 max-w-xl">
+                <div>
+                  <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100 border-none px-3 py-1 mb-3">Plano Ativo</Badge>
+                  <h2 className="text-4xl font-bold text-slate-900">{currentPlan.name}</h2>
+                  <p className="text-slate-500 mt-2">{currentPlan.description}</p>
                 </div>
-                <CardTitle className="text-xl">{details.name}</CardTitle>
-                <div className="mt-4">
-                  <span className="text-3xl font-bold">R$ {details.price.toFixed(2).replace('.', ',')}</span>
-                  <span className="text-slate-500 text-sm">/mês</span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl bg-slate-50 border space-y-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pacientes</p>
+                    <p className="text-xl font-bold text-slate-800">{currentPlan.maxPatients === Infinity ? 'Ilimitados' : currentPlan.maxPatients}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-50 border space-y-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Transcrições / mês</p>
+                    <p className="text-xl font-bold text-slate-800">{currentPlan.maxTranscriptionsPerMonth === Infinity ? 'Ilimitadas' : currentPlan.maxTranscriptionsPerMonth}</p>
+                  </div>
                 </div>
-              </CardHeader>
-              <CardContent className="flex-1 space-y-4 pt-4">
-                <ul className="space-y-3">
-                  <li className="flex items-center gap-3 text-sm">
-                    <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span>{details.maxPatients === Infinity ? 'Ilimitados' : `${details.maxPatients} pacientes`}</span>
+
+                <ul className="space-y-3 pt-2">
+                  <li className="flex items-center gap-3 text-sm text-slate-600">
+                    <Check className="h-5 w-5 text-emerald-500" /> Suporte prioritário
                   </li>
-                  <li className="flex items-center gap-3 text-sm">
-                    <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span>{details.maxTranscriptionsPerMonth === Infinity ? 'Ilimitadas' : `${details.maxTranscriptionsPerMonth}`} transcrições</span>
+                  <li className="flex items-center gap-3 text-sm text-slate-600">
+                    <Check className="h-5 w-5 text-emerald-500" /> Exportação de prontuários em PDF
                   </li>
-                  {details.hasTherapeuticInsights && (
+                  {currentPlan.hasTherapeuticInsights && (
                     <li className="flex items-center gap-3 text-sm font-bold text-indigo-700">
-                      <Sparkles className="h-4 w-4 text-indigo-500 shrink-0" />
-                      <span>Insights Terapêuticos</span>
+                      <Sparkles className="h-5 w-5 text-indigo-500" /> Insights Terapêuticos com IA
                     </li>
                   )}
                 </ul>
-              </CardContent>
-              <CardFooter className="pt-6">
-                <Button 
-                  className={`w-full ${isCurrent ? 'bg-slate-100 text-slate-500' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-                  variant={isCurrent ? "secondary" : "default"}
-                  disabled={(isCurrent && hasSubscription) || (plan.id === 'free' && !hasSubscription) || submitting !== null}
-                  onClick={() => handleAction(plan.id)}
-                >
-                  {submitting === plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : buttonText}
-                </Button>
-              </CardFooter>
-            </Card>
-          );
-        })}
-      </div>
+              </div>
+
+              <Card className="w-full md:w-80 bg-indigo-50/50 border-indigo-100">
+                <CardHeader>
+                  <CardTitle className="text-sm font-bold text-indigo-900 uppercase tracking-wider">Pagamento</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-3xl font-bold text-indigo-900">
+                    R$ {currentPlan.price.toFixed(2).replace('.', ',')}
+                    <span className="text-xs font-normal text-indigo-600/60 ml-1">/mês</span>
+                  </div>
+                  <p className="text-xs text-indigo-700 leading-relaxed">
+                    Sua assinatura é processada com segurança pelo Stripe. Você pode cancelar ou mudar de plano a qualquer momento.
+                  </p>
+                </CardContent>
+                <CardFooter>
+                  <Button 
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 gap-2 shadow-md shadow-indigo-200"
+                    onClick={() => handleAction(currentTier)}
+                    disabled={submitting !== null}
+                  >
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+                    Gerenciar no Stripe
+                  </Button>
+                </CardFooter>
+              </Card>
+            </div>
+          </div>
+          
+          <p className="text-center text-xs text-slate-400">
+            Deseja mudar para o plano {currentTier === 'ultra' ? 'Pro' : 'Ultra'}? Use o botão acima para acessar o portal de faturamento.
+          </p>
+        </div>
+      ) : (
+        /* VISÃO PARA USUÁRIOS FREE: Vitrine de Planos */
+        <div className="space-y-8">
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 flex items-center gap-4">
+            <Shield className="h-8 w-8 text-indigo-600" />
+            <div>
+              <p className="font-bold text-indigo-900">Você está no plano Gratuito</p>
+              <p className="text-sm text-indigo-700">Seus limites são reduzidos. Escolha um dos planos abaixo para desbloquear o potencial total da IA.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {(['basic', 'pro', 'ultra'] as SubscriptionTier[]).map((tierId) => {
+              const details = PLAN_LIMITS[tierId];
+              const icons = { basic: Zap, pro: Rocket, ultra: Sparkles };
+              const colors = { basic: 'text-amber-500', pro: 'text-indigo-600', ultra: 'text-purple-600' };
+              const Icon = icons[tierId as keyof typeof icons];
+
+              return (
+                <Card key={tierId} className="flex flex-col border-2 hover:border-indigo-200 transition-all">
+                  <CardHeader className="text-center">
+                    <div className={`mx-auto p-3 rounded-full bg-slate-50 w-fit mb-4 ${colors[tierId as keyof typeof colors]}`}>
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <CardTitle className="text-xl font-bold">{details.name}</CardTitle>
+                    <div className="mt-4">
+                      <span className="text-3xl font-bold">R$ {details.price.toFixed(2).replace('.', ',')}</span>
+                      <span className="text-slate-500 text-sm">/mês</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex-1 space-y-4">
+                    <p className="text-xs text-slate-500 text-center px-4 leading-relaxed">{details.description}</p>
+                    <ul className="space-y-3 pt-4 border-t">
+                      <li className="flex items-center gap-3 text-sm">
+                        <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                        <span>{details.maxPatients === Infinity ? 'Ilimitados' : `${details.maxPatients} pacientes`}</span>
+                      </li>
+                      <li className="flex items-center gap-3 text-sm">
+                        <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                        <span>{details.maxTranscriptionsPerMonth === Infinity ? 'Ilimitadas' : `${details.maxTranscriptionsPerMonth}`} transcrições</span>
+                      </li>
+                      {details.hasTherapeuticInsights && (
+                        <li className="flex items-center gap-3 text-sm font-bold text-indigo-700">
+                          <Sparkles className="h-4 w-4 text-indigo-500 shrink-0" />
+                          <span>Insights Terapêuticos</span>
+                        </li>
+                      )}
+                    </ul>
+                  </CardContent>
+                  <CardFooter>
+                    <Button 
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 font-bold"
+                      onClick={() => handleAction(tierId)}
+                      disabled={submitting !== null}
+                    >
+                      {submitting === tierId ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Começar Agora'}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+// Componente simples de Badge para não depender de imports externos caso não existam
+const Badge = ({ children, className }: { children: React.ReactNode, className?: string }) => (
+  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${className}`}>
+    {children}
+  </span>
+);
 
 export default Subscription;
