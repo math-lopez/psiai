@@ -1,171 +1,231 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Check, Loader2, Rocket, Zap, Shield, Sparkles, X } from "lucide-react";
+import { Check, Loader2, Rocket, Zap, Shield, Sparkles, ExternalLink, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
-import { showSuccess, showError } from "@/utils/toast";
+import { showError } from "@/utils/toast";
+import { Link } from "react-router-dom";
+
+// ========================================================
+// IDs DO STRIPE (price_...) - SUBSTITUA PELOS SEUS DE PRODUÇÃO
+// ========================================================
+const STRIPE_PRICE_IDS: Record<string, string> = {
+  basic: "price_1TCriP2LdLLLIxeHYXAtYEFW", 
+  pro: "price_1TCrkm2LdLLLIxeHJcrSxfam",   
+  ultra: "price_1TCrm22LdLLLIxeH8tvbj2Nb", 
+};
 
 const Subscription = () => {
   const { user } = useAuth();
   const [currentTier, setCurrentTier] = useState<SubscriptionTier>('free');
+  const [hasSubscription, setHasSubscription] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchTier = async () => {
+    const fetchProfile = async () => {
       if (!user) return;
       try {
-        const { data, error } = await supabase
+        const { data } = await supabase
           .from('profiles')
-          .select('subscription_tier')
+          .select('subscription_tier, stripe_customer_id')
           .eq('id', user.id)
           .maybeSingle();
         
-        if (error) {
-          console.error("Erro ao carregar plano:", error);
-          // Se der erro 400, provavelmente a coluna não existe. Mantemos 'free'.
-          return;
+        if (data) {
+          const tierFromDb = data.subscription_tier as SubscriptionTier;
+          setCurrentTier(PLAN_LIMITS[tierFromDb] ? tierFromDb : 'free');
+          setHasSubscription(!!data.stripe_customer_id);
         }
-
-        if (data?.subscription_tier) {
-          setCurrentTier(data.subscription_tier as SubscriptionTier);
-        }
-      } catch (e) {
-        console.error("Erro inesperado:", e);
       } finally {
         setLoading(false);
       }
     };
-    fetchTier();
+    fetchProfile();
   }, [user]);
 
-  const handleSubscribe = async (tierId: SubscriptionTier) => {
-    if (tierId === currentTier) return;
-    
+  const handleAction = async (tierId: SubscriptionTier) => {
     setSubmitting(tierId);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ subscription_tier: tierId })
-        .eq('id', user?.id);
+      const priceId = STRIPE_PRICE_IDS[tierId];
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: { 
+          tier: tierId, 
+          priceId: priceId || "",
+          successUrl: window.location.origin + "/assinatura?success=true",
+          cancelUrl: window.location.origin + "/assinatura?canceled=true",
+        }
+      });
 
       if (error) throw error;
-
-      setCurrentTier(tierId);
-      showSuccess(`Plano ${PLAN_LIMITS[tierId].name} ativado com sucesso!`);
+      if (data?.url) window.location.href = data.url; 
     } catch (e: any) {
-      showError("Erro ao processar assinatura. Verifique se a coluna 'subscription_tier' existe no banco.");
+      showError(e.message || "Erro ao conectar com o financeiro.");
     } finally {
       setSubmitting(null);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      </div>
-    );
-  }
+  if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
 
-  const planCards: { id: SubscriptionTier; icon: any; color: string }[] = [
-    { id: 'free', icon: Shield, color: 'text-slate-400' },
-    { id: 'basic', icon: Zap, color: 'text-amber-500' },
-    { id: 'pro', icon: Rocket, color: 'text-indigo-600' },
-    { id: 'ultra', icon: Sparkles, color: 'text-purple-600' },
-  ];
+  const currentPlan = PLAN_LIMITS[currentTier];
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8">
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold text-slate-900">Escolha seu Plano</h1>
-        <p className="text-slate-500 max-w-2xl mx-auto">
-          Potencialize sua prática clínica com inteligência artificial. 
-          Desbloqueie o poder máximo da análise terapêutica no plano Ultra.
-        </p>
+    <div className="max-w-5xl mx-auto space-y-8 py-4">
+      <div className="flex items-center gap-4 mb-2">
+         <Link to="/configuracoes">
+          <Button variant="ghost" size="icon"><ArrowLeft className="h-5 w-5" /></Button>
+         </Link>
+         <h1 className="text-3xl font-bold text-slate-900">Assinatura</h1>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {planCards.map((plan) => {
-          const details = PLAN_LIMITS[plan.id];
-          const isCurrent = currentTier === plan.id;
-          const PlanIcon = plan.icon;
+      {hasSubscription && currentTier !== 'free' ? (
+        /* VISÃO PARA ASSINANTES: Mostra apenas o plano atual */
+        <div className="space-y-6">
+          <div className="bg-white border rounded-2xl overflow-hidden shadow-sm">
+            <div className="h-2 bg-indigo-600 w-full" />
+            <div className="p-8 md:p-12 flex flex-col md:flex-row gap-8 items-start justify-between">
+              <div className="space-y-6 max-w-xl">
+                <div>
+                  <Badge className="bg-indigo-100 text-indigo-700 hover:bg-indigo-100 border-none px-3 py-1 mb-3">Plano Ativo</Badge>
+                  <h2 className="text-4xl font-bold text-slate-900">{currentPlan.name}</h2>
+                  <p className="text-slate-500 mt-2">{currentPlan.description}</p>
+                </div>
 
-          return (
-            <Card key={plan.id} className={`relative flex flex-col ${isCurrent ? 'border-indigo-600 shadow-indigo-100 shadow-xl' : ''}`}>
-              {isCurrent && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="bg-indigo-600">Plano Atual</Badge>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-4 rounded-xl bg-slate-50 border space-y-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pacientes</p>
+                    <p className="text-xl font-bold text-slate-800">{currentPlan.maxPatients === Infinity ? 'Ilimitados' : currentPlan.maxPatients}</p>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-50 border space-y-1">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Transcrições / mês</p>
+                    <p className="text-xl font-bold text-slate-800">{currentPlan.maxTranscriptionsPerMonth === Infinity ? 'Ilimitadas' : currentPlan.maxTranscriptionsPerMonth}</p>
+                  </div>
                 </div>
-              )}
-              <CardHeader className="text-center pb-2">
-                <div className={`mx-auto p-3 rounded-full bg-slate-50 w-fit mb-4 ${plan.color}`}>
-                  <PlanIcon className="h-6 w-6" />
-                </div>
-                <CardTitle className="text-xl">{details.name}</CardTitle>
-                <div className="mt-4">
-                  <span className="text-3xl font-bold">R$ {details.price.toFixed(2).replace('.', ',')}</span>
-                  <span className="text-slate-500 text-sm">/mês</span>
-                </div>
-              </CardHeader>
-              <CardContent className="flex-1 space-y-4 pt-4">
-                <p className="text-sm text-slate-500 text-center italic mb-4">{details.description}</p>
-                <ul className="space-y-3">
-                  <li className="flex items-center gap-3 text-sm">
-                    <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span>Até <strong>{details.maxPatients === Infinity ? 'Ilimitados' : details.maxPatients}</strong> pacientes</span>
-                  </li>
-                  <li className="flex items-center gap-3 text-sm">
-                    <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                    <span>Sessões: <strong>{details.maxSessionsPerMonth === Infinity ? 'Ilimitadas' : details.maxSessionsPerMonth}</strong></span>
-                  </li>
-                  
-                  {details.maxTranscriptionsPerMonth === 0 ? (
-                    <li className="flex items-center gap-3 text-sm text-slate-400">
-                      <X className="h-4 w-4 text-red-400 shrink-0" />
-                      <span>Sem transcrição de áudio</span>
-                    </li>
-                  ) : (
-                    <li className="flex items-center gap-3 text-sm">
-                      <Check className="h-4 w-4 text-emerald-500 shrink-0" />
-                      <span>Transcrições: <strong>{details.maxTranscriptionsPerMonth === Infinity ? 'Ilimitadas' : details.maxTranscriptionsPerMonth}</strong></span>
-                    </li>
-                  )}
 
-                  {details.hasTherapeuticInsights ? (
+                <ul className="space-y-3 pt-2">
+                  <li className="flex items-center gap-3 text-sm text-slate-600">
+                    <Check className="h-5 w-5 text-emerald-500" /> Suporte prioritário
+                  </li>
+                  <li className="flex items-center gap-3 text-sm text-slate-600">
+                    <Check className="h-5 w-5 text-emerald-500" /> Exportação de prontuários em PDF
+                  </li>
+                  {currentPlan.hasTherapeuticInsights && (
                     <li className="flex items-center gap-3 text-sm font-bold text-indigo-700">
-                      <Sparkles className="h-4 w-4 text-indigo-500 shrink-0" />
-                      <span>Insights Terapêuticos inclusos</span>
-                    </li>
-                  ) : (
-                    <li className="flex items-center gap-3 text-sm text-slate-400">
-                      <X className="h-4 w-4 text-slate-300 shrink-0" />
-                      <span>Insights de IA bloqueados</span>
+                      <Sparkles className="h-5 w-5 text-indigo-500" /> Insights Terapêuticos com IA
                     </li>
                   )}
                 </ul>
-              </CardContent>
-              <CardFooter className="pt-6">
-                <Button 
-                  className={`w-full ${isCurrent ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-                  variant={isCurrent ? "secondary" : "default"}
-                  disabled={isCurrent || submitting !== null}
-                  onClick={() => handleSubscribe(plan.id)}
-                >
-                  {submitting === plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : isCurrent ? 'Plano Ativo' : 'Escolher Plano'}
-                </Button>
-              </CardFooter>
-            </Card>
-          );
-        })}
-      </div>
+              </div>
+
+              <Card className="w-full md:w-80 bg-indigo-50/50 border-indigo-100">
+                <CardHeader>
+                  <CardTitle className="text-sm font-bold text-indigo-900 uppercase tracking-wider">Pagamento</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="text-3xl font-bold text-indigo-900">
+                    R$ {currentPlan.price.toFixed(2).replace('.', ',')}
+                    <span className="text-xs font-normal text-indigo-600/60 ml-1">/mês</span>
+                  </div>
+                  <p className="text-xs text-indigo-700 leading-relaxed">
+                    Sua assinatura é processada com segurança pelo Stripe. Você pode cancelar ou mudar de plano a qualquer momento.
+                  </p>
+                </CardContent>
+                <CardFooter>
+                  <Button 
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 gap-2 shadow-md shadow-indigo-200"
+                    onClick={() => handleAction(currentTier)}
+                    disabled={submitting !== null}
+                  >
+                    {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
+                    Gerenciar no Stripe
+                  </Button>
+                </CardFooter>
+              </Card>
+            </div>
+          </div>
+          
+          <p className="text-center text-xs text-slate-400">
+            Deseja mudar para o plano {currentTier === 'ultra' ? 'Pro' : 'Ultra'}? Use o botão acima para acessar o portal de faturamento.
+          </p>
+        </div>
+      ) : (
+        /* VISÃO PARA USUÁRIOS FREE: Vitrine de Planos */
+        <div className="space-y-8">
+          <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 flex items-center gap-4">
+            <Shield className="h-8 w-8 text-indigo-600" />
+            <div>
+              <p className="font-bold text-indigo-900">Você está no plano Gratuito</p>
+              <p className="text-sm text-indigo-700">Seus limites são reduzidos. Escolha um dos planos abaixo para desbloquear o potencial total da IA.</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {(['basic', 'pro', 'ultra'] as SubscriptionTier[]).map((tierId) => {
+              const details = PLAN_LIMITS[tierId];
+              const icons = { basic: Zap, pro: Rocket, ultra: Sparkles };
+              const colors = { basic: 'text-amber-500', pro: 'text-indigo-600', ultra: 'text-purple-600' };
+              const Icon = icons[tierId as keyof typeof icons];
+
+              return (
+                <Card key={tierId} className="flex flex-col border-2 hover:border-indigo-200 transition-all">
+                  <CardHeader className="text-center">
+                    <div className={`mx-auto p-3 rounded-full bg-slate-50 w-fit mb-4 ${colors[tierId as keyof typeof colors]}`}>
+                      <Icon className="h-6 w-6" />
+                    </div>
+                    <CardTitle className="text-xl font-bold">{details.name}</CardTitle>
+                    <div className="mt-4">
+                      <span className="text-3xl font-bold">R$ {details.price.toFixed(2).replace('.', ',')}</span>
+                      <span className="text-slate-500 text-sm">/mês</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex-1 space-y-4">
+                    <p className="text-xs text-slate-500 text-center px-4 leading-relaxed">{details.description}</p>
+                    <ul className="space-y-3 pt-4 border-t">
+                      <li className="flex items-center gap-3 text-sm">
+                        <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                        <span>{details.maxPatients === Infinity ? 'Ilimitados' : `${details.maxPatients} pacientes`}</span>
+                      </li>
+                      <li className="flex items-center gap-3 text-sm">
+                        <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                        <span>{details.maxTranscriptionsPerMonth === Infinity ? 'Ilimitadas' : `${details.maxTranscriptionsPerMonth}`} transcrições</span>
+                      </li>
+                      {details.hasTherapeuticInsights && (
+                        <li className="flex items-center gap-3 text-sm font-bold text-indigo-700">
+                          <Sparkles className="h-4 w-4 text-indigo-500 shrink-0" />
+                          <span>Insights Terapêuticos</span>
+                        </li>
+                      )}
+                    </ul>
+                  </CardContent>
+                  <CardFooter>
+                    <Button 
+                      className="w-full bg-indigo-600 hover:bg-indigo-700 font-bold"
+                      onClick={() => handleAction(tierId)}
+                      disabled={submitting !== null}
+                    >
+                      {submitting === tierId ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Começar Agora'}
+                    </Button>
+                  </CardFooter>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+// Componente simples de Badge para não depender de imports externos caso não existam
+const Badge = ({ children, className }: { children: React.ReactNode, className?: string }) => (
+  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${className}`}>
+    {children}
+  </span>
+);
 
 export default Subscription;

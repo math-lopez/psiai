@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Save, User, Shield, CreditCard, Bell, Loader2, Lock, Eye, EyeOff, Sparkles, ArrowRight } from "lucide-react";
+import { Save, User, Shield, CreditCard, Bell, Loader2, Lock, Eye, EyeOff, Sparkles, ArrowRight, Download, FileText, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { showSuccess, showError } from "@/utils/toast";
 import { cn } from "@/lib/utils";
 import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 type SettingsTab = "profile" | "security" | "notifications" | "billing";
 
@@ -20,6 +22,8 @@ const Settings = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [loading, setLoading] = useState(false);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [loadingInvoices, setLoadingInvoices] = useState(false);
   
   // Estados para Perfil
   const [profile, setProfile] = useState({
@@ -27,7 +31,8 @@ const Settings = () => {
     crp: "",
     email: "",
     phone: "",
-    subscription_tier: "free" as SubscriptionTier
+    subscription_tier: "free" as SubscriptionTier,
+    stripe_customer_id: null as string | null
   });
 
   // Estados para Segurança
@@ -37,13 +42,6 @@ const Settings = () => {
   });
   const [showPass, setShowPass] = useState(false);
 
-  // Estados para Notificações
-  const [notifs, setNotifs] = useState({
-    emailSession: true,
-    emailInsights: true,
-    browserAlerts: false
-  });
-
   useEffect(() => {
     const fetchProfile = async () => {
       if (user) {
@@ -51,7 +49,7 @@ const Settings = () => {
           .from('profiles')
           .select('*')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
         
         if (data) {
           setProfile({
@@ -59,13 +57,33 @@ const Settings = () => {
             crp: data.crp || user.user_metadata?.crp || "",
             email: user.email || "",
             phone: data.phone || user.user_metadata?.phone || "",
-            subscription_tier: data.subscription_tier as SubscriptionTier || "free"
+            subscription_tier: data.subscription_tier as SubscriptionTier || "free",
+            stripe_customer_id: data.stripe_customer_id
           });
         }
       }
     };
     fetchProfile();
   }, [user]);
+
+  useEffect(() => {
+    if (activeTab === "billing" && profile.stripe_customer_id) {
+      fetchInvoices();
+    }
+  }, [activeTab, profile.stripe_customer_id]);
+
+  const fetchInvoices = async () => {
+    setLoadingInvoices(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-payment-history');
+      if (error) throw error;
+      setInvoices(data.invoices || []);
+    } catch (e) {
+      console.error("Erro ao buscar faturas:", e);
+    } finally {
+      setLoadingInvoices(false);
+    }
+  };
 
   const handleSaveProfile = async () => {
     setLoading(true);
@@ -122,7 +140,7 @@ const Settings = () => {
     }
   };
 
-  const currentPlan = PLAN_LIMITS[profile.subscription_tier];
+  const currentPlan = PLAN_LIMITS[profile.subscription_tier] || PLAN_LIMITS.free;
 
   return (
     <div className="max-w-4xl mx-auto space-y-8">
@@ -289,9 +307,9 @@ const Settings = () => {
                       </p>
                     </div>
                     <div className="p-4 rounded-xl bg-slate-50 border space-y-2">
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Sessões Mensais</p>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Transcrições / Mês</p>
                       <p className="text-2xl font-bold text-slate-900">
-                        {currentPlan.maxSessionsPerMonth === Infinity ? 'Ilimitadas' : currentPlan.maxSessionsPerMonth}
+                        {currentPlan.maxTranscriptionsPerMonth === Infinity ? 'Ilimitadas' : currentPlan.maxTranscriptionsPerMonth}
                       </p>
                     </div>
                   </div>
@@ -302,15 +320,15 @@ const Settings = () => {
                         <Sparkles className="h-6 w-6 text-indigo-600" />
                       </div>
                       <div>
-                        <h4 className="font-bold text-indigo-900">Precisa de mais espaço?</h4>
-                        <p className="text-sm text-indigo-700">Aumente seus limites e tenha acesso a recursos exclusivos.</p>
+                        <h4 className="font-bold text-indigo-900">Gestão de Assinatura</h4>
+                        <p className="text-sm text-indigo-700">Acesse o portal para faturas, cancelamentos e upgrades.</p>
                       </div>
                     </div>
                     <Button 
                       className="bg-indigo-600 hover:bg-indigo-700 gap-2"
                       onClick={() => navigate("/assinatura")}
                     >
-                      Ver Planos <ArrowRight className="h-4 w-4" />
+                      Gerenciar <ArrowRight className="h-4 w-4" />
                     </Button>
                   </div>
                 </CardContent>
@@ -319,10 +337,52 @@ const Settings = () => {
               <Card>
                 <CardHeader>
                   <CardTitle>Histórico de Pagamentos</CardTitle>
-                  <CardDescription>Consulte suas faturas anteriores.</CardDescription>
+                  <CardDescription>Consulte e baixe suas faturas processadas pelo Stripe.</CardDescription>
                 </CardHeader>
-                <CardContent className="py-8 text-center text-slate-500 italic">
-                  Nenhuma fatura encontrada.
+                <CardContent>
+                  {loadingInvoices ? (
+                    <div className="py-10 flex justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-indigo-600" />
+                    </div>
+                  ) : invoices.length > 0 ? (
+                    <div className="space-y-4">
+                      {invoices.map((inv) => (
+                        <div key={inv.id} className="flex items-center justify-between p-4 rounded-lg border hover:bg-slate-50 transition-colors">
+                          <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 rounded-full bg-emerald-50 flex items-center justify-center">
+                              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-slate-900">{inv.number}</p>
+                              <p className="text-xs text-slate-500">{format(new Date(inv.date * 1000), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-6">
+                            <div className="text-right">
+                              <p className="text-sm font-bold text-slate-900">R$ {inv.amount.toFixed(2).replace('.', ',')}</p>
+                              <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-wider">{inv.status}</p>
+                            </div>
+                            {inv.pdf_url && (
+                              <a 
+                                href={inv.pdf_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
+                                title="Baixar PDF"
+                              >
+                                <Download className="h-4 w-4" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="py-10 text-center flex flex-col items-center gap-3">
+                       <FileText className="h-8 w-8 text-slate-200" />
+                       <p className="text-sm text-slate-500 italic">Nenhuma fatura encontrada.</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
