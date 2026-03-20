@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Search, Filter, Mic, FileText, Loader2 } from "lucide-react";
+import { Plus, Search, Filter, Mic, FileText, Loader2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -11,8 +11,15 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import { sessionService } from "@/services/sessionService";
-import { Session } from "@/types";
+import { Session, SessionStatus, SessionRecordType } from "@/types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -20,6 +27,10 @@ const Sessions = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Estados para filtros
+  const [statusFilters, setStatusFilters] = useState<SessionStatus[]>([]);
+  const [typeFilters, setTypeFilters] = useState<SessionRecordType[]>([]);
 
   useEffect(() => {
     const fetchSessions = async () => {
@@ -35,11 +46,28 @@ const Sessions = () => {
     fetchSessions();
   }, []);
 
+  const toggleStatusFilter = (status: SessionStatus) => {
+    setStatusFilters(prev => 
+      prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+    );
+  };
+
+  const toggleTypeFilter = (type: SessionRecordType) => {
+    setTypeFilters(prev => 
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
+  };
+
+  const clearFilters = () => {
+    setStatusFilters([]);
+    setTypeFilters([]);
+    setSearchTerm("");
+  };
+
   const filteredSessions = sessions.filter(s => {
     const search = searchTerm.toLowerCase();
     const patientName = s.patient?.full_name?.toLowerCase() || "";
     
-    // Tenta formatar a data da sessão para comparação se o termo de busca parecer uma data
     let dateStr = "";
     try {
       dateStr = format(new Date(s.session_date), "dd/MM/yyyy");
@@ -47,8 +75,14 @@ const Sessions = () => {
       dateStr = "";
     }
 
-    return patientName.includes(search) || dateStr.includes(search);
+    const matchesSearch = patientName.includes(search) || dateStr.includes(search);
+    const matchesStatus = statusFilters.length === 0 || statusFilters.includes(s.processing_status);
+    const matchesType = typeFilters.length === 0 || typeFilters.includes(s.record_type);
+
+    return matchesSearch && matchesStatus && matchesType;
   });
+
+  const hasActiveFilters = statusFilters.length > 0 || typeFilters.length > 0 || searchTerm !== "";
 
   return (
     <div className="space-y-6">
@@ -74,9 +108,83 @@ const Sessions = () => {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="gap-2">
-          <Filter className="h-4 w-4" /> Filtros
-        </Button>
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant={statusFilters.length > 0 || typeFilters.length > 0 ? "secondary" : "outline"} className="gap-2">
+              <Filter className="h-4 w-4" /> 
+              Filtros
+              {(statusFilters.length + typeFilters.length) > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 text-[10px] bg-indigo-600 text-white rounded-full">
+                  {statusFilters.length + typeFilters.length}
+                </span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-4" align="end">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <h4 className="font-semibold text-sm border-b pb-1">Status</h4>
+                <div className="grid gap-2">
+                  {[
+                    { id: 'draft', label: 'Rascunho' },
+                    { id: 'processing', label: 'Processando' },
+                    { id: 'completed', label: 'Concluído' },
+                    { id: 'error', label: 'Erro' }
+                  ].map((item) => (
+                    <div key={item.id} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`status-${item.id}`} 
+                        checked={statusFilters.includes(item.id as SessionStatus)}
+                        onCheckedChange={() => toggleStatusFilter(item.id as SessionStatus)}
+                      />
+                      <Label htmlFor={`status-${item.id}`} className="text-sm cursor-pointer">{item.label}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t">
+                <h4 className="font-semibold text-sm border-b pb-1">Tipo de Registro</h4>
+                <div className="grid gap-2">
+                  {[
+                    { id: 'manual', label: 'Apenas Notas' },
+                    { id: 'ambos', label: 'Áudio + Notas' }
+                  ].map((item) => (
+                    <div key={item.id} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`type-${item.id}`} 
+                        checked={typeFilters.includes(item.id as SessionRecordType)}
+                        onCheckedChange={() => toggleTypeFilter(item.id as SessionRecordType)}
+                      />
+                      <Label htmlFor={`type-${item.id}`} className="text-sm cursor-pointer">{item.label}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {(statusFilters.length > 0 || typeFilters.length > 0) && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="w-full text-indigo-600 text-xs mt-2"
+                  onClick={() => {
+                    setStatusFilters([]);
+                    setTypeFilters([]);
+                  }}
+                >
+                  Limpar Filtros
+                </Button>
+              )}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters} className="text-slate-500 gap-1 px-2">
+            <X className="h-3 w-3" /> Limpar tudo
+          </Button>
+        )}
       </div>
 
       <div className="bg-white rounded-lg border">
@@ -147,7 +255,7 @@ const Sessions = () => {
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-10 text-slate-500">
-                    Nenhuma sessão encontrada.
+                    Nenhuma sessão encontrada com os filtros atuais.
                   </TableCell>
                 </TableRow>
               )}
