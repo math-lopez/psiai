@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { Search, Plus, Filter, MoreHorizontal, Loader2, Trash2 } from "lucide-react";
+import { Search, Plus, Filter, MoreHorizontal, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
@@ -32,12 +32,15 @@ import { Patient } from "@/types";
 import { format } from "date-fns";
 import { showSuccess, showError } from "@/utils/toast";
 
+const ITEMS_PER_PAGE = 10;
+
 const Patients = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchPatients();
@@ -72,10 +75,24 @@ const Patients = () => {
     }
   };
 
-  const filteredPatients = patients.filter(p => 
-    p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredPatients = patients.filter(p => {
+    const search = searchTerm.toLowerCase();
+    const nameMatch = p.full_name?.toLowerCase().includes(search);
+    const emailMatch = p.email?.toLowerCase().includes(search);
+    const phoneMatch = p.phone?.toLowerCase().includes(search);
+    return nameMatch || emailMatch || phoneMatch;
+  });
+
+  // Paginação
+  const totalPages = Math.ceil(filteredPatients.length / ITEMS_PER_PAGE);
+  const paginatedPatients = filteredPatients.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
   );
+
+  useEffect(() => {
+    setCurrentPage(1); // Resetar página ao buscar
+  }, [searchTerm]);
 
   return (
     <div className="space-y-6">
@@ -95,90 +112,128 @@ const Patients = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input 
-            placeholder="Buscar paciente por nome ou e-mail..." 
+            placeholder="Buscar paciente por nome, e-mail ou telefone..." 
             className="pl-10"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="gap-2">
-          <Filter className="h-4 w-4" /> Filtros
-        </Button>
       </div>
 
-      <div className="bg-white rounded-lg border">
+      <div className="bg-white rounded-lg border overflow-hidden">
         {loading ? (
           <div className="p-20 flex justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
           </div>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>Telefone</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Criado em</TableHead>
-                <TableHead className="w-[100px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredPatients.length > 0 ? (
-                filteredPatients.map((patient) => (
-                  <TableRow key={patient.id} className="cursor-pointer hover:bg-slate-50">
-                    <TableCell className="font-medium">
-                      <Link to={`/pacientes/${patient.id}`} className="hover:text-indigo-600">
-                        {patient.full_name}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{patient.email}</TableCell>
-                    <TableCell>{patient.phone}</TableCell>
-                    <TableCell>
-                      <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
-                        patient.status === 'ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
-                      }`}>
-                        {patient.status}
-                      </span>
-                    </TableCell>
-                    <TableCell>{format(new Date(patient.created_at), "dd/MM/yyyy")}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link to={`/pacientes/${patient.id}`}>Ver detalhes</Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem asChild>
-                            <Link to={`/pacientes/editar/${patient.id}`}>Editar</Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-red-600 focus:text-red-600"
-                            onClick={() => {
-                              setDeletingId(patient.id);
-                              setIsDeleteDialogOpen(true);
-                            }}
-                          >
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>E-mail</TableHead>
+                  <TableHead>Telefone</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Criado em</TableHead>
+                  <TableHead className="w-[100px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedPatients.length > 0 ? (
+                  paginatedPatients.map((patient) => (
+                    <TableRow key={patient.id} className="cursor-pointer hover:bg-slate-50">
+                      <TableCell className="font-medium">
+                        <Link to={`/pacientes/${patient.id}`} className="hover:text-indigo-600">
+                          {patient.full_name}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{patient.email}</TableCell>
+                      <TableCell>{patient.phone}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                          patient.status === 'ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {patient.status}
+                        </span>
+                      </TableCell>
+                      <TableCell>{format(new Date(patient.created_at), "dd/MM/yyyy")}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link to={`/pacientes/${patient.id}`}>Ver detalhes</Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <Link to={`/pacientes/editar/${patient.id}`}>Editar</Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              className="text-red-600 focus:text-red-600"
+                              onClick={() => {
+                                setDeletingId(patient.id);
+                                setIsDeleteDialogOpen(true);
+                              }}
+                            >
+                              Excluir
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center py-10 text-slate-500">
+                      Nenhum paciente encontrado.
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-10 text-slate-500">
-                    Nenhum paciente encontrado.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                )}
+              </TableBody>
+            </Table>
+
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-4 border-t bg-slate-50/50">
+                <p className="text-sm text-slate-500">
+                  Mostrando {paginatedPatients.length} de {filteredPatients.length} pacientes
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage(prev => prev - 1)}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" /> Anterior
+                  </Button>
+                  <div className="flex items-center gap-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => (
+                      <Button
+                        key={p}
+                        variant={currentPage === p ? "default" : "outline"}
+                        size="sm"
+                        className="h-8 w-8 p-0"
+                        onClick={() => setCurrentPage(p)}
+                      >
+                        {p}
+                      </Button>
+                    ))}
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => prev + 1)}
+                  >
+                    Próximo <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
