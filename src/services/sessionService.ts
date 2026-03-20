@@ -1,149 +1,194 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { Check, Loader2, Rocket, Zap, Shield, Sparkles, X, Lock } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-import { Session, DashboardStats } from "@/types";
-import { storageService } from "./storageService";
 import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
-import { startOfMonth, endOfMonth } from "date-fns";
+import { showSuccess, showError } from "@/utils/toast";
 
-export const sessionService = {
-  list: async (): Promise<Session[]> => {
-    const { data, error } = await supabase
-      .from('sessions')
-      .select('*, patient:patients(full_name)')
-      .order('session_date', { ascending: false });
-    
-    if (error) throw error;
-    return data as Session[];
-  },
-
-  getById: async (id: string): Promise<Session | null> => {
-    if (!id) return null;
-    const { data, error } = await supabase
-      .from('sessions')
-      .select('*, patient:patients(full_name)')
-      .eq('id', id)
-      .single();
-    
-    if (error) return null;
-    return data as Session;
-  },
-
-  checkTranscriptionLimit: async (userId: string, tier: SubscriptionTier): Promise<boolean> => {
-    const limit = PLAN_LIMITS[tier].maxTranscriptionsPerMonth;
-    if (limit === Infinity) return true;
-    if (limit === 0) return false;
-
-    const start = startOfMonth(new Date()).toISOString();
-    const end = endOfMonth(new Date()).toISOString();
-
-    const { count } = await supabase
-      .from('sessions')
-      .select('*', { count: 'exact', head: true })
-      .eq('psychologist_id', userId)
-      .not('audio_file_path', 'is', null)
-      .in('processing_status', ['completed', 'processing', 'queued'])
-      .gte('created_at', start)
-      .lte('created_at', end);
-
-    return (count || 0) < limit;
-  },
-
-  create: async (sessionData: any, audioFile?: File): Promise<Session> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Não autenticado");
-
-    const { data: profile } = await supabase.from('profiles').select('subscription_tier').eq('id', user.id).single();
-    const tier = (profile?.subscription_tier as SubscriptionTier) || 'free';
-    
-    const sessionLimit = PLAN_LIMITS[tier].maxSessionsPerMonth;
-    const start = startOfMonth(new Date()).toISOString();
-    const end = endOfMonth(new Date()).toISOString();
-
-    const { count: sessionCount } = await supabase.from('sessions').select('*', { count: 'exact', head: true })
-      .eq('psychologist_id', user.id).gte('created_at', start).lte('created_at', end);
-
-    if (sessionCount !== null && sessionCount >= sessionLimit) {
-      throw new Error(`Limite de sessões atingido (${sessionLimit}/mês).`);
-    }
-
-    if (audioFile) {
-      const canTranscribe = await sessionService.checkTranscriptionLimit(user.id, tier);
-      if (!canTranscribe) throw new Error("Seu plano não permite mais transcrições este mês.");
-    }
-
-    const { data: session, error: sessionError } = await supabase.from('sessions').insert([{ ...sessionData, psychologist_id: user.id }]).select().single();
-    if (sessionError) throw sessionError;
-
-    if (audioFile) {
-      const uploadResult = await storageService.uploadSessionAudio(user.id, session.patient_id, session.id, audioFile);
-      const { data: updated } = await supabase.from('sessions').update({ audio_file_name: uploadResult.name, audio_file_path: uploadResult.path }).eq('id', session.id).select().single();
-      return updated as Session;
-    }
-
-    return session as Session;
-  },
-
-  update: async (id: string, sessionData: Partial<Session>, newAudioFile?: File): Promise<Session> => {
-    const { data, error } = await supabase.from('sessions').update(sessionData).eq('id', id).select().single();
-    if (error) throw error;
-    if (newAudioFile) {
-      const { data: { user } } = await supabase.auth.getUser();
-      const uploadResult = await storageService.uploadSessionAudio(user!.id, data.patient_id, id, newAudioFile);
-      const { data: updated } = await supabase.from('sessions').update({ audio_file_name: uploadResult.name, audio_file_path: uploadResult.path }).eq('id', id).select().single();
-      return updated as Session;
-    }
-    return data as Session;
-  },
-
-  processAudio: async (sessionId: string): Promise<any> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: profile } = await supabase.from('profiles').select('subscription_tier').eq('id', user?.id).single();
-    const tier = (profile?.subscription_tier as SubscriptionTier) || 'free';
-    
-    if (tier === 'free') throw new Error("Plano Gratuito não permite transcrição.");
-
-    const { data, error } = await supabase.functions.invoke('process-session-audio', {
-      body: { sessionId }
-    });
-    
-    if (error) throw error;
-
-    // Se NÃO for Ultra, limpamos os campos de insights no banco após o processamento da Edge Function
-    if (!PLAN_LIMITS[tier].hasTherapeuticInsights) {
-      await supabase.from('sessions').update({
-        highlights: null,
-        next_steps: null
-      }).eq('id', sessionId);
-    }
-
-    return data;
-  },
-
-  finishSession: async (id: string): Promise<void> => {
-    const session = await sessionService.getById(id);
-    if (session?.audio_file_path) {
-      await sessionService.processAudio(id);
-    } else {
-      await supabase.from('sessions').update({ processing_status: 'completed' }).eq('id', id);
-    }
-  },
-
-  removeAudio: async (sessionId: string): Promise<void> => {
-    const session = await sessionService.getById(sessionId);
-    if (session?.audio_file_path) await storageService.deleteFile(session.audio_file_path);
-    await supabase.from('sessions').update({ audio_file_name: null, audio_file_path: null, transcript: null, highlights: null, next_steps: null, processing_status: 'draft' }).eq('id', sessionId);
-  },
-
-  delete: async (id: string): Promise<void> => {
-    const session = await sessionService.getById(id);
-    if (session?.audio_file_path) await storageService.deleteFile(session.audio_file_path);
-    await supabase.from('sessions').delete().eq('id', id);
-  },
-
-  getStats: async (): Promise<DashboardStats> => {
-    const { data: p } = await supabase.from('patients').select('id', { count: 'exact' });
-    const { data: s } = await supabase.from('sessions').select('id', { count: 'exact' });
-    const { data: pen } = await supabase.from('sessions').select('id', { count: 'exact' }).in('processing_status', ['queued', 'processing']);
-    const { data: com } = await supabase.from('sessions').select('id', { count: 'exact' }).eq('processing_status', 'completed');
-    return { totalPatients: p?.length || 0, totalSessions: s?.length || 0, pendingProcessing: pen?.length || 0, completedSessions: com?.length || 0 };
-  }
+// MAPEAMENTO DE IDs DE PREÇO DO STRIPE (Substitua pelos seus IDs reais do Dashboard do Stripe)
+const STRIPE_PRICE_IDS: Record<string, string> = {
+  basic: "prod_UBEAgDzNMifEcG",
+  pro: "price_pro_id_here",
+  ultra: "price_ultra_id_here",
 };
+
+const Subscription = () => {
+  const { user } = useAuth();
+  const [currentTier, setCurrentTier] = useState<SubscriptionTier>('free');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchTier = async () => {
+      if (!user) return;
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('subscription_tier')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (data?.subscription_tier) {
+          setCurrentTier(data.subscription_tier as SubscriptionTier);
+        }
+      } catch (e) {
+        console.error("Erro ao carregar plano:", e);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTier();
+  }, [user]);
+
+  const handleSubscribe = async (tierId: SubscriptionTier) => {
+    if (tierId === currentTier) return;
+    
+    // Plano gratuito apenas atualiza no banco (se permitido voltar atrás)
+    if (tierId === 'free') {
+      setSubmitting('free');
+      await supabase.from('profiles').update({ subscription_tier: 'free' }).eq('id', user?.id);
+      setCurrentTier('free');
+      setSubmitting(null);
+      return;
+    }
+
+    setSubmitting(tierId);
+    try {
+      const priceId = STRIPE_PRICE_IDS[tierId];
+      if (!priceId || priceId.includes("_id_here")) {
+        throw new Error("ID do preço não configurado. Por favor, configure o Stripe Price ID.");
+      }
+
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: { 
+          tier: tierId, 
+          priceId: priceId,
+          successUrl: window.location.origin + "/assinatura?success=true",
+          cancelUrl: window.location.origin + "/assinatura?canceled=true",
+        }
+      });
+
+      if (error) throw error;
+      if (data?.url) {
+        window.location.href = data.url; // Redireciona para o Stripe
+      }
+    } catch (e: any) {
+      showError(e.message || "Erro ao iniciar pagamento.");
+      setSubmitting(null);
+    }
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('success')) {
+      showSuccess("Pagamento recebido! Seu plano será atualizado em instantes.");
+      // Limpa a URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  if (loading) {
+    return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
+  }
+
+  const planCards: { id: SubscriptionTier; icon: any; color: string }[] = [
+    { id: 'free', icon: Shield, color: 'text-slate-400' },
+    { id: 'basic', icon: Zap, color: 'text-amber-500' },
+    { id: 'pro', icon: Rocket, color: 'text-indigo-600' },
+    { id: 'ultra', icon: Sparkles, color: 'text-purple-600' },
+  ];
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-8">
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl font-bold text-slate-900">Escolha seu Plano</h1>
+        <p className="text-slate-500 max-w-2xl mx-auto">
+          Potencialize sua prática clínica com inteligência artificial. 
+          Assinatura mensal recorrente com cobrança automática via Stripe.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {planCards.map((plan) => {
+          const details = PLAN_LIMITS[plan.id];
+          const isCurrent = currentTier === plan.id;
+          const PlanIcon = plan.icon;
+
+          return (
+            <Card key={plan.id} className={`relative flex flex-col ${isCurrent ? 'border-indigo-600 shadow-indigo-100 shadow-xl' : ''}`}>
+              {isCurrent && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <Badge className="bg-indigo-600">Plano Atual</Badge>
+                </div>
+              )}
+              <CardHeader className="text-center pb-2">
+                <div className={`mx-auto p-3 rounded-full bg-slate-50 w-fit mb-4 ${plan.color}`}>
+                  <PlanIcon className="h-6 w-6" />
+                </div>
+                <CardTitle className="text-xl">{details.name}</CardTitle>
+                <div className="mt-4">
+                  <span className="text-3xl font-bold">R$ {details.price.toFixed(2).replace('.', ',')}</span>
+                  <span className="text-slate-500 text-sm">/mês</span>
+                </div>
+              </CardHeader>
+              <CardContent className="flex-1 space-y-4 pt-4">
+                <p className="text-sm text-slate-500 text-center italic mb-4">{details.description}</p>
+                <ul className="space-y-3">
+                  <li className="flex items-center gap-3 text-sm">
+                    <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span>Até <strong>{details.maxPatients === Infinity ? 'Ilimitados' : details.maxPatients}</strong> pacientes</span>
+                  </li>
+                  <li className="flex items-center gap-3 text-sm">
+                    <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                    <span>Sessões: <strong>{details.maxSessionsPerMonth === Infinity ? 'Ilimitadas' : details.maxSessionsPerMonth}</strong></span>
+                  </li>
+                  
+                  {details.maxTranscriptionsPerMonth === 0 ? (
+                    <li className="flex items-center gap-3 text-sm text-slate-400">
+                      <X className="h-4 w-4 text-red-400 shrink-0" />
+                      <span>Sem transcrição de áudio</span>
+                    </li>
+                  ) : (
+                    <li className="flex items-center gap-3 text-sm">
+                      <Check className="h-4 w-4 text-emerald-500 shrink-0" />
+                      <span>Transcrições: <strong>{details.maxTranscriptionsPerMonth === Infinity ? 'Ilimitadas' : details.maxTranscriptionsPerMonth}</strong></span>
+                    </li>
+                  )}
+
+                  {details.hasTherapeuticInsights ? (
+                    <li className="flex items-center gap-3 text-sm font-bold text-indigo-700">
+                      <Sparkles className="h-4 w-4 text-indigo-500 shrink-0" />
+                      <span>Insights Terapêuticos inclusos</span>
+                    </li>
+                  ) : (
+                    <li className="flex items-center gap-3 text-sm text-slate-400">
+                      <Lock className="h-4 w-4 text-slate-300 shrink-0" />
+                      <span>Insights de IA bloqueados</span>
+                    </li>
+                  )}
+                </ul>
+              </CardContent>
+              <CardFooter className="pt-6">
+                <Button 
+                  className={`w-full ${isCurrent ? 'bg-slate-100 text-slate-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                  variant={isCurrent ? "secondary" : "default"}
+                  disabled={isCurrent || submitting !== null}
+                  onClick={() => handleSubscribe(plan.id)}
+                >
+                  {submitting === plan.id ? <Loader2 className="h-4 w-4 animate-spin" /> : isCurrent ? 'Plano Ativo' : 'Assinar Agora'}
+                </Button>
+              </CardFooter>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+export default Subscription;
