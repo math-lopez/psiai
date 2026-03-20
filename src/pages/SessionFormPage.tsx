@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music } from "lucide-react";
+import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -81,10 +81,9 @@ const SessionFormPage = () => {
     setExistingAudioName(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent, shouldFinish: boolean = false) => {
     e.preventDefault();
     
-    // Validação extra para evitar erro de UUID vazio
     if (!formData.patient_id || formData.patient_id === "") {
       showError("Por favor, selecione um paciente.");
       return;
@@ -92,19 +91,29 @@ const SessionFormPage = () => {
 
     setSubmitting(true);
     try {
+      let savedSession;
+      
+      // 1. Salva/Atualiza os dados (sempre fica rascunho por padrão no backend)
       if (id) {
-        await sessionService.update(id, {
+        savedSession = await sessionService.update(id, {
           ...formData,
           record_type: recordType,
         }, audioFile || undefined);
-        showSuccess("Sessão atualizada com sucesso!");
       } else {
-        await sessionService.create({
+        savedSession = await sessionService.create({
           ...formData,
           record_type: recordType,
         }, audioFile || undefined);
-        showSuccess("Sessão registrada com sucesso!");
       }
+
+      // 2. Se for para finalizar, dispara a lógica de conclusão
+      if (shouldFinish) {
+        await sessionService.finishSession(savedSession.id);
+        showSuccess(audioFile || existingAudioName ? "Sessão enviada para processamento!" : "Sessão finalizada com sucesso!");
+      } else {
+        showSuccess("Rascunho salvo com sucesso!");
+      }
+
       navigate("/sessoes");
     } catch (error: any) {
       showError(error.message || "Erro ao salvar sessão");
@@ -123,11 +132,11 @@ const SessionFormPage = () => {
         </Button>
         <div>
           <h1 className="text-2xl font-bold text-slate-900">{id ? "Editar Sessão" : "Nova Sessão"}</h1>
-          <p className="text-slate-500">Gerencie os detalhes do atendimento e arquivos de áudio.</p>
+          <p className="text-slate-500">Registre os detalhes do atendimento.</p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form className="space-y-6">
         <Card>
           <CardContent className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -256,22 +265,32 @@ const SessionFormPage = () => {
           </CardContent>
         </Card>
 
-        <div className="flex justify-end gap-3">
+        <div className="flex flex-col md:flex-row justify-end gap-3">
           <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={submitting}>
             Cancelar
           </Button>
-          <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700 gap-2 h-11 px-8" disabled={submitting}>
+          <Button 
+            type="button" 
+            variant="secondary" 
+            className="gap-2" 
+            disabled={submitting}
+            onClick={(e) => handleSave(e, false)}
+          >
+            {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />}
+            Salvar Rascunho
+          </Button>
+          <Button 
+            type="button" 
+            className="bg-indigo-600 hover:bg-indigo-700 gap-2 h-11 px-8" 
+            disabled={submitting}
+            onClick={(e) => handleSave(e, true)}
+          >
             {submitting ? (
-              <>
-                <Loader2 className="animate-spin h-4 w-4" />
-                Enviando...
-              </>
+              <Loader2 className="animate-spin h-4 w-4" />
             ) : (
-              <>
-                <Save className="h-4 w-4" />
-                {id ? "Salvar Alterações" : "Salvar Sessão"}
-              </>
+              <CheckCircle2 className="h-4 w-4" />
             )}
+            Finalizar Sessão
           </Button>
         </div>
       </form>

@@ -33,7 +33,6 @@ export const sessionService = {
       ...sessionData,
       patient_id: sessionData.patient_id === "" ? null : sessionData.patient_id,
       psychologist_id: user.id,
-      // Removido processing_status: inicial. O banco de dados assume o default 'draft'.
     };
 
     if (!cleanedData.patient_id) throw new Error("Paciente é obrigatório");
@@ -60,7 +59,6 @@ export const sessionService = {
           .update({
             audio_file_name: uploadResult.name,
             audio_file_path: uploadResult.path
-            // Removido update de status.
           })
           .eq('id', session.id)
           .select()
@@ -85,7 +83,6 @@ export const sessionService = {
     const cleanedData = { ...sessionData };
     if (cleanedData.patient_id === "") delete cleanedData.patient_id;
 
-    // Garantir que o frontend não envie campos de processamento no update manual
     delete (cleanedData as any).processing_status;
     delete (cleanedData as any).processing_error;
     delete (cleanedData as any).transcript;
@@ -113,8 +110,6 @@ export const sessionService = {
       audioInfo = {
         audio_file_name: uploadResult.name,
         audio_file_path: uploadResult.path
-        // Removido reset de status. O backend tratará isso se necessário ou 
-        // a lógica de negócio dirá que o usuário deve clicar em "Processar" novamente.
       };
     }
 
@@ -130,13 +125,30 @@ export const sessionService = {
   },
 
   processAudio: async (sessionId: string): Promise<any> => {
-    // Esta é a ÚNICA forma permitida de alterar o status de processamento (via Edge Function)
     const { data, error } = await supabase.functions.invoke('process-session-audio', {
       body: { sessionId }
     });
     
     if (error) throw error;
     return data;
+  },
+
+  finishSession: async (id: string): Promise<void> => {
+    // Busca os dados atuais para saber se tem áudio
+    const session = await sessionService.getById(id);
+    if (!session) return;
+
+    if (session.audio_file_path) {
+      // Se tem áudio, dispara a Edge Function que cuida de todo o status (queued -> processing -> completed)
+      await sessionService.processAudio(id);
+    } else {
+      // Se NÃO tem áudio, apenas marca como concluído no banco
+      const { error } = await supabase
+        .from('sessions')
+        .update({ processing_status: 'completed' })
+        .eq('id', id);
+      if (error) throw error;
+    }
   },
 
   removeAudio: async (sessionId: string): Promise<void> => {
@@ -153,11 +165,10 @@ export const sessionService = {
       .update({
         audio_file_name: null,
         audio_file_path: null,
-        // Limpamos os dados gerados, mas não alteramos o status diretamente.
-        // O banco de dados ou a próxima ação decidirão o status.
         transcript: null,
         highlights: null,
-        next_steps: null
+        next_steps: null,
+        processing_status: 'draft' // Volta para rascunho ao remover áudio
       })
       .eq('id', sessionId);
 
