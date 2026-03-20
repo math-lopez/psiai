@@ -19,9 +19,11 @@ export const useNotifications = () => {
   useEffect(() => {
     if (!user) return;
 
+    console.log("[useNotifications] Iniciando subscrição em tempo real para o usuário:", user.id);
+
     // Canal para ouvir mudanças nas sessões do usuário logado
     const channel = supabase
-      .channel('session-notifications')
+      .channel(`user-notifications-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -31,16 +33,15 @@ export const useNotifications = () => {
           filter: `psychologist_id=eq.${user.id}`,
         },
         (payload) => {
-          const oldStatus = payload.old.processing_status;
           const newStatus = payload.new.processing_status;
-
-          // Só notifica se o status mudou para concluído ou erro
-          if (oldStatus !== newStatus && (newStatus === 'completed' || newStatus === 'error')) {
+          
+          // Notifica se o status mudou para concluído ou erro
+          if (newStatus === 'completed' || newStatus === 'error') {
             const isSuccess = newStatus === 'completed';
             const title = isSuccess ? "Processamento Concluído" : "Erro no Processamento";
             const message = isSuccess 
-              ? `A IA finalizou a transcrição da sessão.` 
-              : `Houve um erro ao processar o áudio da sessão.`;
+              ? `A IA finalizou a transcrição de uma sessão.` 
+              : `Houve um erro ao processar o áudio de uma sessão.`;
 
             const newNotif: Notification = {
               id: Math.random().toString(36).substr(2, 9),
@@ -53,12 +54,15 @@ export const useNotifications = () => {
 
             setNotifications(prev => [newNotif, ...prev]);
             
+            // Também mostramos um toast para feedback imediato
             if (isSuccess) showSuccess(message);
             else showError(message);
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("[useNotifications] Status da subscrição:", status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
