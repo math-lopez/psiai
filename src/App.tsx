@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { Analytics } from "@vercel/analytics/react";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -56,6 +57,7 @@ const App = () => (
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
+        <Analytics />
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
