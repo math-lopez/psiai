@@ -27,7 +27,7 @@ import { showSuccess, showError } from "@/utils/toast";
 import { validateAudioFile } from "@/lib/file-utils";
 import { supabase } from "@/integrations/supabase/client";
 import { SubscriptionTier } from "@/config/plans";
-import { getLocalDateTime, cn } from "@/lib/utils";
+import { formatToLocalISO, formatToUTCISO, cn } from "@/lib/utils";
 
 const SessionFormPage = () => {
   const { id } = useParams();
@@ -39,12 +39,11 @@ const SessionFormPage = () => {
   const [recordType, setRecordType] = useState<SessionRecordType>("ambos");
   const [tier, setTier] = useState<SubscriptionTier>("free");
   
-  // Controle do Combobox
   const [open, setOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     patient_id: "",
-    session_date: getLocalDateTime(),
+    session_date: formatToLocalISO(),
     duration_minutes: 50,
     manual_notes: "",
   });
@@ -68,7 +67,6 @@ const SessionFormPage = () => {
         const pats = await patientService.list();
         setPatients(pats);
 
-        // Se vier do detalhe do paciente, pré-seleciona
         const initialPatientId = location.state?.patientId;
 
         if (id) {
@@ -76,7 +74,7 @@ const SessionFormPage = () => {
           if (session) {
             setFormData({
               patient_id: session.patient_id,
-              session_date: new Date(session.session_date).toISOString().slice(0, 16),
+              session_date: formatToLocalISO(session.session_date),
               duration_minutes: session.duration_minutes,
               manual_notes: session.manual_notes || "",
             });
@@ -95,26 +93,6 @@ const SessionFormPage = () => {
     loadData();
   }, [id, location.state]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (tier === 'free') {
-      showError("Seu plano atual não permite transcrição de áudio.");
-      e.target.value = '';
-      return;
-    }
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const validation = validateAudioFile(file);
-    if (!validation.valid) {
-      showError(validation.error!);
-      e.target.value = '';
-      return;
-    }
-
-    setAudioFile(file);
-    setExistingAudioName(null);
-  };
-
   const handleSave = async (e: React.FormEvent, shouldFinish: boolean = false) => {
     e.preventDefault();
     if (!formData.patient_id) {
@@ -124,11 +102,18 @@ const SessionFormPage = () => {
 
     setSubmitting(true);
     try {
+      // Garantimos que a data seja enviada em UTC para o banco
+      const payload = {
+        ...formData,
+        session_date: formatToUTCISO(formData.session_date),
+        record_type: recordType
+      };
+
       let savedSession;
       if (id) {
-        savedSession = await sessionService.update(id, { ...formData, record_type: recordType }, audioFile || undefined);
+        savedSession = await sessionService.update(id, payload, audioFile || undefined);
       } else {
-        savedSession = await sessionService.create({ ...formData, record_type: recordType }, audioFile || undefined);
+        savedSession = await sessionService.create(payload, audioFile || undefined);
       }
 
       if (shouldFinish) {
@@ -303,7 +288,24 @@ const SessionFormPage = () => {
                       type="file" 
                       accept=".mp3,.wav,.m4a,.webm,audio/*"
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      onChange={handleFileChange}
+                      onChange={(e) => {
+                        if (tier === 'free') {
+                          showError("Seu plano atual não permite transcrição de áudio.");
+                          e.target.value = '';
+                          return;
+                        }
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const validation = validateAudioFile(file);
+                          if (!validation.valid) {
+                            showError(validation.error!);
+                            e.target.value = '';
+                            return;
+                          }
+                          setAudioFile(file);
+                          setExistingAudioName(null);
+                        }
+                      }}
                     />
                     <div className="border-2 border-dashed border-slate-200 rounded-lg p-10 text-center hover:bg-slate-50 transition-colors">
                       <div className="flex flex-col items-center gap-2">
