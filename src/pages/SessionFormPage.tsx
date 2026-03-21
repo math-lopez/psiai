@@ -1,19 +1,25 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
-import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2, Lock, Sparkles } from "lucide-react";
+import { useNavigate, useParams, Link, useLocation } from "react-router-dom";
+import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2, Lock, Sparkles, Check, ChevronsUpDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { patientService } from "@/services/patientService";
 import { sessionService } from "@/services/sessionService";
 import { Patient, SessionRecordType } from "@/types";
@@ -21,10 +27,11 @@ import { showSuccess, showError } from "@/utils/toast";
 import { validateAudioFile } from "@/lib/file-utils";
 import { supabase } from "@/integrations/supabase/client";
 import { SubscriptionTier } from "@/config/plans";
-import { getLocalDateTime } from "@/lib/utils";
+import { getLocalDateTime, cn } from "@/lib/utils";
 
 const SessionFormPage = () => {
   const { id } = useParams();
+  const location = useLocation();
   const navigate = useNavigate();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +39,9 @@ const SessionFormPage = () => {
   const [recordType, setRecordType] = useState<SessionRecordType>("ambos");
   const [tier, setTier] = useState<SubscriptionTier>("free");
   
+  // Controle do Combobox
+  const [open, setOpen] = useState(false);
+
   const [formData, setFormData] = useState({
     patient_id: "",
     session_date: getLocalDateTime(),
@@ -47,20 +57,19 @@ const SessionFormPage = () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile } = await supabase
           .from('profiles')
-          .select('*')
+          .select('subscription_tier')
           .eq('id', user?.id)
           .maybeSingle();
         
-        if (!profileError && profile?.subscription_tier) {
-          setTier(profile.subscription_tier as SubscriptionTier);
-        } else {
-          setTier("free");
-        }
+        setTier(profile?.subscription_tier as SubscriptionTier || "free");
 
         const pats = await patientService.list();
         setPatients(pats);
+
+        // Se vier do detalhe do paciente, pré-seleciona
+        const initialPatientId = location.state?.patientId;
 
         if (id) {
           const session = await sessionService.getById(id);
@@ -74,6 +83,8 @@ const SessionFormPage = () => {
             setRecordType(session.record_type);
             setExistingAudioName(session.audio_file_name);
           }
+        } else if (initialPatientId) {
+          setFormData(prev => ({ ...prev, patient_id: initialPatientId }));
         }
       } catch (e) {
         console.error("Erro ao carregar dados:", e);
@@ -82,7 +93,7 @@ const SessionFormPage = () => {
       }
     };
     loadData();
-  }, [id]);
+  }, [id, location.state]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (tier === 'free') {
@@ -136,6 +147,8 @@ const SessionFormPage = () => {
 
   if (loading) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-indigo-600" /></div>;
 
+  const selectedPatient = patients.find(p => p.id === formData.patient_id);
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-4">
@@ -152,18 +165,50 @@ const SessionFormPage = () => {
         <Card>
           <CardContent className="p-6 space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
+              <div className="space-y-2 flex flex-col">
                 <Label htmlFor="patient">Paciente *</Label>
-                <Select required value={formData.patient_id} onValueChange={(v) => setFormData({...formData, patient_id: v})} disabled={!!id}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione o paciente" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {patients.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      className="w-full justify-between font-normal h-10 border-slate-200"
+                      disabled={!!id}
+                    >
+                      {selectedPatient ? selectedPatient.full_name : "Selecionar paciente..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Buscar paciente..." />
+                      <CommandList>
+                        <CommandEmpty>Nenhum paciente encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {patients.map((patient) => (
+                            <CommandItem
+                              key={patient.id}
+                              value={patient.full_name}
+                              onSelect={() => {
+                                setFormData({ ...formData, patient_id: patient.id });
+                                setOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  formData.patient_id === patient.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {patient.full_name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -216,15 +261,6 @@ const SessionFormPage = () => {
                   </Label>
                 </div>
               </RadioGroup>
-              
-              {tier === 'free' && (
-                <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg flex items-center gap-3">
-                  <Sparkles className="h-4 w-4 text-amber-600" />
-                  <p className="text-xs text-amber-700">
-                    O plano gratuito não permite gravação de áudio. <Link to="/assinatura" className="font-bold underline">Faça upgrade</Link> para transcrever suas sessões.
-                  </p>
-                </div>
-              )}
             </div>
 
             {(recordType === 'audio' || recordType === 'ambos') && tier !== 'free' && (

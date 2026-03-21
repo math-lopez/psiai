@@ -125,7 +125,7 @@ const PatientDetailPage = () => {
             </AlertDialogContent>
           </AlertDialog>
 
-          <Link to="/sessoes/nova">
+          <Link to="/sessoes/nova" state={{ patientId: id }}>
             <Button className="bg-primary hover:bg-primary/90 rounded-2xl h-11 shadow-lg shadow-primary/10 gap-2">
               <Plus className="h-4 w-4" /> Registrar Sessão
             </Button>
