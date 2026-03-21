@@ -26,6 +26,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { patientService } from "@/services/patientService";
 import { sessionService } from "@/services/sessionService";
 import { Patient, Session } from "@/types";
@@ -33,6 +34,7 @@ import { LongitudinalAnalysis } from "@/components/patients/LongitudinalAnalysis
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { showError, showSuccess } from "@/utils/toast";
+import { cn } from "@/lib/utils";
 
 const PatientDetailPage = () => {
   const { id } = useParams();
