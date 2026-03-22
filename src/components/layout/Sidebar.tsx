@@ -9,42 +9,26 @@ import {
   LogOut,
   BrainCircuit,
   X,
-  ChevronRight,
-  Book,
-  Sparkles
+  ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect, useState } from "react";
-import { diaryService } from "@/services/diaryService";
 
-export const Sidebar = ({ isMobile, onpjClose }: { isMobile?: boolean; onpjClose?: () => void }) => {
+const menuItems = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: Users, label: "Pacientes", path: "/pacientes" },
+  { icon: CalendarDays, label: "Sessões", path: "/sessoes" },
+  { icon: Settings, label: "Configurações", path: "/configuracoes" },
+];
+
+interface SidebarProps {
+  isMobile?: boolean;
+  onpjClose?: () => void;
+}
+
+export const Sidebar = ({ isMobile, onpjClose }: SidebarProps) => {
   const location = useLocation();
-  const { user, signOut } = useAuth();
-  const [isPatient, setIsPatient] = useState(false);
-
-  useEffect(() => {
-    const checkRole = async () => {
-      const context = await diaryService.getPatientContext();
-      setIsPatient(!!context);
-    };
-    if (user) checkRole();
-  }, [user]);
-
-  const psychologistMenu = [
-    { icon: LayoutDashboard, label: "Dashboard", path: "/" },
-    { icon: Users, label: "Pacientes", path: "/pacientes" },
-    { icon: CalendarDays, label: "Sessões", path: "/sessoes" },
-    { icon: Settings, label: "Configurações", path: "/configuracoes" },
-  ];
-
-  const patientMenu = [
-    { icon: LayoutDashboard, label: "Meu Painel", path: "/meu-painel" },
-    { icon: Book, label: "Meu Diário", path: "/meu-diario" },
-    { icon: Settings, label: "Configurações", path: "/configuracoes" },
-  ];
-
-  const menuItems = isPatient ? patientMenu : psychologistMenu;
+  const { signOut } = useAuth();
 
   return (
     <div className={cn(
@@ -91,7 +75,7 @@ export const Sidebar = ({ isMobile, onpjClose }: { isMobile?: boolean; onpjClose
 
       <div className="p-6">
         <div className="p-4 bg-slate-50 rounded-3xl border border-slate-100 space-y-4">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Conta</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">Sessão</p>
           <button 
             onClick={() => signOut()}
             className="flex w-full items-center gap-3 px-3 py-2 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 transition-colors"

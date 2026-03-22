@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { Bell, UserCircle, Loader2, CheckCircle2, AlertCircle, Trash2, Menu, ShieldCheck } from "lucide-react";
+import { Bell, UserCircle, Loader2, CheckCircle2, AlertCircle, Trash2, Menu } from "lucide-react";
 import { useNotifications } from "@/hooks/useNotifications";
 import {
   Popover,
@@ -11,8 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useEffect, useState } from "react";
-import { diaryService } from "@/services/diaryService";
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -21,18 +19,9 @@ interface HeaderProps {
 export const Header = ({ onMenuClick }: HeaderProps) => {
   const { user, loading } = useAuth();
   const { notifications, unreadCount, markAllAsRead, clearNotifications } = useNotifications();
-  const [isPatient, setIsPatient] = useState(false);
-
-  useEffect(() => {
-    const checkRole = async () => {
-      const context = await diaryService.getPatientContext();
-      setIsPatient(!!context);
-    };
-    if (user) checkRole();
-  }, [user]);
 
   const fullName = user?.user_metadata?.full_name || user?.email || "Usuário";
-  const subText = isPatient ? "Portal do Paciente" : (user?.user_metadata?.crp || "Psicólogo");
+  const crp = user?.user_metadata?.crp || "CRP";
 
   return (
     <header className="sticky top-0 z-30 h-20 border-b border-slate-100 bg-white/80 backdrop-blur-md px-4 md:px-8 flex items-center justify-between">
@@ -44,11 +33,11 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
           <Menu className="h-6 w-6" />
         </button>
         <div className="hidden sm:block">
-          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">PsiAI</h2>
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Bem-vindo(a)</h2>
           {loading ? (
             <Loader2 className="h-5 w-5 animate-spin text-primary" />
           ) : (
-            <p className="text-lg font-bold text-slate-900 truncate max-w-[200px] md:max-w-xs">Olá, {fullName.split(' ')[0]}</p>
+            <p className="text-lg font-bold text-slate-900 truncate max-w-[200px] md:max-w-xs">{fullName}</p>
           )}
         </div>
       </div>
@@ -125,9 +114,7 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
         <div className="flex items-center gap-3 pl-1">
           <div className="text-right hidden md:block">
             <p className="text-sm font-bold text-slate-900">{fullName}</p>
-            <p className="text-[9px] text-primary font-black uppercase tracking-widest flex items-center justify-end gap-1">
-              {isPatient && <ShieldCheck className="h-2.5 w-2.5" />} {subText}
-            </p>
+            <p className="text-[9px] text-primary font-black uppercase tracking-widest">{crp}</p>
           </div>
           <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black border-2 border-white shadow-sm transition-transform hover:scale-105">
             {fullName.charAt(0).toUpperCase()}
