@@ -10,12 +10,14 @@ import {
   History, 
   ClipboardCheck,
   Calendar,
-  MessageSquare
+  MessageSquare,
+  Sparkles,
+  ArrowRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PatientLogForm } from "@/components/diary/PatientLogForm";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { showError } from "@/utils/toast";
 
@@ -25,7 +27,6 @@ const PatientDiaryPage = () => {
   const [loading, setLoading] = useState(true);
   const [context, setContext] = useState<{ patientId: string; psychologistId: string } | null>(null);
 
-  // Modais
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [activePromptId, setActivePromptId] = useState<string | null>(null);
 
@@ -33,7 +34,7 @@ const PatientDiaryPage = () => {
     try {
       const ctx = await diaryService.getPatientContext();
       if (!ctx) {
-        showError("Não foi possível identificar seu vínculo clínico. Contate seu psicólogo.");
+        setLoading(false);
         return;
       }
       setContext(ctx);
@@ -42,9 +43,10 @@ const PatientDiaryPage = () => {
         diaryService.listLogs(ctx.patientId),
         diaryService.listPrompts(ctx.patientId)
       ]);
-      setLogs(l);
-      setPrompts(p);
+      setLogs(l || []);
+      setPrompts(p || []);
     } catch (e) {
+      console.error("Erro ao carregar diário:", e);
       showError("Erro ao carregar dados do diário.");
     } finally {
       setLoading(false);
@@ -55,38 +57,48 @@ const PatientDiaryPage = () => {
     fetchData();
   }, []);
 
-  if (loading) return <div className="py-20 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
+  if (loading) return (
+    <div className="h-[60vh] flex flex-col items-center justify-center gap-4">
+      <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
+      <p className="text-xs font-black text-slate-400 uppercase tracking-widest">Carregando seus registros...</p>
+    </div>
+  );
 
   const activePrompts = prompts.filter(p => p.status === 'active');
 
   return (
-    <div className="space-y-10">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Meu Diário</h1>
+    <div className="space-y-12 animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+            Meu Diário <Sparkles className="h-6 w-6 text-indigo-500" />
+          </h1>
+          <p className="text-slate-500 font-medium mt-2">Um espaço para suas reflexões entre as sessões.</p>
+        </div>
         <Button 
           onClick={() => { setActivePromptId(null); setIsFormOpen(true); }}
-          className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-12 px-6 shadow-xl shadow-indigo-100 gap-2 font-black"
+          className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-14 px-8 shadow-xl shadow-indigo-100 gap-2 font-black text-lg transition-transform hover:scale-105 active:scale-95"
         >
-          <Plus className="h-5 w-5" /> Novo Registro
+          <Plus className="h-6 w-6" /> Novo Registro
         </Button>
       </div>
 
       {activePrompts.length > 0 && (
-        <section className="space-y-4">
-          <h3 className="text-xs font-black uppercase tracking-widest text-amber-600 px-2 flex items-center gap-2">
-            <ClipboardCheck className="h-4 w-4" /> Tarefas Pendentes
+        <section className="space-y-6">
+          <h3 className="text-xs font-black uppercase tracking-widest text-amber-600 px-4 flex items-center gap-2">
+            <ClipboardCheck className="h-4 w-4" /> Tarefas Sugeridas pelo Psicólogo
           </h3>
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {activePrompts.map((p) => (
-              <Card key={p.id} className="border-none shadow-md rounded-[32px] overflow-hidden bg-amber-50/50 border-amber-100 border">
-                <CardContent className="p-6 flex items-center justify-between gap-4">
+              <Card key={p.id} className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white border-l-4 border-l-amber-400">
+                <CardContent className="p-6 flex items-center justify-between gap-6">
                   <div className="space-y-1 min-w-0">
-                    <p className="font-bold text-slate-900 truncate">{p.title}</p>
-                    <p className="text-xs text-slate-500 line-clamp-1">{p.description}</p>
+                    <p className="font-black text-slate-900 truncate text-lg">{p.title}</p>
+                    <p className="text-sm text-slate-500 line-clamp-1">{p.description || "Sem instruções adicionais."}</p>
                   </div>
                   <Button 
                     onClick={() => { setActivePromptId(p.id); setIsFormOpen(true); }}
-                    className="bg-amber-500 hover:bg-amber-600 rounded-xl h-10 px-4 font-black shrink-0"
+                    className="bg-amber-100 text-amber-700 hover:bg-amber-200 rounded-2xl h-11 px-5 font-black shrink-0 border-none"
                   >
                     Responder
                   </Button>
@@ -97,44 +109,54 @@ const PatientDiaryPage = () => {
         </section>
       )}
 
-      <section className="space-y-6">
-        <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 px-2 flex items-center gap-2">
+      <section className="space-y-8">
+        <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 px-4 flex items-center gap-2">
           <History className="h-4 w-4" /> Histórico de Registros
         </h3>
         
-        <div className="space-y-4">
-          {logs.length > 0 ? logs.map((log) => (
-            <div key={log.id} className="p-6 bg-white border border-slate-100 rounded-[32px] shadow-sm hover:shadow-md transition-all">
-              <div className="flex items-start justify-between gap-4 mb-3">
-                <div className="flex items-center gap-4">
-                  {log.mood ? (
-                    <div className="h-12 w-12 rounded-2xl bg-slate-50 flex items-center justify-center text-2xl">
-                      {log.mood}
+        <div className="grid grid-cols-1 gap-6">
+          {logs.length > 0 ? logs.map((log) => {
+            const logDate = new Date(log.created_at);
+            const isValidDate = isValid(logDate);
+            
+            return (
+              <div key={log.id} className="group p-8 bg-white border border-slate-100 rounded-[40px] shadow-sm hover:shadow-xl hover:border-indigo-100 transition-all duration-300">
+                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
+                  <div className="flex items-center gap-5">
+                    {log.mood ? (
+                      <div className="h-14 w-14 rounded-3xl bg-slate-50 flex items-center justify-center text-3xl shadow-inner group-hover:bg-white group-hover:scale-110 transition-transform">
+                        {log.mood}
+                      </div>
+                    ) : (
+                      <div className="h-14 w-14 rounded-3xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                        <MessageSquare className="h-7 w-7" />
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="font-black text-slate-900 text-xl leading-none mb-2">{log.title || "Anotação do Diário"}</h4>
+                      <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                        <Calendar className="h-3.5 w-3.5" /> 
+                        {isValidDate ? format(logDate, "dd 'de' MMMM, yyyy", { locale: ptBR }) : "Data não disponível"}
+                      </p>
                     </div>
-                  ) : (
-                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                      <MessageSquare className="h-6 w-6" />
+                  </div>
+                  {log.created_by === 'psychologist' && (
+                    <div className="px-4 py-1.5 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
+                      Postado pelo Psicólogo
                     </div>
                   )}
-                  <div>
-                    <h4 className="font-bold text-slate-900 leading-none mb-1">{log.title || "Anotação do Diário"}</h4>
-                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-1">
-                      <Calendar className="h-3 w-3" /> {format(new Date(log.created_at), "dd 'de' MMMM", { locale: ptBR })}
-                    </p>
-                  </div>
                 </div>
-                {log.created_by === 'psychologist' && (
-                  <div className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-md text-[8px] font-black uppercase tracking-widest">
-                    Postado pelo Psicólogo
-                  </div>
-                )}
+                <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-50">
+                  <p className="text-base text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">{log.content}</p>
+                </div>
               </div>
-              <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-wrap">{log.content}</p>
-            </div>
-          )) : (
-            <div className="text-center py-20 bg-slate-50 rounded-[40px] border border-dashed border-slate-200">
-               <BookOpen className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-               <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">Seu diário ainda está vazio.</p>
+            );
+          }) : (
+            <div className="text-center py-24 bg-white rounded-[60px] border-2 border-dashed border-slate-100">
+               <div className="h-24 w-24 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
+                <BookOpen className="h-10 w-10 text-slate-200" />
+               </div>
+               <p className="text-sm text-slate-400 font-black uppercase tracking-widest max-w-xs mx-auto">Sua jornada começa aqui. Faça seu primeiro registro.</p>
             </div>
           )}
         </div>
