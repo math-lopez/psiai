@@ -15,7 +15,8 @@ import {
   Loader2,
   StickyNote,
   Footprints,
-  Quote
+  Quote,
+  ClipboardList
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -104,7 +105,7 @@ export const SessionTimelineItem = ({ session }: SessionTimelineItemProps) => {
 
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase text-indigo-500 tracking-wider">
-                  <Zap className="h-3 w-3" /> Intervenções
+                  <Quote className="h-3 w-3" /> Intervenções
                 </div>
                 <p className="text-xs text-slate-700 leading-relaxed">
                   {session.interventions || "Não preenchido."}
