@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { PatientLog, PatientLogPrompt } from "@/types/diary";
+import { PatientLog, PatientLogPrompt, LogType } from "@/types/diary";
 import { diaryService } from "@/services/diaryService";
 import { 
   BookOpen, 
@@ -12,10 +12,13 @@ import {
   Calendar,
   MessageSquare,
   CheckCircle2,
-  ChevronDown
+  ChevronDown,
+  Search,
+  Filter
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { PatientLogForm } from "@/components/diary/PatientLogForm";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -28,6 +31,9 @@ const PatientDiaryPage = () => {
   const [loading, setLoading] = useState(true);
   const [context, setContext] = useState<{ patientId: string; psychologistId: string } | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  
+  const [searchTerm, setSearchTerm] = useState("");
+  const [activeFilter, setActiveFilter] = useState<LogType | 'all'>('all');
 
   // Modais
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -37,7 +43,7 @@ const PatientDiaryPage = () => {
     try {
       const ctx = await diaryService.getPatientContext();
       if (!ctx) {
-        showError("Não foi possível identificar seu vínculo clínico. Contate seu psicólogo.");
+        showError("Não foi possível identificar seu vínculo clínico.");
         return;
       }
       setContext(ctx);
@@ -59,6 +65,13 @@ const PatientDiaryPage = () => {
     fetchData();
   }, []);
 
+  const filteredLogs = logs.filter(log => {
+    const matchesSearch = log.title?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         log.content.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = activeFilter === 'all' || log.log_type === activeFilter;
+    return matchesSearch && matchesFilter;
+  });
+
   if (loading) return <div className="py-20 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
 
   const activePrompts = prompts.filter(p => p.status === 'active');
@@ -76,6 +89,7 @@ const PatientDiaryPage = () => {
         </Button>
       </div>
 
+      {/* Seção de Tarefas */}
       {(activePrompts.length > 0 || completedPrompts.length > 0) && (
         <section className="space-y-4">
           <h3 className="text-xs font-black uppercase tracking-widest text-amber-600 px-2 flex items-center gap-2">
@@ -129,13 +143,47 @@ const PatientDiaryPage = () => {
         </section>
       )}
 
+      {/* Seção de Registros com Filtros */}
       <section className="space-y-6">
-        <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 px-2 flex items-center gap-2">
-          <History className="h-4 w-4" /> Histórico de Registros
-        </h3>
+        <div className="flex flex-wrap items-center justify-between gap-4 px-2">
+          <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+            <History className="h-4 w-4" /> Histórico de Registros
+          </h3>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 bg-white p-4 rounded-[28px] border border-slate-100 shadow-sm">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input 
+              placeholder="Buscar no seu diário..." 
+              className="pl-10 h-11 rounded-2xl border-slate-100 bg-slate-50/50"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {(['all', 'weekly_journal', 'emotional_record', 'thought_record', 'homework'] as const).map((f) => (
+              <Button
+                key={f}
+                variant={activeFilter === f ? 'secondary' : 'ghost'}
+                size="sm"
+                className={cn(
+                  "rounded-xl h-9 px-4 text-[10px] font-black uppercase tracking-widest",
+                  activeFilter === f ? "bg-indigo-50 text-indigo-600" : "text-slate-500"
+                )}
+                onClick={() => setActiveFilter(f)}
+              >
+                {f === 'all' ? 'Tudo' : 
+                 f === 'weekly_journal' ? 'Semanal' : 
+                 f === 'emotional_record' ? 'Emoção' : 
+                 f === 'thought_record' ? 'Pensamento' : 'Tarefa'}
+              </Button>
+            ))}
+          </div>
+        </div>
         
         <div className="space-y-4">
-          {logs.length > 0 ? logs.map((log) => (
+          {filteredLogs.length > 0 ? filteredLogs.map((log) => (
             <div key={log.id} className="p-6 bg-white border border-slate-100 rounded-[32px] shadow-sm hover:shadow-md transition-all">
               <div className="flex items-start justify-between gap-4 mb-3">
                 <div className="flex items-center gap-4">
@@ -166,7 +214,7 @@ const PatientDiaryPage = () => {
           )) : (
             <div className="text-center py-20 bg-slate-50 rounded-[40px] border border-dashed border-slate-200">
                <BookOpen className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-               <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">Seu diário ainda está vazio.</p>
+               <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">Nenhum registro encontrado com esses filtros.</p>
             </div>
           )}
         </div>
