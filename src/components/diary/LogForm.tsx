@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Loader2, BookOpen, Smile, Eye, EyeOff } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
+import { cn } from "@/lib/utils";
 
 interface LogFormProps {
   isOpen: boolean;
