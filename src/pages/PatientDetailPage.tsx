@@ -7,13 +7,13 @@ import {
   Calendar, 
   Mail, 
   Phone, 
-  CalendarDays, 
   Loader2, 
   Trash2,
   AlertTriangle,
   Target,
   BookOpen,
-  Lock
+  Lock,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -63,7 +63,6 @@ const PatientDetailPage = () => {
           sessionService.list()
         ]);
         setPatient(pData);
-        // Filtra sessões deste paciente
         const patientSessions = sData.filter(s => s.patient_id === id);
         setSessions(patientSessions);
       } finally {
@@ -100,7 +99,6 @@ const PatientDetailPage = () => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-10 pb-20">
-      {/* Header com Navegação e Ações */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
           <Button 
@@ -164,11 +162,9 @@ const PatientDetailPage = () => {
         </div>
       </div>
 
-      {/* Destaque da Última Sessão */}
       <LatestSessionFeature session={latestSession} />
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
-        {/* Sidebar de Informações */}
         <div className="lg:col-span-1 space-y-8">
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
             <div className="h-2 w-full bg-blue-500" />
@@ -224,7 +220,6 @@ const PatientDetailPage = () => {
           </Card>
         </div>
 
-        {/* Conteúdo Principal: Overview / Timeline / Treatment Plan / Diary / Access */}
         <div className="lg:col-span-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="bg-slate-100/50 p-1.5 rounded-3xl h-auto mb-10 gap-2 border border-slate-100 flex-wrap justify-start">
@@ -248,9 +243,11 @@ const PatientDetailPage = () => {
               </TabsTrigger>
               <TabsTrigger 
                 value="analysis" 
-                className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
+                disabled
+                className="rounded-2xl px-6 py-3 font-black text-sm opacity-40 cursor-not-allowed flex gap-2 grayscale"
               >
-                Parecer Clínico <Badge className="h-5 px-1.5 bg-indigo-50 text-indigo-600 border-none text-[8px] font-black">AI BETA</Badge>
+                Parecer Clínico <Clock className="h-3 w-3" />
+                <Badge className="h-4 px-1 bg-slate-200 text-slate-500 border-none text-[7px] font-black">BREVE</Badge>
               </TabsTrigger>
               <TabsTrigger 
                 value="access" 
@@ -262,7 +259,6 @@ const PatientDetailPage = () => {
 
             <TabsContent value="overview" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
               <PatientTimeline sessions={sessions} />
-              {/* Resumo do Diário na Visão Geral */}
               <DiaryOverviewWidget patientId={id!} onViewMore={() => setActiveTab("diary")} />
             </TabsContent>
 

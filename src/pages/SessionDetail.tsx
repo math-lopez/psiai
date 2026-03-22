@@ -41,7 +41,6 @@ const SessionDetail = () => {
       setSession(sessionData);
       setAiAnalysis(analysisData);
       
-      // Se já existe uma análise e ela está pendente/processando, entramos em modo de espera
       if (analysisData && (analysisData.status === 'processing' || analysisData.status === 'pending')) {
         setIsAnalyzing(true);
       }
@@ -59,28 +58,21 @@ const SessionDetail = () => {
   useEffect(() => {
     fetchData();
 
-    // CONFIGURAÇÃO DO REALTIME (WebSocket)
-    // Escuta mudanças na tabela de análise para esta sessão específica
     const channel = supabase
       .channel(`ai-analysis-${id}`)
       .on(
         'postgres_changes',
         {
-          event: '*', // Escuta INSERT e UPDATE
+          event: '*',
           schema: 'public',
           table: 'session_ai_analysis',
           filter: `session_id=eq.${id}`,
         },
         (payload) => {
-          console.log("[Realtime] Mudança detectada na análise:", payload);
           const newAnalysis = payload.new as any;
-          
           if (newAnalysis.summary) {
             setAiAnalysis(newAnalysis);
             setIsAnalyzing(false);
-            if (newAnalysis.status === 'completed') {
-              showSuccess("Análise de IA concluída!");
-            }
           }
         }
       )
@@ -105,23 +97,8 @@ const SessionDetail = () => {
   };
 
   const handleAnalyzeSessionAI = async () => {
-    setIsAnalyzing(true);
-    setAnalysisError(null);
-    try {
-      // Chamamos a Edge Function, mas não esperamos o resultado pesado dela aqui
-      // A função deve retornar "success: true" assim que disparar o processo
-      await sessionService.analyzeSessionAI(id!);
-      showSuccess("Solicitação de análise enviada!");
-    } catch (e: any) {
-      // Se der erro de timeout (WORKER_LIMIT), não mostramos erro crítico para o usuário
-      // pois o Realtime pode resolver se o processo continuar no background
-      if (e.message?.includes('WORKER_LIMIT') || e.message?.includes('504')) {
-        console.log("Edge function demorando, aguardando via Realtime...");
-      } else {
-        setAnalysisError(e.message || "Erro ao processar análise profunda.");
-        setIsAnalyzing(false);
-      }
-    }
+    // Feature desativada no front para representar estado futuro
+    return;
   };
 
   const handleDelete = async () => {
@@ -141,17 +118,7 @@ const SessionDetail = () => {
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
   if (!session) return <div className="p-10 text-center"><Button onClick={() => navigate("/sessoes")}>Voltar</Button></div>;
 
-  const isUltra = PLAN_LIMITS[tier].hasTherapeuticInsights;
   const isProcessing = ['queued', 'processing'].includes(session.processing_status);
-
-  // Verifica se há qualquer conteúdo relevante
-  const hasSufficientContent = !!(
-    (session.transcript && session.transcript.trim().length > 20) ||
-    (session.manual_notes && session.manual_notes.trim().length > 20) ||
-    (session.clinical_notes && session.clinical_notes.trim().length > 20) ||
-    (session.interventions && session.interventions.trim().length > 20) ||
-    (session.session_summary_manual && session.session_summary_manual.trim().length > 20)
-  );
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-20">
@@ -242,123 +209,27 @@ const SessionDetail = () => {
             <CardContent><p className="text-slate-700 font-bold leading-relaxed whitespace-pre-wrap italic">{session.session_summary_manual || "Não preenchido."}</p></CardContent>
           </Card>
 
-          <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
-            <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
-            <CardHeader className="pb-2 border-b border-slate-50 mb-4 flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-indigo-600">
-                <BrainCircuit className="h-4 w-4" /> Análise da Sessão com IA
+          {/* SEÇÃO DESABILITADA (BREVE) */}
+          <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-slate-50 opacity-60 grayscale pointer-events-none">
+            <div className="h-1.5 w-full bg-slate-300" />
+            <CardHeader className="pb-2 border-b border-slate-100 mb-4 flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-slate-400">
+                <BrainCircuit className="h-4 w-4" /> Análise da Sessão com IA (Em breve)
               </CardTitle>
-              {aiAnalysis && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleAnalyzeSessionAI} 
-                  disabled={isAnalyzing}
-                  className="h-8 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600"
-                >
-                  {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
-                  Reprocessar
-                </Button>
-              )}
             </CardHeader>
-            <CardContent className="min-h-[200px] flex flex-col">
-              {isAnalyzing ? (
-                <div className="flex-1 flex flex-col items-center justify-center py-10 gap-3">
-                  <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-                  <p className="text-sm font-bold text-slate-500 animate-pulse">A IA está processando sua sessão...</p>
-                  <p className="text-[10px] text-slate-400 font-medium">Isso pode levar até 2 minutos. Você pode continuar navegando.</p>
-                </div>
-              ) : analysisError ? (
-                <div className="flex-1 flex flex-col items-center justify-center py-10 gap-4">
-                  <div className="h-12 w-12 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center">
-                    <AlertCircle className="h-6 w-6" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-bold text-slate-900">Erro na análise profunda</p>
-                    <p className="text-xs text-slate-500 mt-1 max-w-xs">{analysisError}</p>
-                  </div>
-                  <Button onClick={handleAnalyzeSessionAI} className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-11 font-black px-6">
-                    Tentar novamente
-                  </Button>
-                </div>
-              ) : !aiAnalysis ? (
-                <div className="flex-1 flex flex-col items-center justify-center py-12 gap-6 border-2 border-dashed border-slate-100 rounded-[28px]">
-                  <div className="h-14 w-14 bg-indigo-50 text-indigo-400 rounded-2xl flex items-center justify-center">
-                    <Sparkles className="h-7 w-7" />
-                  </div>
-                  <div className="text-center space-y-1">
-                    <p className="text-sm font-black text-slate-900">Nenhuma análise profunda gerada ainda</p>
-                    <p className="text-xs text-slate-500 max-w-xs mx-auto font-medium leading-relaxed">
-                      Gere um relatório estruturado com padrões de comportamento, pontos de atenção e recomendações clínicas automáticas.
-                    </p>
-                  </div>
-                  <Button 
-                    onClick={handleAnalyzeSessionAI} 
-                    disabled={!hasSufficientContent}
-                    className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-12 font-black px-8 shadow-xl shadow-indigo-100"
-                  >
-                    {!hasSufficientContent ? <Lock className="h-4 w-4 mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                    {hasSufficientContent ? "Gerar análise da sessão" : "Conteúdo insuficiente"}
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-8 py-2">
-                  <div className="space-y-3">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 flex items-center gap-1.5">
-                      <FileText className="h-3.5 w-3.5" /> Sumário Estruturado
-                    </h4>
-                    <p className="text-sm text-slate-700 leading-relaxed font-medium bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50 italic">
-                      {aiAnalysis.summary}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-400 flex items-center gap-1.5">
-                        <ListChecks className="h-3.5 w-3.5" /> Padrões Identificados
-                      </h4>
-                      <div className="space-y-2">
-                        {aiAnalysis.key_patterns?.map((pattern: string, i: number) => (
-                          <div key={i} className="flex items-start gap-2 p-3 bg-blue-50/30 rounded-xl border border-blue-50 text-xs text-slate-700 font-bold">
-                            <span className="h-1.5 w-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
-                            {pattern}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h4 className="text-[10px] font-black uppercase tracking-widest text-red-400 flex items-center gap-1.5">
-                        <TriangleAlert className="h-3.5 w-3.5" /> Pontos de Atenção
-                      </h4>
-                      <div className="space-y-2">
-                        {aiAnalysis.risk_flags?.length > 0 ? aiAnalysis.risk_flags.map((flag: string, i: number) => (
-                          <div key={i} className="flex items-start gap-2 p-3 bg-red-50/30 rounded-xl border border-red-50 text-xs text-red-700 font-bold">
-                            <span className="h-1.5 w-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
-                            {flag}
-                          </div>
-                        )) : (
-                          <p className="text-[10px] text-slate-400 italic">Nenhum risco detectado.</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
-                      <CheckCircle2 className="h-3.5 w-3.5" /> Recomendações Clínicas
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {aiAnalysis.recommendations?.map((rec: string, i: number) => (
-                        <div key={i} className="p-4 bg-emerald-50/30 rounded-2xl border border-emerald-50 text-xs text-emerald-800 font-medium flex gap-3">
-                          <Zap className="h-4 w-4 text-emerald-500 shrink-0" />
-                          {rec}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
+            <CardContent className="min-h-[200px] flex flex-col items-center justify-center py-12 gap-6">
+              <div className="h-14 w-14 bg-slate-100 text-slate-300 rounded-2xl flex items-center justify-center">
+                <Sparkles className="h-7 w-7" />
+              </div>
+              <div className="text-center space-y-1">
+                <p className="text-sm font-black text-slate-400">Funcionalidade em desenvolvimento</p>
+                <p className="text-xs text-slate-400 max-w-xs mx-auto font-medium leading-relaxed">
+                  Em breve você poderá gerar relatórios estruturados com padrões de comportamento e recomendações clínicas automáticas.
+                </p>
+              </div>
+              <Button disabled className="bg-slate-200 text-slate-400 rounded-2xl h-12 font-black px-8">
+                Indisponível no momento
+              </Button>
             </CardContent>
           </Card>
 
