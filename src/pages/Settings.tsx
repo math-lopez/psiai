@@ -14,7 +14,6 @@ import { cn } from "@/lib/utils";
 import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { diaryService } from "@/services/diaryService";
 
 type SettingsTab = "profile" | "security" | "notifications" | "billing";
 
@@ -25,7 +24,6 @@ const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loadingInvoices, setLoadingInvoices] = useState(false);
-  const [isPatient, setIsPatient] = useState(false);
   
   // Estados para Perfil
   const [profile, setProfile] = useState({
@@ -47,10 +45,6 @@ const Settings = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       if (user) {
-        // Verifica se é paciente
-        const context = await diaryService.getPatientContext();
-        setIsPatient(!!context);
-
         const { data } = await supabase
           .from('profiles')
           .select('*')
@@ -73,10 +67,10 @@ const Settings = () => {
   }, [user]);
 
   useEffect(() => {
-    if (activeTab === "billing" && profile.stripe_customer_id && !isPatient) {
+    if (activeTab === "billing" && profile.stripe_customer_id) {
       fetchInvoices();
     }
-  }, [activeTab, profile.stripe_customer_id, isPatient]);
+  }, [activeTab, profile.stripe_customer_id]);
 
   const fetchInvoices = async () => {
     setLoadingInvoices(true);
@@ -148,13 +142,6 @@ const Settings = () => {
 
   const currentPlan = PLAN_LIMITS[profile.subscription_tier] || PLAN_LIMITS.free;
 
-  const tabs = [
-    { id: "profile", label: "Perfil", icon: User },
-    { id: "security", label: "Segurança", icon: Shield },
-    { id: "notifications", label: "Notificações", icon: Bell },
-    ...(!isPatient ? [{ id: "billing", label: "Assinatura", icon: CreditCard }] : []),
-  ];
-
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div>
@@ -164,7 +151,12 @@ const Settings = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
         <nav className="space-y-1">
-          {tabs.map((tab) => (
+          {[
+            { id: "profile", label: "Perfil", icon: User },
+            { id: "security", label: "Segurança", icon: Shield },
+            { id: "notifications", label: "Notificações", icon: Bell },
+            { id: "billing", label: "Assinatura", icon: CreditCard },
+          ].map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as SettingsTab)}
@@ -185,8 +177,8 @@ const Settings = () => {
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Dados Pessoais</CardTitle>
-                  <CardDescription>Informações da sua conta no sistema.</CardDescription>
+                  <CardTitle>Dados Profissionais</CardTitle>
+                  <CardDescription>Informações exibidas em seus documentos e prontuários.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -198,18 +190,16 @@ const Settings = () => {
                         onChange={(e) => setProfile({...profile, full_name: e.target.value})}
                       />
                     </div>
-                    {!isPatient && (
-                      <div className="space-y-2">
-                        <Label htmlFor="crp">CRP</Label>
-                        <Input 
-                          id="crp" 
-                          value={profile.crp} 
-                          onChange={(e) => setProfile({...profile, crp: e.target.value})}
-                        />
-                      </div>
-                    )}
                     <div className="space-y-2">
-                      <Label htmlFor="email">E-mail</Label>
+                      <Label htmlFor="crp">CRP</Label>
+                      <Input 
+                        id="crp" 
+                        value={profile.crp} 
+                        onChange={(e) => setProfile({...profile, crp: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email">E-mail Profissional</Label>
                       <Input id="email" value={profile.email} disabled className="bg-slate-50" />
                     </div>
                     <div className="space-y-2">
@@ -224,23 +214,21 @@ const Settings = () => {
                 </CardContent>
               </Card>
 
-              {!isPatient && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Preferências da IA</CardTitle>
-                    <CardDescription>Configure como o PsiAI deve processar suas sessões.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label>Transcrição Automática</Label>
-                        <p className="text-sm text-slate-500">Processar áudio imediatamente após o upload.</p>
-                      </div>
-                      <Switch defaultChecked />
+              <Card>
+                <CardHeader>
+                  <CardTitle>Preferências da IA</CardTitle>
+                  <CardDescription>Configure como o PsiAI deve processar suas sessões.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label>Transcrição Automática</Label>
+                      <p className="text-sm text-slate-500">Processar áudio imediatamente após o upload.</p>
                     </div>
-                  </CardContent>
-                </Card>
-              )}
+                    <Switch defaultChecked />
+                  </div>
+                </CardContent>
+              </Card>
               <div className="flex justify-end">
                 <Button className="bg-indigo-600 hover:bg-indigo-700 gap-2" onClick={handleSaveProfile} disabled={loading}>
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
@@ -295,7 +283,7 @@ const Settings = () => {
             </div>
           )}
 
-          {activeTab === "billing" && !isPatient && (
+          {activeTab === "billing" && (
             <div className="space-y-6">
               <Card className="overflow-hidden">
                 <div className="h-2 bg-indigo-600 w-full" />

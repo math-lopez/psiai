@@ -1,9 +1,8 @@
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { Bell, UserCircle, Loader2, CheckCircle2, AlertCircle, Trash2, Menu, Search } from "lucide-react";
+import { Bell, UserCircle, Loader2, CheckCircle2, AlertCircle, Trash2, Menu } from "lucide-react";
 import { useNotifications } from "@/hooks/useNotifications";
-import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Popover,
   PopoverContent,
@@ -25,51 +24,48 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
   const crp = user?.user_metadata?.crp || "CRP";
 
   return (
-    <header className="sticky top-0 z-30 h-24 px-4 md:px-10 flex items-center justify-between bg-background/80 backdrop-blur-md">
-      <div className="flex items-center gap-6">
+    <header className="sticky top-0 z-30 h-20 border-b border-slate-100 bg-white/80 backdrop-blur-md px-4 md:px-8 flex items-center justify-between">
+      <div className="flex items-center gap-4">
         <button 
           onClick={onMenuClick}
-          className="lg:hidden p-3 text-slate-500 hover:bg-white dark:hover:bg-slate-800 rounded-2xl shadow-sm transition-all"
+          className="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-xl transition-colors"
         >
           <Menu className="h-6 w-6" />
         </button>
-        
-        <div className="hidden md:flex items-center bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 rounded-2xl px-4 py-2 w-72 shadow-sm focus-within:ring-2 ring-indigo-500/20 transition-all">
-          <Search className="h-4 w-4 text-slate-400 mr-2" />
-          <input 
-            type="text" 
-            placeholder="Pesquisar..." 
-            className="bg-transparent border-none text-sm focus:outline-none w-full text-slate-600 dark:text-slate-300 font-medium"
-          />
+        <div className="hidden sm:block">
+          <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Bem-vindo(a)</h2>
+          {loading ? (
+            <Loader2 className="h-5 w-5 animate-spin text-primary" />
+          ) : (
+            <p className="text-lg font-bold text-slate-900 truncate max-w-[200px] md:max-w-xs">{fullName}</p>
+          )}
         </div>
       </div>
 
-      <div className="flex items-center gap-3 md:gap-5">
-        <ThemeToggle />
-        
+      <div className="flex items-center gap-2 md:gap-4">
         <Popover onOpenChange={(open) => {
           if (open && unreadCount > 0) {
             markAllAsRead();
           }
         }}>
           <PopoverTrigger asChild>
-            <button className="relative p-3 text-slate-500 bg-white dark:bg-slate-900 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-2xl shadow-sm border border-slate-200/60 dark:border-slate-800 transition-all hover:scale-105 active:scale-95 focus:outline-none">
+            <button className="relative p-2.5 text-slate-400 hover:text-primary rounded-xl hover:bg-slate-50 transition-all focus:outline-none">
               <Bell className="h-5.5 w-5.5" />
               {unreadCount > 0 && (
-                <span className="absolute top-2.5 right-2.5 h-4 w-4 bg-indigo-600 text-white text-[9px] font-black flex items-center justify-center rounded-full border-2 border-white">
+                <span className="absolute top-2 right-2 h-4.5 w-4.5 bg-red-500 text-white text-[10px] font-black flex items-center justify-center rounded-full border-2 border-white">
                   {unreadCount}
                 </span>
               )}
             </button>
           </PopoverTrigger>
-          <PopoverContent className="w-80 p-0 shadow-2xl border-none rounded-[28px] overflow-hidden mt-2" align="end">
-            <div className="p-5 border-b flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/50">
-              <h4 className="font-black text-xs uppercase tracking-widest text-slate-500">Notificações</h4>
+          <PopoverContent className="w-80 p-0 shadow-2xl border-slate-200 rounded-2xl overflow-hidden" align="end">
+            <div className="p-4 border-b flex items-center justify-between bg-slate-50/50">
+              <h4 className="font-bold text-sm text-slate-900">Notificações</h4>
               {notifications.length > 0 && (
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  className="h-auto p-1 text-[10px] font-black text-slate-400 hover:text-red-500" 
+                  className="h-auto p-1 text-[10px] text-slate-500 hover:text-red-500" 
                   onClick={(e) => {
                     e.stopPropagation();
                     clearNotifications();
@@ -79,24 +75,24 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
                 </Button>
               )}
             </div>
-            <div className="max-h-[350px] overflow-y-auto bg-white dark:bg-slate-900">
+            <div className="max-h-[350px] overflow-y-auto">
               {notifications.length > 0 ? (
-                <div className="divide-y divide-slate-50 dark:divide-slate-800">
+                <div className="divide-y divide-slate-50">
                   {notifications.map((n) => (
-                    <div key={n.id} className={`p-5 flex gap-4 transition-colors ${!n.read ? 'bg-indigo-50/30 dark:bg-indigo-900/10' : 'bg-white dark:bg-slate-900'}`}>
+                    <div key={n.id} className={`p-4 flex gap-3 transition-colors ${!n.read ? 'bg-primary/5' : 'bg-white'}`}>
                       {n.type === 'success' ? (
-                        <div className="mt-1 bg-emerald-100 dark:bg-emerald-900/30 p-2 rounded-xl shrink-0 h-fit">
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        <div className="mt-1 bg-emerald-100 p-1.5 rounded-full shrink-0 h-fit">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
                         </div>
                       ) : (
-                        <div className="mt-1 bg-red-100 dark:bg-red-900/30 p-2 rounded-xl shrink-0 h-fit">
-                          <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        <div className="mt-1 bg-red-100 p-1.5 rounded-full shrink-0 h-fit">
+                          <AlertCircle className="h-3.5 w-3.5 text-red-600" />
                         </div>
                       )}
-                      <div className="space-y-1">
-                        <p className="text-xs font-black text-slate-900 dark:text-white leading-tight">{n.title}</p>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">{n.message}</p>
-                        <p className="text-[9px] text-indigo-400 font-black uppercase tracking-wider">
+                      <div className="space-y-0.5">
+                        <p className="text-xs font-bold text-slate-900">{n.title}</p>
+                        <p className="text-[11px] text-slate-600 leading-snug">{n.message}</p>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase">
                           {formatDistanceToNow(n.createdAt, { addSuffix: true, locale: ptBR })}
                         </p>
                       </div>
@@ -105,22 +101,22 @@ export const Header = ({ onMenuClick }: HeaderProps) => {
                 </div>
               ) : (
                 <div className="p-12 text-center">
-                  <div className="h-16 w-16 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Bell className="h-8 w-8 text-slate-200 dark:text-slate-700" />
-                  </div>
-                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Tudo em dia!</p>
+                  <Bell className="h-10 w-10 text-slate-200 mx-auto mb-3" />
+                  <p className="text-xs text-slate-400 font-medium">Tudo em dia!</p>
                 </div>
               )}
             </div>
           </PopoverContent>
         </Popover>
 
-        <div className="flex items-center gap-3 pl-2 group cursor-pointer">
-          <div className="text-right hidden sm:block">
-            <p className="text-sm font-black text-slate-900 dark:text-white leading-none mb-1">{fullName}</p>
-            <p className="text-[10px] text-indigo-500 font-black uppercase tracking-[0.1em]">{crp}</p>
+        <div className="h-10 w-[1px] bg-slate-100 mx-1 md:mx-2" />
+        
+        <div className="flex items-center gap-3 pl-1">
+          <div className="text-right hidden md:block">
+            <p className="text-sm font-bold text-slate-900">{fullName}</p>
+            <p className="text-[9px] text-primary font-black uppercase tracking-widest">{crp}</p>
           </div>
-          <div className="h-12 w-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-800 flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-black shadow-sm group-hover:shadow-md group-hover:scale-105 transition-all duration-200">
+          <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black border-2 border-white shadow-sm transition-transform hover:scale-105">
             {fullName.charAt(0).toUpperCase()}
           </div>
         </div>

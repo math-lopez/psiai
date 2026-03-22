@@ -1,6 +1,6 @@
 export type PlanStatus = 'active' | 'completed' | 'archived';
 export type GoalStatus = 'not_started' | 'in_progress' | 'completed' | 'paused' | 'cancelled';
-export type GoalPriority = 'low' | 'medium' | 'high' | 'urgent';
+export type GoalPriority = 'low' | 'medium' | 'high';
 
 export interface TreatmentPlan {
   id: string;
@@ -9,7 +9,7 @@ export interface TreatmentPlan {
   title: string;
   description: string | null;
   status: PlanStatus;
-  start_date: string | null;
+  start_date: string;
   end_date: string | null;
   created_at: string;
   updated_at: string;

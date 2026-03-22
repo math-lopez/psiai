@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { 
-  ChevronLeft, Edit, Trash2, Mic, Clock, FileText, Sparkles, Loader2, AlertTriangle, Music, Lock, Stethoscope, ClipboardList, Zap
+  ChevronLeft, Edit, Trash2, Mic, Clock, User, FileText, Sparkles, Loader2, AlertTriangle, Music, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Lock, ClipboardList, Zap, Quote
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,19 +24,27 @@ const SessionDetail = () => {
   const [tier, setTier] = useState<SubscriptionTier>("free");
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchData = async () => {
     if (!id) return;
     try {
       const data = await sessionService.getById(id);
       setSession(data);
+      
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase.from('profiles').select('subscription_tier').eq('id', user?.id).single();
       setTier(profile?.subscription_tier as SubscriptionTier || "free");
-    } finally { setLoading(false); }
+    } catch (e) {
+      showError("Erro ao carregar sessão.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { fetchData(); }, [id]);
+  useEffect(() => {
+    fetchData();
+  }, [id]);
 
   const handleProcessAudio = async () => {
     setProcessing(true);
@@ -44,7 +52,25 @@ const SessionDetail = () => {
       await sessionService.processAudio(id!);
       showSuccess("Processamento iniciado!");
       fetchData();
-    } catch (e: any) { showError(e.message); } finally { setProcessing(false); }
+    } catch (e: any) {
+      showError(e.message);
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!id) return;
+    setDeleting(true);
+    try {
+      await sessionService.delete(id);
+      showSuccess("Sessão excluída com sucesso.");
+      navigate("/sessoes");
+    } catch (e) {
+      showError("Erro ao excluir sessão.");
+    } finally {
+      setDeleting(false);
+    }
   };
 
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
@@ -54,102 +80,139 @@ const SessionDetail = () => {
   const isProcessing = ['queued', 'processing'].includes(session.processing_status);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 pb-12">
+    <div className="max-w-5xl mx-auto space-y-8 pb-20">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/sessoes")} className="rounded-xl"><ChevronLeft className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate("/sessoes")} className="rounded-2xl h-12 w-12 hover:bg-white border-transparent hover:border-slate-100 shadow-sm"><ChevronLeft className="h-6 w-6" /></Button>
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">{session.patient?.full_name}</h1>
-            <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">{format(new Date(session.session_date), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}</p>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tight">{session.patient?.full_name}</h1>
+            <p className="text-slate-500 font-medium">{format(new Date(session.session_date), "dd 'de' MMMM 'às' HH:mm", { locale: ptBR })}</p>
           </div>
         </div>
         <div className="flex gap-2">
-          <Link to={`/sessoes/editar/${id}`}><Button variant="outline" className="h-10 px-6 rounded-xl font-bold gap-2"><Edit className="h-4 w-4" /> Editar Atendimento</Button></Link>
+          <Link to={`/sessoes/editar/${id}`}><Button variant="outline" size="sm" className="gap-2 rounded-xl h-10 font-bold border-slate-200"><Edit className="h-4 w-4" /> Editar Atendimento</Button></Link>
+          
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2 rounded-xl h-10 font-bold text-red-500 border-slate-200 hover:bg-red-50">
+                <Trash2 className="h-4 w-4" /> Excluir
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="rounded-3xl border-none shadow-2xl">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="flex items-center gap-2 text-2xl font-black">
+                  <AlertTriangle className="h-6 w-6 text-red-500" /> Excluir Registro
+                </AlertDialogTitle>
+                <AlertDialogDescription className="text-slate-600 font-medium">
+                  Tem certeza que deseja excluir esta sessão de **{session.patient?.full_name}**? Esta ação removerá permanentemente todas as notas clínicas e transcrições vinculadas.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="rounded-2xl h-12 px-6 font-bold border-slate-100">Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 rounded-2xl h-12 px-6 font-bold">
+                  {deleting ? "Excluindo..." : "Confirmar Exclusão"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Sidebar Informativa */}
         <div className="space-y-6">
-          <Card className="rounded-[32px] border-none shadow-sm overflow-hidden">
-            <CardHeader className="bg-slate-50/50 pb-4"><CardTitle className="text-[10px] uppercase font-black text-slate-400 tracking-widest">Atendimento</CardTitle></CardHeader>
-            <CardContent className="p-6 space-y-4">
-              <div className="flex items-center gap-3 font-bold text-slate-900"><Clock className="h-4 w-4 text-indigo-500" /> {session.duration_minutes} min de sessão</div>
-              <div className={cn("px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest w-fit shadow-sm", 
-                session.processing_status === 'completed' ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500')}>
-                Status: {session.processing_status}
+          <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
+            <div className="h-1.5 w-full bg-slate-100" />
+            <CardHeader className="pb-4"><CardTitle className="text-[10px] font-black uppercase tracking-widest text-slate-400">Informações Técnicas</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-3"><Clock className="h-4 w-4 text-slate-400" /><p className="text-sm font-bold text-slate-700">Duração: {session.duration_minutes} min</p></div>
+              <div className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase w-fit",
+                session.processing_status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
+                ['queued', 'processing'].includes(session.processing_status) ? 'bg-blue-100 text-blue-700' :
+                session.processing_status === 'error' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+              )}>
+                {session.processing_status}
               </div>
             </CardContent>
           </Card>
 
           {session.audio_file_path && (
-            <Card className="rounded-[32px] border-none shadow-sm bg-indigo-600 text-white overflow-hidden">
-              <CardHeader className="pb-4"><CardTitle className="flex items-center gap-2 text-xs font-black uppercase tracking-widest"><Zap className="h-4 w-4" /> Inteligência PsiAI</CardTitle></CardHeader>
-              <CardContent className="p-6">
-                <Button className="w-full h-12 rounded-2xl gap-2 bg-white text-indigo-600 hover:bg-slate-50 font-black shadow-xl" onClick={handleProcessAudio} disabled={processing || isProcessing}>
+            <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-indigo-50/20">
+              <div className="h-1.5 w-full bg-indigo-500" />
+              <CardHeader className="pb-4"><CardTitle className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-400"><Music className="h-4 w-4" /> Áudio da Sessão</CardTitle></CardHeader>
+              <CardContent>
+                <Button className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-11 font-black shadow-lg shadow-indigo-100" onClick={handleProcessAudio} disabled={processing || isProcessing}>
                   {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  {session.processing_status === 'completed' ? "Reprocessar IA" : "Transcrição Inteligente"}
+                  {session.processing_status === 'completed' ? "Reprocessar com IA" : "Processar Transcrição"}
                 </Button>
               </CardContent>
             </Card>
           )}
         </div>
 
+        {/* Conteúdo Principal */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Nova Seção: Registro Clínico Estruturado */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 px-2">
-              <Stethoscope className="h-5 w-5 text-indigo-600" />
-              <h3 className="font-black text-slate-900 uppercase text-xs tracking-widest">Registro Clínico Estruturado</h3>
-            </div>
-            
-            <Card className="rounded-[32px] border-none shadow-sm overflow-hidden">
-              <CardContent className="p-0 divide-y divide-slate-50">
-                <div className="p-8 space-y-3">
-                  <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2"><ClipboardList className="h-3 w-3" /> Resumo do Atendimento</h4>
-                  <p className="text-sm text-slate-700 leading-relaxed italic">{session.session_summary_manual || "Não preenchido."}</p>
-                </div>
-                
-                <div className="p-8 space-y-3">
-                  <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2"><Zap className="h-3 w-3" /> Intervenções Realizadas</h4>
-                  <p className="text-sm text-slate-700 leading-relaxed">{session.interventions || "Não preenchido."}</p>
-                </div>
+          {/* Seção Clínica Estruturada */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
+              <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-blue-500"><ClipboardList className="h-4 w-4" /> Notas Clínicas</CardTitle></CardHeader>
+              <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.clinical_notes || "Não preenchido."}</p></CardContent>
+            </Card>
 
-                <div className="p-8 space-y-3">
-                  <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2"><FileText className="h-3 w-3" /> Notas de Evolução e Sintomas</h4>
-                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{session.clinical_notes || "Não preenchido."}</p>
-                </div>
-              </CardContent>
+            <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
+              <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-indigo-500"><Zap className="h-4 w-4" /> Intervenções</CardTitle></CardHeader>
+              <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.interventions || "Não preenchido."}</p></CardContent>
             </Card>
           </div>
 
-          <Card className="rounded-[32px] border-none shadow-sm overflow-hidden opacity-80">
-            <CardHeader className="bg-slate-50/50 pb-4 border-b border-slate-100"><CardTitle className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-widest"><FileText className="h-4 w-4" /> Rascunho Livre / Notas Manuais</CardTitle></CardHeader>
-            <CardContent className="p-8"><p className="text-sm text-slate-600 whitespace-pre-wrap">{session.manual_notes || "Sem notas."}</p></CardContent>
+          <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
+            <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-emerald-500"><Quote className="h-4 w-4" /> Síntese da Sessão</CardTitle></CardHeader>
+            <CardContent><p className="text-slate-700 font-bold leading-relaxed whitespace-pre-wrap italic">{session.session_summary_manual || "Não preenchido."}</p></CardContent>
+          </Card>
+
+          <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
+            <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-slate-400"><FileText className="h-4 w-4" /> Diário do Psicólogo</CardTitle></CardHeader>
+            <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.manual_notes || "Sem notas adicionais."}</p></CardContent>
           </Card>
 
           {session.processing_status === 'completed' && (
-            <div className="space-y-6 pt-6">
-              <Card className="rounded-[32px] border-none shadow-xl bg-gradient-to-br from-indigo-50 to-white overflow-hidden">
-                <CardHeader className="pb-4 border-b border-indigo-100/50"><CardTitle className="flex items-center gap-2 text-indigo-900 text-sm font-black uppercase tracking-widest"><Sparkles className="h-5 w-5 text-indigo-500" /> Transcrição Completa</CardTitle></CardHeader>
-                <CardContent className="p-8"><p className="text-slate-700 text-xs leading-relaxed whitespace-pre-wrap">{session.transcript}</p></CardContent>
+            <div className="space-y-8 pt-6">
+              <div className="flex items-center gap-3">
+                <div className="h-px flex-1 bg-slate-100" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Inteligência Artificial</span>
+                <div className="h-px flex-1 bg-slate-100" />
+              </div>
+
+              <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
+                <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-lg font-bold text-indigo-900"><Sparkles className="h-5 w-5 text-indigo-500" /> Transcrição Integrada</CardTitle></CardHeader>
+                <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.transcript || "Não disponível."}</p></CardContent>
               </Card>
 
-              {/* Insights do Plano Ultra (se houver) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className={cn("rounded-[32px] border-none shadow-sm overflow-hidden", !isUltra && "opacity-60 grayscale")}>
-                  <CardHeader><CardTitle className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Highlights da IA</CardTitle></CardHeader>
-                  <CardContent className="p-6">
+                <Card className={cn("relative overflow-hidden rounded-[32px] border-none shadow-sm", !isUltra && 'opacity-70 grayscale')}>
+                  {!isUltra && (
+                    <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center">
+                      <Lock className="h-8 w-8 text-indigo-600 mb-2" />
+                      <p className="text-xs font-bold text-indigo-900 uppercase">Recurso Ultra</p>
+                      <Link to="/assinatura"><Button size="sm" variant="link" className="text-indigo-600 text-xs mt-2 underline">Fazer Upgrade</Button></Link>
+                    </div>
+                  )}
+                  <CardHeader><CardTitle className="text-sm font-black uppercase tracking-widest text-indigo-400">Pontos Relevantes</CardTitle></CardHeader>
+                  <CardContent>
                     {isUltra && session.highlights ? (
-                      <ul className="space-y-2">
-                        {session.highlights.map((h, i) => <li key={i} className="text-xs text-slate-700 flex gap-2"><div className="h-1 w-1 rounded-full bg-indigo-400 mt-1.5 shrink-0" />{h}</li>)}
+                      <ul className="space-y-3">
+                        {session.highlights.map((h, i) => <li key={i} className="text-xs text-slate-700 flex gap-2"><div className="h-1.5 w-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />{h}</li>)}
                       </ul>
-                    ) : <div className="flex flex-col items-center py-4 text-center"><Lock className="h-4 w-4 text-slate-300 mb-2" /><p className="text-[10px] font-bold text-slate-400">Upgrade para Ultra</p></div>}
+                    ) : <p className="text-xs text-slate-400 italic">Análise bloqueada.</p>}
                   </CardContent>
                 </Card>
-                <Card className={cn("rounded-[32px] border-none shadow-sm overflow-hidden", !isUltra && "opacity-60 grayscale")}>
-                  <CardHeader><CardTitle className="text-[10px] font-black text-amber-900 uppercase tracking-widest">Sugestão de Próximos Passos</CardTitle></CardHeader>
-                  <CardContent className="p-6">
-                    {isUltra ? <p className="text-xs text-slate-700">{session.next_steps}</p> : <div className="flex flex-col items-center py-4 text-center"><Lock className="h-4 w-4 text-slate-300 mb-2" /><p className="text-[10px] font-bold text-slate-400">Upgrade para Ultra</p></div>}
+
+                <Card className={cn("relative overflow-hidden rounded-[32px] border-none shadow-sm", !isUltra && 'opacity-70 grayscale')}>
+                  {!isUltra && <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[2px] flex items-center justify-center p-4"><Lock className="h-5 w-5 text-indigo-400" /></div>}
+                  <CardHeader><CardTitle className="text-sm font-black uppercase tracking-widest text-amber-500">Próximos Passos</CardTitle></CardHeader>
+                  <CardContent>
+                    {isUltra ? <p className="text-xs text-slate-700 leading-relaxed">{session.next_steps || "Sem sugestões."}</p> : <p className="text-xs text-slate-400 italic">Análise bloqueada.</p>}
                   </CardContent>
                 </Card>
               </div>

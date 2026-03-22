@@ -1,22 +1,37 @@
 import { supabase } from "@/integrations/supabase/client";
-import { PatientLog, PatientLogPrompt } from "@/types/diary";
+import { PatientLog, PatientLogPrompt, LogType, PromptStatus } from "@/types/diary";
 
 export const diaryService = {
+  // Retorna os IDs necessários para o portal do paciente
   getPatientContext: async (): Promise<{ patientId: string; psychologistId: string } | null> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
+    // Buscamos o vínculo diretamente (usando o novo campo psychologist_id que criamos para evitar loops)
     const { data, error } = await supabase
       .from('patient_access')
       .select('patient_id, psychologist_id')
       .eq('user_id', user.id)
-      .eq('status', 'active')
       .maybeSingle();
     
-    if (error || !data) return null;
-    return { patientId: data.patient_id, psychologistId: data.psychologist_id };
+    if (error || !data) {
+      console.error("Erro ao buscar contexto do paciente:", error);
+      return null;
+    }
+
+    return {
+      patientId: data.patient_id,
+      psychologistId: data.psychologist_id
+    };
   },
 
+  // Mantido para compatibilidade, mas prefira getPatientContext
+  getMyPatientId: async (): Promise<string | null> => {
+    const context = await diaryService.getPatientContext();
+    return context?.patientId || null;
+  },
+
+  // Logs / Registros
   listLogs: async (patientId: string): Promise<PatientLog[]> => {
     const { data, error } = await supabase
       .from('patient_logs')
@@ -32,15 +47,15 @@ export const diaryService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    const entry = {
+    // Injeta o psychologist_id se ele não estiver presente (caso do psicólogo criando log)
+    const logData = {
       ...log,
-      psychologist_id: log.psychologist_id || user.id,
-      created_by: log.created_by || 'psychologist'
+      psychologist_id: log.psychologist_id || user.id
     };
 
     const { data, error } = await supabase
       .from('patient_logs')
-      .insert([entry])
+      .insert([logData])
       .select()
       .single();
     
@@ -48,10 +63,10 @@ export const diaryService = {
     return data;
   },
 
-  updateLog: async (id: string, log: Partial<PatientLog>): Promise<PatientLog> => {
+  updateLog: async (id: string, updates: Partial<PatientLog>): Promise<PatientLog> => {
     const { data, error } = await supabase
       .from('patient_logs')
-      .update(log)
+      .update(updates)
       .eq('id', id)
       .select()
       .single();
@@ -61,14 +76,11 @@ export const diaryService = {
   },
 
   deleteLog: async (id: string): Promise<void> => {
-    const { error } = await supabase
-      .from('patient_logs')
-      .delete()
-      .eq('id', id);
-    
+    const { error } = await supabase.from('patient_logs').delete().eq('id', id);
     if (error) throw error;
   },
 
+  // Prompts / Tarefas
   listPrompts: async (patientId: string): Promise<PatientLogPrompt[]> => {
     const { data, error } = await supabase
       .from('patient_log_prompts')
@@ -86,11 +98,7 @@ export const diaryService = {
 
     const { data, error } = await supabase
       .from('patient_log_prompts')
-      .insert([{ 
-        ...prompt, 
-        psychologist_id: user.id,
-        status: prompt.status || 'active'
-      }])
+      .insert([{ ...prompt, psychologist_id: user.id }])
       .select()
       .single();
     
@@ -111,11 +119,7 @@ export const diaryService = {
   },
 
   deletePrompt: async (id: string): Promise<void> => {
-    const { error } = await supabase
-      .from('patient_log_prompts')
-      .delete()
-      .eq('id', id);
-    
+    const { error } = await supabase.from('patient_log_prompts').delete().eq('id', id);
     if (error) throw error;
   }
 };

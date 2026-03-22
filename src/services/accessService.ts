@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { PatientAccess } from "@/types/access";
+import { PatientAccess, AccessStatus } from "@/types/access";
 
 export const accessService = {
   getAccessByPatientId: async (patientId: string): Promise<PatientAccess | null> => {
@@ -17,29 +17,41 @@ export const accessService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    // Gerar um token simples para o convite
-    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-
+    const inviteToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    
     const { data, error } = await supabase
       .from('patient_access')
       .upsert({
         patient_id: patientId,
-        psychologist_id: user.id,
-        invite_token: token,
+        psychologist_id: user.id, // Agora gravamos o psicólogo aqui para segurança e performance
         status: 'invited',
-        invited_at: new Date().toISOString()
+        invite_token: inviteToken,
+        invited_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }, { onConflict: 'patient_id' })
       .select()
       .single();
-
+    
     if (error) throw error;
     return data;
+  },
+
+  updateStatus: async (patientId: string, status: AccessStatus): Promise<void> => {
+    const { error } = await supabase
+      .from('patient_access')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('patient_id', patientId);
+    
+    if (error) throw error;
   },
 
   revokeAccess: async (patientId: string): Promise<void> => {
     const { error } = await supabase
       .from('patient_access')
-      .update({ status: 'suspended', invite_token: null })
+      .update({ 
+        status: 'suspended', 
+        updated_at: new Date().toISOString() 
+      })
       .eq('patient_id', patientId);
     
     if (error) throw error;

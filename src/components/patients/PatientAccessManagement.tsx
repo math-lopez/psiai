@@ -1,10 +1,19 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { AccessStatus, PatientAccess } from "@/types/access";
 import { accessService } from "@/services/accessService";
-import { PatientAccess } from "@/types/access";
 import { 
-  ShieldCheck, UserPlus, UserMinus, Clock, ExternalLink, Loader2, AlertCircle, Copy, CheckCircle2, Lock, Trash2
+  ShieldCheck, 
+  UserPlus, 
+  UserMinus, 
+  Clock, 
+  ExternalLink, 
+  Loader2, 
+  AlertCircle,
+  Copy,
+  CheckCircle2,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -14,7 +23,12 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
-export const PatientAccessManagement = ({ patientId, patientEmail }: { patientId: string; patientEmail: string }) => {
+interface PatientAccessManagementProps {
+  patientId: string;
+  patientEmail: string;
+}
+
+export const PatientAccessManagement = ({ patientId, patientEmail }: PatientAccessManagementProps) => {
   const [access, setAccess] = useState<PatientAccess | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -24,28 +38,42 @@ export const PatientAccessManagement = ({ patientId, patientEmail }: { patientId
     try {
       const data = await accessService.getAccessByPatientId(patientId);
       setAccess(data);
-    } catch (e) { console.error(e); } finally { setLoading(false); }
+    } catch (e) {
+      console.error("Erro ao buscar acesso:", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  useEffect(() => { fetchAccess(); }, [patientId]);
+  useEffect(() => {
+    fetchAccess();
+  }, [patientId]);
 
   const handleInvite = async () => {
     setSubmitting(true);
     try {
       await accessService.createInvite(patientId);
-      showSuccess("Convite gerado!");
+      showSuccess("Convite gerado com sucesso!");
       fetchAccess();
-    } catch (e) { showError("Erro ao gerar convite."); } finally { setSubmitting(false); }
+    } catch (e) {
+      showError("Erro ao gerar convite.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleRevoke = async () => {
-    if (!confirm("Tem certeza que deseja remover o acesso deste paciente ao portal?")) return;
+    if (!confirm("Tem certeza que deseja revogar o acesso deste paciente? Ele não poderá mais visualizar conteúdos compartilhados.")) return;
     setSubmitting(true);
     try {
       await accessService.revokeAccess(patientId);
-      showSuccess("Acesso removido com sucesso.");
+      showSuccess("Acesso revogado.");
       fetchAccess();
-    } catch (e) { showError("Erro ao remover acesso."); } finally { setSubmitting(false); }
+    } catch (e) {
+      showError("Erro ao revogar acesso.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const copyInviteLink = () => {
@@ -53,70 +81,141 @@ export const PatientAccessManagement = ({ patientId, patientEmail }: { patientId
     const link = `${window.location.origin}/portal/ativar?token=${access.invite_token}`;
     navigator.clipboard.writeText(link);
     setCopied(true);
-    showSuccess("Link copiado!");
+    showSuccess("Link de convite copiado!");
     setTimeout(() => setCopied(false), 2000);
   };
 
   if (loading) return <div className="py-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-indigo-600" /></div>;
 
+  const statusMap: Record<AccessStatus, { label: string; color: string; icon: any }> = {
+    inactive: { label: "Sem Acesso", color: "bg-slate-100 text-slate-500", icon: AlertCircle },
+    invited: { label: "Convite Pendente", color: "bg-amber-100 text-amber-700", icon: Clock },
+    active: { label: "Acesso Ativo", color: "bg-emerald-100 text-emerald-700", icon: ShieldCheck },
+    suspended: { label: "Acesso Suspenso", color: "bg-red-100 text-red-700", icon: UserMinus },
+  };
+
   const currentStatus = access?.status || 'inactive';
+  const config = statusMap[currentStatus];
 
   return (
-    <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white dark:bg-slate-900 mt-6">
-      <div className={cn("h-1.5 w-full", (currentStatus === 'active' || currentStatus === 'invited') ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-slate-800')} />
-      <CardHeader className="p-8 pb-4">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
-            <ShieldCheck className="h-5 w-5 text-indigo-500" /> Acesso ao Portal do Paciente
-          </CardTitle>
-          <div className="flex items-center gap-3">
-            <Badge className={cn("px-3 py-1 border-none text-[10px] font-black uppercase tracking-widest", 
-              currentStatus === 'active' ? 'bg-emerald-100 text-emerald-700' : 
-              currentStatus === 'invited' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
-            )}>
-              {currentStatus === 'active' ? 'Ativo' : currentStatus === 'invited' ? 'Pendente' : 'Sem Acesso'}
+    <div className="space-y-6">
+      <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
+        <div className={cn("h-1.5 w-full", 
+          currentStatus === 'active' ? 'bg-emerald-500' : 
+          currentStatus === 'invited' ? 'bg-amber-500' : 
+          currentStatus === 'suspended' ? 'bg-red-500' : 'bg-slate-200'
+        )} />
+        <CardHeader className="p-8 pb-4">
+          <div className="flex items-center justify-between mb-2">
+            <CardTitle className="text-xl font-black text-slate-900 flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-indigo-500" /> Controle de Acesso do Paciente
+            </CardTitle>
+            <Badge className={cn("px-3 py-1 border-none text-[10px] font-black uppercase tracking-widest", config.color)}>
+              <config.icon className="h-3 w-3 mr-1.5" /> {config.label}
             </Badge>
-            {(currentStatus === 'active' || currentStatus === 'invited') && (
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 rounded-xl" onClick={handleRevoke} disabled={submitting}>
-                <Trash2 className="h-4 w-4" />
+          </div>
+          <CardDescription className="text-slate-500 font-medium max-w-2xl">
+            Gerencie como seu paciente interage com o sistema. Ao liberar o acesso, o paciente poderá ver registros compartilhados e responder tarefas entre sessões.
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent className="p-8 space-y-8">
+          {currentStatus === 'inactive' || currentStatus === 'suspended' ? (
+            <div className="bg-slate-50 rounded-3xl p-8 text-center border border-dashed border-slate-200">
+              <div className="h-16 w-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm text-slate-300">
+                <UserPlus className="h-8 w-8" />
+              </div>
+              <h4 className="font-bold text-slate-900 mb-2">Liberar o Portal do Paciente</h4>
+              <p className="text-sm text-slate-500 max-w-sm mx-auto mb-6">
+                Um convite será gerado para o e-mail <strong>{patientEmail}</strong>. O paciente precisará definir uma senha para acessar.
+              </p>
+              <Button 
+                onClick={handleInvite} 
+                disabled={submitting}
+                className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-12 px-8 font-black shadow-lg shadow-indigo-100 gap-2"
+              >
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
+                Gerar Link de Convite
               </Button>
-            )}
-          </div>
-        </div>
-        <CardDescription className="mt-2 font-medium">Controle o que o paciente pode visualizar e registrar no portal dele.</CardDescription>
-      </CardHeader>
-      <CardContent className="p-8">
-        {currentStatus === 'inactive' || currentStatus === 'suspended' ? (
-          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-8 text-center border border-dashed border-slate-200 dark:border-slate-800">
-            <UserPlus className="h-10 w-10 text-slate-300 dark:text-slate-700 mx-auto mb-4" />
-            <h4 className="font-bold mb-2 dark:text-white">Habilitar Portal</h4>
-            <p className="text-sm text-slate-500 mb-6">O paciente receberá um convite para o e-mail {patientEmail}.</p>
-            <Button onClick={handleInvite} disabled={submitting} className="bg-indigo-600 rounded-2xl h-12 px-8 font-black">
-              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Gerar Convite"}
-            </Button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 space-y-2">
-              <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Atividade</p>
-              <p className="text-sm font-bold dark:text-white">Último acesso: <span className="text-slate-500 font-medium">{access?.last_access_at ? format(new Date(access.last_access_at), "dd/MM/yyyy", { locale: ptBR }) : 'Nunca'}</span></p>
             </div>
-            <div className="p-6 rounded-3xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-900/30 space-y-3">
-              <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Link de Ativação</p>
-              <div className="flex items-center gap-2">
-                <div className="flex-1 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/30 rounded-xl px-4 py-2 text-xs font-mono text-indigo-600 dark:text-indigo-400 truncate">
-                  {currentStatus === 'active' ? 'Conta já ativada' : access?.invite_token ? `${window.location.origin}/portal/ativar?token=${access.invite_token}` : 'Gerando...'}
+          ) : (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 space-y-3">
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                    <Clock className="h-3 w-3" /> Histórico de Atividade
+                  </p>
+                  <div className="space-y-1">
+                    <p className="text-sm font-bold text-slate-700">
+                      Convidado em: <span className="text-slate-900">{access?.invited_at ? format(new Date(access.invited_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '-'}</span>
+                    </p>
+                    <p className="text-sm font-bold text-slate-700">
+                      Último acesso: <span className="text-slate-900">{access?.last_access_at ? format(new Date(access.last_access_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : 'Nunca acessou'}</span>
+                    </p>
+                  </div>
                 </div>
-                {currentStatus === 'invited' && access?.invite_token && (
-                  <Button variant="secondary" size="icon" className="bg-white dark:bg-slate-900 rounded-xl" onClick={copyInviteLink}>
-                    {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                  </Button>
-                )}
+
+                <div className="p-6 rounded-3xl bg-indigo-50 border border-indigo-100 space-y-4">
+                  <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2">
+                    <ExternalLink className="h-3 w-3" /> {currentStatus === 'active' ? 'Status da Conta' : 'Link de Acesso'}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 bg-white border border-indigo-100 rounded-xl px-4 py-2 text-xs font-mono text-indigo-600 truncate">
+                      {currentStatus === 'active' 
+                        ? 'Conta ativada pelo paciente' 
+                        : access?.invite_token 
+                          ? `${window.location.origin}/portal/ativar?token=...` 
+                          : 'Gerando...'}
+                    </div>
+                    {currentStatus === 'invited' && access?.invite_token && (
+                      <Button 
+                        variant="secondary" 
+                        size="icon" 
+                        className="bg-white hover:bg-indigo-100 text-indigo-600 border border-indigo-100 rounded-xl shrink-0"
+                        onClick={copyInviteLink}
+                      >
+                        {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    )}
+                    {currentStatus === 'active' && (
+                      <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+                        <Lock className="h-4 w-4" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-4">
+                <Button 
+                  variant="ghost" 
+                  onClick={handleRevoke}
+                  disabled={submitting}
+                  className="text-red-500 hover:text-red-600 hover:bg-red-50 font-bold rounded-2xl h-12 gap-2"
+                >
+                  <UserMinus className="h-4 w-4" /> Revogar Acesso Permanentemente
+                </Button>
               </div>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-none shadow-sm rounded-[32px] bg-slate-900 text-white overflow-hidden">
+        <CardContent className="p-8 flex items-start gap-6">
+          <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center shrink-0">
+            <AlertCircle className="h-6 w-6 text-indigo-400" />
           </div>
-        )}
-      </CardContent>
-    </Card>
+          <div className="space-y-2">
+            <h4 className="font-bold text-white">Sobre a Área do Paciente</h4>
+            <p className="text-xs text-slate-400 leading-relaxed max-w-3xl">
+              Ao habilitar este recurso, o paciente terá acesso a um ambiente restrito onde poderá responder seus registros de humor, pensamentos e tarefas de casa. 
+              <strong> Suas notas clínicas e transcrições internas NUNCA são compartilhadas.</strong> 
+              O paciente verá apenas o que você marcar explicitamente com a visibilidade "Compartilhado".
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 };

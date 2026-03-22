@@ -1,3 +1,5 @@
+"use client";
+
 export type SessionStatus = 'draft' | 'queued' | 'processing' | 'completed' | 'error';
 export type SessionRecordType = 'manual' | 'audio' | 'ambos';
 export type PatientStatus = 'ativo' | 'inativo';
@@ -52,7 +54,6 @@ export interface Session {
   additional_notes: string | null;
   created_at: string;
   updated_at: string;
-  // Join fields
   patient?: {
     full_name: string;
   };

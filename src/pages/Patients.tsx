@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { Search, Plus, Filter, MoreHorizontal, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -42,20 +42,22 @@ const Patients = () => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
 
-  useEffect(() => {
-    fetchPatients();
-  }, []);
-
-  const fetchPatients = async () => {
+  const fetchPatients = useCallback(async () => {
+    setLoading(true);
     try {
       const data = await patientService.list();
       setPatients(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao buscar pacientes:", error);
+      showError("Não foi possível carregar a lista de pacientes.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchPatients();
+  }, [fetchPatients]);
 
   const handleDelete = async () => {
     if (!deletingId) return;
@@ -76,6 +78,7 @@ const Patients = () => {
   };
 
   const filteredPatients = patients.filter(p => {
+    if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
     const nameMatch = p.full_name?.toLowerCase().includes(search);
     const emailMatch = p.email?.toLowerCase().includes(search);
@@ -113,7 +116,7 @@ const Patients = () => {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input 
             placeholder="Buscar paciente por nome, e-mail ou telefone..." 
-            className="pl-10"
+            className="pl-10 h-11"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -141,38 +144,38 @@ const Patients = () => {
               <TableBody>
                 {paginatedPatients.length > 0 ? (
                   paginatedPatients.map((patient) => (
-                    <TableRow key={patient.id} className="cursor-pointer hover:bg-slate-50">
-                      <TableCell className="font-medium">
+                    <TableRow key={patient.id} className="cursor-pointer hover:bg-slate-50 transition-colors">
+                      <TableCell className="font-bold text-slate-900">
                         <Link to={`/pacientes/${patient.id}`} className="hover:text-indigo-600">
                           {patient.full_name}
                         </Link>
                       </TableCell>
-                      <TableCell>{patient.email}</TableCell>
-                      <TableCell>{patient.phone}</TableCell>
+                      <TableCell className="text-slate-600">{patient.email}</TableCell>
+                      <TableCell className="text-slate-600">{patient.phone}</TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
+                        <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${
                           patient.status === 'ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
                         }`}>
                           {patient.status}
                         </span>
                       </TableCell>
-                      <TableCell>{format(new Date(patient.created_at), "dd/MM/yyyy")}</TableCell>
+                      <TableCell className="text-slate-500">{format(new Date(patient.created_at), "dd/MM/yyyy")}</TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
+                            <Button variant="ghost" className="h-8 w-8 p-0 rounded-full">
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                          <DropdownMenuContent align="end" className="rounded-xl border-slate-100">
                             <DropdownMenuItem asChild>
-                              <Link to={`/pacientes/${patient.id}`}>Ver detalhes</Link>
+                              <Link to={`/pacientes/${patient.id}`} className="font-bold text-xs">Ver detalhes</Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem asChild>
-                              <Link to={`/pacientes/editar/${patient.id}`}>Editar</Link>
+                              <Link to={`/pacientes/editar/${patient.id}`} className="font-bold text-xs">Editar</Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem 
-                              className="text-red-600 focus:text-red-600"
+                              className="text-red-600 focus:text-red-600 font-bold text-xs"
                               onClick={() => {
                                 setDeletingId(patient.id);
                                 setIsDeleteDialogOpen(true);
@@ -187,7 +190,7 @@ const Patients = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-10 text-slate-500">
+                    <TableCell colSpan={6} className="text-center py-20 text-slate-500 font-medium">
                       Nenhum paciente encontrado.
                     </TableCell>
                   </TableRow>
@@ -196,14 +199,15 @@ const Patients = () => {
             </Table>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-between px-4 py-4 border-t bg-slate-50/50">
-                <p className="text-sm text-slate-500">
-                  Mostrando {paginatedPatients.length} de {filteredPatients.length} pacientes
+              <div className="flex items-center justify-between px-6 py-4 border-t bg-slate-50/50">
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">
+                  {filteredPatients.length} paciente(s) no total
                 </p>
                 <div className="flex items-center gap-2">
                   <Button 
                     variant="outline" 
                     size="sm" 
+                    className="rounded-xl h-9"
                     disabled={currentPage === 1}
                     onClick={() => setCurrentPage(prev => prev - 1)}
                   >
@@ -215,7 +219,7 @@ const Patients = () => {
                         key={p}
                         variant={currentPage === p ? "default" : "outline"}
                         size="sm"
-                        className="h-8 w-8 p-0"
+                        className="h-9 w-9 p-0 rounded-xl"
                         onClick={() => setCurrentPage(p)}
                       >
                         {p}
@@ -225,6 +229,7 @@ const Patients = () => {
                   <Button 
                     variant="outline" 
                     size="sm" 
+                    className="rounded-xl h-9"
                     disabled={currentPage === totalPages}
                     onClick={() => setCurrentPage(prev => prev + 1)}
                   >
@@ -238,17 +243,16 @@ const Patients = () => {
       </div>
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-[32px] border-none shadow-2xl">
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir paciente?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Todos os dados cadastrais serão removidos.
-              Se o paciente possuir sessões registradas, a exclusão será bloqueada.
+            <AlertDialogTitle className="text-2xl font-black">Excluir paciente?</AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-600 font-medium">
+              Esta ação não pode ser desfeita. Todos os dados cadastrais serão removidos permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-2xl h-12 font-bold px-6">Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700 rounded-2xl h-12 font-bold px-6">
               Confirmar Exclusão
             </AlertDialogAction>
           </AlertDialogFooter>

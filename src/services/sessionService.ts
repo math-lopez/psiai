@@ -127,26 +127,5 @@ export const sessionService = {
     });
     
     if (error) throw error;
-  },
-
-  // Novo método para análise profunda por sessão
-  analyzeSessionAI: async (sessionId: string): Promise<any> => {
-    const { data, error } = await supabase.functions.invoke('analyze-session-ai', {
-      body: { sessionId }
-    });
-    
-    if (error) throw error;
-    return data;
-  },
-
-  getSessionAIAnalysis: async (sessionId: string): Promise<any> => {
-    const { data, error } = await supabase
-      .from('session_ai_analysis')
-      .select('*')
-      .eq('session_id', sessionId)
-      .maybeSingle();
-    
-    if (error) throw error;
-    return data;
   }
 };
