@@ -40,6 +40,14 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+
+// Badge local para garantir estabilidade visual
+const Badge = ({ children, className }: { children: React.ReactNode, className?: string }) => (
+  <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors", className)}>
+    {children}
+  </span>
+);
 
 interface TreatmentPlanModuleProps {
   patientId: string;
@@ -171,7 +179,7 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
 
   const completedGoals = activePlan?.goals?.filter(g => g.status === 'completed').length || 0;
   const totalGoals = activePlan?.goals?.length || 0;
-  const progress = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
+  const progressValue = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
 
   return (
     <div className="space-y-8 pb-10">
@@ -230,14 +238,13 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Coluna do Plano Ativo */}
           <div className="lg:col-span-8 space-y-8">
             <Card className="border-none shadow-xl shadow-indigo-100/30 rounded-[40px] overflow-hidden bg-white">
               <div className="h-2 w-full bg-gradient-to-r from-indigo-600 to-primary" />
               <CardHeader className="p-8 pb-4">
                 <div className="flex items-center justify-between mb-2">
                    <div className="flex items-center gap-2">
-                    <Badge className="bg-indigo-50 text-indigo-600 hover:bg-indigo-50 border-none px-3 py-1 text-[10px] font-black uppercase tracking-widest">Plano Ativo</Badge>
+                    <Badge className="bg-indigo-50 text-indigo-600 border-none px-3 py-1 text-[10px] font-black uppercase tracking-widest">Plano Ativo</Badge>
                     <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest flex items-center gap-1">
                       <Calendar className="h-3 w-3" /> Iniciado em {format(new Date(activePlan.start_date), "MMMM 'de' yyyy", { locale: ptBR })}
                     </span>
@@ -250,22 +257,20 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
                 <p className="text-slate-500 font-medium leading-relaxed mt-2">{activePlan.description}</p>
               </CardHeader>
               <CardContent className="p-8 pt-6 space-y-8">
-                {/* Progresso do Plano */}
                 <div className="space-y-4 p-6 bg-slate-50 rounded-3xl border border-slate-100">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <TrendingUp className="h-4 w-4 text-indigo-500" />
                       <span className="text-xs font-black uppercase tracking-widest text-slate-500">Evolução dos Objetivos</span>
                     </div>
-                    <span className="text-sm font-black text-indigo-600">{Math.round(progress)}%</span>
+                    <span className="text-sm font-black text-indigo-600">{Math.round(progressValue)}%</span>
                   </div>
-                  <Progress value={progress} className="h-2.5 bg-slate-200" indicatorClassName="bg-indigo-600" />
+                  <Progress value={progressValue} className="h-2.5 bg-slate-200" />
                   <p className="text-[10px] font-bold text-slate-400 text-center uppercase tracking-widest">
                     {completedGoals} de {totalGoals} objetivos concluídos
                   </p>
                 </div>
 
-                {/* Lista de Objetivos */}
                 <div className="space-y-6">
                   <div className="flex items-center justify-between px-2">
                     <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
@@ -316,7 +321,6 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
             </Card>
           </div>
 
-          {/* Sidebar de Histórico */}
           <div className="lg:col-span-4 space-y-6">
             <Card className="border-none shadow-sm rounded-[32px] bg-white">
               <CardHeader>
@@ -361,7 +365,6 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
         </div>
       )}
 
-      {/* Modal de Objetivo */}
       <Dialog open={isGoalDialogOpen} onOpenChange={setIsGoalDialogOpen}>
         <DialogContent className="rounded-[32px] border-none shadow-2xl p-8 max-w-lg">
           <DialogHeader>

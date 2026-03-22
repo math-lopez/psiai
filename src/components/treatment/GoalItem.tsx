@@ -1,6 +1,7 @@
+"use client";
+
 import React from "react";
 import { TreatmentGoal, GoalStatus } from "@/types/treatment";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { 
   CheckCircle2, 
@@ -21,6 +22,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+
+// Badge local para evitar erro de componente undefined caso o shadcn/ui esteja configurado como default export
+const Badge = ({ children, className }: { children: React.ReactNode, className?: string }) => (
+  <span className={cn("inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2", className)}>
+    {children}
+  </span>
+);
 
 interface GoalItemProps {
   goal: TreatmentGoal;
@@ -78,13 +86,13 @@ export const GoalItem = ({ goal, onUpdateStatus, onEdit, onDelete }: GoalItemPro
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="rounded-2xl border-slate-100">
-                <DropdownMenuItem onClick={() => onEdit(goal)} className="font-bold text-xs">Editar Objetivo</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onEdit(goal)} className="font-bold text-xs cursor-pointer">Editar Objetivo</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onUpdateStatus(goal.id, 'in_progress')} className="text-xs">Marcar "Em Progresso"</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onUpdateStatus(goal.id, 'paused')} className="text-xs">Marcar "Pausado"</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => onUpdateStatus(goal.id, 'cancelled')} className="text-xs text-red-500">Cancelar Objetivo</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onUpdateStatus(goal.id, 'in_progress')} className="text-xs cursor-pointer">Marcar "Em Progresso"</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onUpdateStatus(goal.id, 'paused')} className="text-xs cursor-pointer">Marcar "Pausado"</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onUpdateStatus(goal.id, 'cancelled')} className="text-xs text-red-500 cursor-pointer">Cancelar Objetivo</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => onDelete(goal.id)} className="text-red-600 focus:text-red-600 font-bold text-xs">Excluir Permanente</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onDelete(goal.id)} className="text-red-600 focus:text-red-600 font-bold text-xs cursor-pointer">Excluir Permanente</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
