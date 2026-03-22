@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PatientAttachment, AttachmentVisibility } from "@/types/attachment";
 import { sanitizeFileName } from "@/lib/file-utils";
 
+// Usando o bucket que você criou manualmente
 const BUCKET_NAME = 'patient-attachments';
 
 export const attachmentService = {
@@ -26,8 +27,9 @@ export const attachmentService = {
     const timestamp = Date.now();
     const sanitizedName = sanitizeFileName(file.name);
     
-    // IMPORTANTE: Estrutura /psicologo_id/paciente_id/arquivo para as regras de segurança
-    const filePath = `${psychologistId}/${patientId}/${timestamp}-${sanitizedName}`;
+    // IMPORTANTE: Estrutura /id_psicologo/id_paciente/anexos/arquivo
+    // Isso é vital para as políticas de segurança (RLS) funcionarem!
+    const filePath = `${psychologistId}/${patientId}/anexos/${timestamp}-${sanitizedName}`;
 
     // 1. Upload para o Storage
     const { error: storageError } = await supabase.storage
@@ -35,10 +37,8 @@ export const attachmentService = {
       .upload(filePath, file);
 
     if (storageError) {
-      if (storageError.message.includes('Bucket not found')) {
-        throw new Error('Configuração pendente: O bucket "patient-attachments" precisa ser criado no Dashboard do Supabase.');
-      }
-      throw storageError;
+      console.error("Erro no Storage:", storageError);
+      throw new Error(`Erro no upload: ${storageError.message}`);
     }
 
     // 2. Registro no Banco de Dados
