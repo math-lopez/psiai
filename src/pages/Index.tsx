@@ -22,15 +22,24 @@ const Index = () => {
       try {
         console.log("[Index] Verificando identidade do usuário:", session.user.id);
         
-        // 1. Verifica se é um Paciente Ativo
-        const { data: patientAccess } = await supabase
+        // 1. Verifica se é um Paciente e se está Ativo
+        const { data: accessData } = await supabase
           .from('patient_access')
-          .select('id')
+          .select('id, patients(status)')
           .eq('user_id', session.user.id)
           .maybeSingle();
 
-        if (patientAccess) {
-          console.log("[Index] Identificado como Paciente. Indo para /portal");
+        if (accessData) {
+          const patientStatus = (accessData.patients as any)?.status;
+          
+          if (patientStatus === 'inativo') {
+            console.log("[Index] Paciente inativo detectado.");
+            await supabase.auth.signOut();
+            navigate("/login?error=inactive", { replace: true });
+            return;
+          }
+
+          console.log("[Index] Identificado como Paciente Ativo. Indo para /portal");
           navigate("/portal", { replace: true });
           return;
         }
@@ -51,7 +60,6 @@ const Index = () => {
         // 3. Usuário sem papel (Órfão)
         console.warn("[Index] Usuário sem permissões detectado.");
         await supabase.auth.signOut();
-        // Redireciona com parâmetro de erro para o login mostrar a toast de aviso
         navigate("/login?error=no-access", { replace: true });
 
       } catch (err) {

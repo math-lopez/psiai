@@ -19,15 +19,17 @@ const Login = () => {
   const [fullName, setFullName] = useState("");
   const [crp, setCrp] = useState("");
 
-  // Verifica se veio redirecionado por falta de acesso
+  // Verifica se veio redirecionado por falta de acesso ou inatividade
   useEffect(() => {
-    if (searchParams.get("error") === "no-access") {
-      showError("Esta conta não possui um vínculo ativo com um psicólogo ou perfil profissional configurado.");
+    const error = searchParams.get("error");
+    if (error === "no-access") {
+      showError("Esta conta não possui um vínculo ativo ou perfil profissional configurado.");
+    } else if (error === "inactive") {
+      showError("Seu acesso está inativo no momento. Entre em contato com seu psicólogo.");
     }
   }, [searchParams]);
 
   useEffect(() => {
-    // Se o usuário já estiver logado e NÃO veio de um erro de acesso, tenta ir pro Index
     if (session && !searchParams.get("error")) {
       navigate("/");
     }
@@ -37,7 +39,6 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // 1. Tenta o login básico no Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -46,22 +47,29 @@ const Login = () => {
       if (error) throw error;
 
       if (data.user) {
-        console.log("[Login] Validando permissões para:", data.user.id);
-        
-        // 2. Verifica se é um Paciente Ativo
-        const { data: patientAccess } = await supabase
+        // 1. Verifica se é um Paciente e qual seu status no prontuário
+        const { data: accessData } = await supabase
           .from('patient_access')
-          .select('id')
+          .select('id, patients(status)')
           .eq('user_id', data.user.id)
           .maybeSingle();
 
-        if (patientAccess) {
+        if (accessData) {
+          const patientStatus = (accessData.patients as any)?.status;
+          
+          if (patientStatus === 'inativo') {
+            console.warn("[Login] Paciente inativo tentou acessar.");
+            await supabase.auth.signOut();
+            showError("Acesso negado: Seu prontuário está inativo. Procure seu psicólogo.");
+            return;
+          }
+
           showSuccess("Bem-vindo(a) ao seu Portal!");
           navigate("/portal");
           return;
         }
 
-        // 3. Verifica se é um Psicólogo (tem CRP)
+        // 2. Verifica se é um Psicólogo (tem CRP)
         const { data: profile } = await supabase
           .from('profiles')
           .select('crp')
@@ -72,10 +80,9 @@ const Login = () => {
           showSuccess("Bem-vindo(a) de volta, Dra/Dr!");
           navigate("/dashboard");
         } else {
-          // 4. Usuário sem vínculo (Órfão)
           console.warn("[Login] Usuário sem papel detectado.");
           await supabase.auth.signOut();
-          showError("Acesso negado: Sua conta não possui vínculo clínico ativo ou perfil profissional.");
+          showError("Acesso negado: Sua conta não possui vínculo clínico ativo.");
         }
       }
     } catch (error: any) {
