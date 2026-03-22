@@ -6,7 +6,7 @@ import { Patient, Session } from "@/types";
 import { 
   FileText, Download, ShieldCheck, ClipboardList, Stethoscope, 
   History, Zap, Sparkles, ChevronDown, ChevronUp, ExternalLink,
-  Clock, MessageSquare, Calendar
+  Clock, MessageSquare, Calendar, Edit3
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -160,12 +160,21 @@ export const ProntuarioTab = ({ patient, sessions }: ProntuarioTabProps) => {
                               </p>
                             </div>
 
-                            <div className="md:col-span-2 space-y-3">
+                            <div className="space-y-3">
                               <h5 className="text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2">
-                                <FileText className="h-3 w-3" /> Evolução e Notas Clínicas
+                                <FileText className="h-3 w-3" /> Evolução Clínica
                               </h5>
-                              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed whitespace-pre-wrap bg-white/50 dark:bg-slate-900/50 p-4 rounded-2xl border border-indigo-50 dark:border-indigo-900/20">
+                              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed whitespace-pre-wrap">
                                 {session.clinical_notes || "Nenhuma nota detalhada."}
+                              </p>
+                            </div>
+
+                            <div className="space-y-3">
+                              <h5 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                                <Edit3 className="h-3 w-3" /> Rascunho Livre / Notas Manuais
+                              </h5>
+                              <p className="text-xs text-slate-500 dark:text-slate-500 leading-relaxed whitespace-pre-wrap italic">
+                                {session.manual_notes || "Sem notas manuais registradas."}
                               </p>
                             </div>
                           </div>
