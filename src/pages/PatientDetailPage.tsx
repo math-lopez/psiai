@@ -10,7 +10,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { patientService } from "@/services/patientService";
 import { sessionService } from "@/services/sessionService";
+import { supabase } from "@/integrations/supabase/client";
 import { Patient, Session } from "@/types";
+import { SubscriptionTier, PLAN_LIMITS } from "@/config/plans";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { showError } from "@/utils/toast";
@@ -20,18 +22,24 @@ import { SessionTimeline } from "@/components/patients/SessionTimeline";
 import { TreatmentPlanTab } from "@/components/patients/TreatmentPlanTab";
 import { DiaryTab } from "@/components/patients/DiaryTab";
 import { ProntuarioTab } from "@/components/patients/ProntuarioTab";
+import { AIPatientInsight } from "@/components/patients/AIPatientInsight";
 
 const PatientDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [tier, setTier] = useState<SubscriptionTier>("free");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       if (!id) return;
       try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const { data: profile } = await supabase.from('profiles').select('subscription_tier').eq('id', user?.id).maybeSingle();
+        setTier(profile?.subscription_tier as SubscriptionTier || "free");
+
         const [pData, sData] = await Promise.all([
           patientService.getById(id),
           sessionService.list()
@@ -53,6 +61,8 @@ const PatientDetailPage = () => {
   const latestSession = sessions.length > 0 
     ? [...sessions].sort((a, b) => new Date(b.session_date).getTime() - new Date(a.session_date).getTime())[0]
     : null;
+
+  const hasUltra = PLAN_LIMITS[tier].hasTherapeuticInsights;
 
   return (
     <div className="max-w-6xl mx-auto space-y-10">
@@ -117,6 +127,9 @@ const PatientDetailPage = () => {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-10 outline-none">
+          {/* Nova Feature: Parecer Consolidado IA */}
+          <AIPatientInsight patientId={id!} hasUltra={hasUltra} />
+
           {latestSession && <LatestSessionSummary session={latestSession} />}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
             <div className="lg:col-span-2">

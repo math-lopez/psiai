@@ -49,6 +49,7 @@ const Login = () => {
         email,
         password,
         options: {
+          emailRedirectTo: window.location.origin, // Garante redirecionamento para www.psyccai.com.br em produção
           data: {
             full_name: fullName,
             crp: crp,
