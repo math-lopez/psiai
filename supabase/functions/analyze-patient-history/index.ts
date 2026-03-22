@@ -11,7 +11,7 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  const serviceUrl = Deno.env.get('PROCESSING_SERVICE_URL');
+  const serviceUrl = Deno.env.get('PROCESSING_SERVICE_URL'); // https://patient-analysis-service-production.up.railway.app/process-patient-analysis
   const serviceToken = Deno.env.get('PROCESSING_SERVICE_INTERNAL_TOKEN');
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -23,51 +23,52 @@ serve(async (req) => {
     const { patientId } = await req.json();
     if (!patientId) throw new Error('patientId é obrigatório');
 
-    // 1. Coletar todos os dados relevantes do paciente
-    const [patientRes, sessionsRes, goalsRes, logsRes] = await Promise.all([
+    // 1. Coletar dados do paciente e sessões
+    const [patientRes, sessionsRes] = await Promise.all([
       supabase.from('patients').select('*').eq('id', patientId).single(),
-      supabase.from('sessions').select('*').eq('patient_id', patientId).order('session_date', { ascending: false }).limit(5),
-      supabase.from('treatment_goals').select('*').eq('patient_id', patientId),
-      supabase.from('patient_logs').select('*').eq('patient_id', patientId).eq('visibility', 'shared_with_psychologist').order('created_at', { ascending: false }).limit(10)
+      supabase.from('sessions').select('*').eq('patient_id', patientId).order('session_date', { ascending: false }).limit(10)
     ]);
 
     const patient = patientRes.data;
     const sessions = sessionsRes.data || [];
-    const goals = goalsRes.data || [];
-    const logs = logsRes.data || [];
 
-    // 2. Formatar os dados para a IA
-    const context = {
-      patient_info: {
-        name: patient.full_name,
-        age: patient.birth_date ? Math.floor((new Date().getTime() - new Date(patient.birth_date).getTime()) / 31557600000) : 'N/A',
-        notes: patient.notes
+    if (!patient) throw new Error('Paciente não encontrado');
+
+    // 2. Formatar o payload EXATAMENTE como o serviço espera (camelCase)
+    const payload = {
+      patientId: patient.id,
+      psychologistId: patient.psychologist_id,
+      patient: {
+        id: patient.id,
+        name: patient.full_name
       },
-      recent_sessions: sessions.map(s => ({
-        date: s.session_date,
-        summary: s.session_summary_manual || s.manual_notes,
-        clinical_notes: s.clinical_notes,
-        highlights: s.highlights
-      })),
-      treatment_goals: goals.map(g => ({ title: g.title, status: g.status })),
-      recent_diary_entries: logs.map(l => ({ content: l.content, mood: l.mood, date: l.created_at }))
+      sessions: sessions.map(s => ({
+        id: s.id,
+        sessionDate: s.session_date,
+        manualNotes: s.manual_notes || "",
+        transcript: s.transcript || "",
+        highlights: s.highlights || [],
+        nextSteps: s.next_steps || ""
+      }))
     };
 
-    if (!serviceUrl || !serviceToken) throw new Error('Configuração de IA ausente');
+    if (!serviceUrl || !serviceToken) throw new Error('Configuração de IA ausente nas variáveis de ambiente');
 
-    // 3. Chamar o serviço de IA para análise clínica consolidada
-    const response = await fetch(serviceUrl + "/analyze-history", {
+    console.log(`[analyze-patient-history] Enviando análise para o serviço: ${serviceUrl}`);
+
+    // 3. Chamar o serviço externo
+    const response = await fetch(serviceUrl, {
       method: 'POST',
       headers: { 
         'Authorization': `Bearer ${serviceToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(context)
+      body: JSON.stringify(payload)
     });
 
     if (!response.ok) {
       const errorMsg = await response.text();
-      throw new Error(`IA Service Error: ${errorMsg}`);
+      throw new Error(`Erro no Serviço de Análise: ${errorMsg}`);
     }
 
     const result = await response.json();
@@ -78,7 +79,7 @@ serve(async (req) => {
     });
 
   } catch (err: any) {
-    console.error(`[analyze-patient] Erro: ${err.message}`);
+    console.error(`[analyze-patient-history] Erro: ${err.message}`);
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
