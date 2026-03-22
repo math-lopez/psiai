@@ -5,6 +5,7 @@ import { Patient, Session } from "@/types";
 import { FileText, Download, ShieldCheck, ClipboardList, Stethoscope, History, Zap, Sparkles } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
