@@ -172,8 +172,107 @@ const SessionFormPage = () => {
 
       <form className="space-y-6">
         <Card className="rounded-[32px] border-none shadow-sm bg-white overflow-hidden">
-          <CardContent className="p-8 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <CardContent className="p-8 space-y-10">
+            {/* 1. Tipo de Atendimento - AGORA NO TOPO */}
+            <div className="space-y-6">
+               <div className="flex items-center justify-between">
+                 <Label className="text-xs font-black uppercase text-slate-400 tracking-widest">Tipo de Atendimento</Label>
+                 {tier === 'free' && (
+                   <Badge variant="outline" className="text-[9px] font-black uppercase border-amber-200 text-amber-600 bg-amber-50">Somente Texto no Plano Free</Badge>
+                 )}
+               </div>
+
+               <RadioGroup value={recordType} onValueChange={(v: any) => setRecordType(v)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className={cn(
+                    "relative flex items-center justify-between p-6 rounded-[24px] border-2 transition-all cursor-pointer", 
+                    recordType === 'manual' ? 'border-indigo-600 bg-indigo-50/20' : 'border-slate-50 bg-white hover:border-slate-200'
+                  )}>
+                    <RadioGroupItem value="manual" id="m" className="sr-only" />
+                    <Label htmlFor="m" className="flex items-center gap-4 cursor-pointer w-full">
+                      <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center", recordType === 'manual' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500')}>
+                        <FileText className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-900">Apenas Notas</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Sem processamento de áudio</p>
+                      </div>
+                    </Label>
+                    {recordType === 'manual' && <CheckCircle2 className="h-5 w-5 text-indigo-600 absolute top-4 right-4" />}
+                  </div>
+
+                  <div className={cn(
+                    "relative flex items-center justify-between p-6 rounded-[24px] border-2 transition-all cursor-pointer", 
+                    recordType === 'ambos' ? 'border-indigo-600 bg-indigo-50/20' : 'border-slate-50 bg-white hover:border-slate-200',
+                    tier === 'free' && 'opacity-50 cursor-not-allowed'
+                  )}>
+                    <RadioGroupItem value="ambos" id="a" disabled={tier === 'free'} className="sr-only" />
+                    <Label htmlFor="a" className="flex items-center gap-4 cursor-pointer w-full">
+                      <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center", recordType === 'ambos' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500')}>
+                        <Mic className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-900">Áudio + Notas</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Transcrição por IA inclusa</p>
+                      </div>
+                    </Label>
+                    {recordType === 'ambos' && <CheckCircle2 className="h-5 w-5 text-indigo-600 absolute top-4 right-4" />}
+                  </div>
+               </RadioGroup>
+
+               {showAudioUpload && (
+                 <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className={cn(
+                        "border-2 border-dashed rounded-[32px] p-8 flex flex-col items-center justify-center gap-4 transition-all cursor-pointer",
+                        audioFile || existingAudioName ? "bg-indigo-50 border-indigo-200" : "bg-slate-50/50 border-slate-100 hover:border-indigo-300 hover:bg-white"
+                      )}
+                    >
+                      <Input 
+                        type="file" 
+                        ref={fileInputRef}
+                        className="hidden" 
+                        accept="audio/*" 
+                        onChange={handleFileChange} 
+                      />
+                      
+                      {audioFile || existingAudioName ? (
+                        <div className="flex flex-col items-center text-center space-y-3">
+                          <div className="h-16 w-16 bg-indigo-600 text-white rounded-3xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                            <FileAudio className="h-8 w-8" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-black text-slate-900">{audioFile?.name || existingAudioName}</p>
+                            <p className="text-[10px] font-bold text-indigo-500 uppercase">Arquivo pronto para processamento</p>
+                          </div>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={(e) => { e.stopPropagation(); removeFile(); }}
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50 font-bold"
+                          >
+                            <X className="h-4 w-4 mr-2" /> Remover arquivo
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center text-center space-y-3">
+                          <div className="h-12 w-12 bg-white border-2 border-slate-100 text-slate-300 rounded-2xl flex items-center justify-center">
+                            <Upload className="h-6 w-6" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-slate-900">Clique para fazer upload do áudio da sessão</p>
+                            <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">MP3, WAV, M4A ou WebM (Máx. 50MB)</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                 </div>
+               )}
+            </div>
+
+            {/* 2. Informações Gerais */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t border-slate-50">
               <div className="space-y-2 flex flex-col">
                 <Label className="text-xs font-black uppercase text-slate-400 mb-1">Paciente</Label>
                 <Popover open={openPatientSelect} onOpenChange={setOpenPatientSelect}>
@@ -245,7 +344,8 @@ const SessionFormPage = () => {
               </div>
             </div>
 
-            <div className="space-y-6 pt-6 border-t border-slate-50">
+            {/* 3. Registro Clínico Estruturado */}
+            <div className="space-y-6 pt-8 border-t border-slate-50">
               <div className="flex items-center gap-2 text-indigo-600 mb-2">
                 <Stethoscope className="h-5 w-5" />
                 <h3 className="font-black text-xs uppercase tracking-widest">Registro Clínico Estruturado</h3>
@@ -284,7 +384,8 @@ const SessionFormPage = () => {
               </div>
             </div>
 
-            <div className="space-y-4 pt-6 border-t border-slate-50">
+            {/* 4. Rascunho Livre */}
+            <div className="space-y-4 pt-8 border-t border-slate-50">
                <Label className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Rascunho Livre / Notas Gerais</Label>
                <Textarea 
                 placeholder="Anotações livres que não entram necessariamente no prontuário..." 
@@ -292,110 +393,6 @@ const SessionFormPage = () => {
                 value={formData.manual_notes}
                 onChange={(e) => setFormData({...formData, manual_notes: e.target.value})}
               />
-            </div>
-
-            <div className="space-y-8 pt-8 border-t border-slate-50">
-               <div className="flex items-center justify-between">
-                 <Label className="text-xs font-black uppercase text-slate-400 tracking-widest">Tipo de Atendimento</Label>
-                 {tier === 'free' && (
-                   <Badge variant="outline" className="text-[9px] font-black uppercase border-amber-200 text-amber-600 bg-amber-50">Somente Texto no Plano Free</Badge>
-                 )}
-               </div>
-
-               <RadioGroup value={recordType} onValueChange={(v: any) => setRecordType(v)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className={cn(
-                    "relative flex items-center justify-between p-6 rounded-[24px] border-2 transition-all cursor-pointer", 
-                    recordType === 'manual' ? 'border-indigo-600 bg-indigo-50/20' : 'border-slate-50 bg-white hover:border-slate-200'
-                  )}>
-                    <RadioGroupItem value="manual" id="m" className="sr-only" />
-                    <Label htmlFor="m" className="flex items-center gap-4 cursor-pointer w-full">
-                      <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center", recordType === 'manual' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500')}>
-                        <FileText className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <p className="font-black text-slate-900">Apenas Notas</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">Sem processamento de áudio</p>
-                      </div>
-                    </Label>
-                    {recordType === 'manual' && <CheckCircle2 className="h-5 w-5 text-indigo-600 absolute top-4 right-4" />}
-                  </div>
-
-                  <div className={cn(
-                    "relative flex items-center justify-between p-6 rounded-[24px] border-2 transition-all cursor-pointer", 
-                    recordType === 'ambos' ? 'border-indigo-600 bg-indigo-50/20' : 'border-slate-50 bg-white hover:border-slate-200',
-                    tier === 'free' && 'opacity-50 cursor-not-allowed'
-                  )}>
-                    <RadioGroupItem value="ambos" id="a" disabled={tier === 'free'} className="sr-only" />
-                    <Label htmlFor="a" className="flex items-center gap-4 cursor-pointer w-full">
-                      <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center", recordType === 'ambos' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500')}>
-                        <Mic className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <p className="font-black text-slate-900">Áudio + Notas</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">Transcrição por IA inclusa</p>
-                      </div>
-                    </Label>
-                    {recordType === 'ambos' && <CheckCircle2 className="h-5 w-5 text-indigo-600 absolute top-4 right-4" />}
-                  </div>
-               </RadioGroup>
-
-               {showAudioUpload && (
-                 <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
-                    <Label className="text-[11px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2">
-                      <Music className="h-4 w-4" /> Upload do Áudio da Sessão
-                    </Label>
-                    
-                    <div 
-                      onClick={() => fileInputRef.current?.click()}
-                      className={cn(
-                        "border-2 border-dashed rounded-[32px] p-10 flex flex-col items-center justify-center gap-4 transition-all cursor-pointer",
-                        audioFile || existingAudioName ? "bg-indigo-50 border-indigo-200" : "bg-slate-50/50 border-slate-100 hover:border-indigo-300 hover:bg-white"
-                      )}
-                    >
-                      <Input 
-                        type="file" 
-                        ref={fileInputRef}
-                        className="hidden" 
-                        accept="audio/*" 
-                        onChange={handleFileChange} 
-                      />
-                      
-                      {audioFile || existingAudioName ? (
-                        <div className="flex flex-col items-center text-center space-y-3">
-                          <div className="h-16 w-16 bg-indigo-600 text-white rounded-3xl flex items-center justify-center shadow-lg shadow-indigo-200">
-                            <FileAudio className="h-8 w-8" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-sm font-black text-slate-900">{audioFile?.name || existingAudioName}</p>
-                            <p className="text-[10px] font-bold text-indigo-500 uppercase">Arquivo pronto para processamento</p>
-                          </div>
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={(e) => { e.stopPropagation(); removeFile(); }}
-                            className="text-red-500 hover:text-red-600 hover:bg-red-50 font-bold"
-                          >
-                            <X className="h-4 w-4 mr-2" /> Remover e trocar arquivo
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center text-center space-y-4">
-                          <div className="h-16 w-16 bg-white border-2 border-slate-100 text-slate-300 rounded-3xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                            <Upload className="h-8 w-8" />
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-sm font-black text-slate-900">Selecione o arquivo de áudio</p>
-                            <p className="text-xs text-slate-400 font-medium">MP3, WAV, M4A ou WebM (Máx. 50MB)</p>
-                          </div>
-                          <Button type="button" variant="secondary" className="rounded-2xl px-8 h-10 font-black text-xs uppercase tracking-widest bg-white border border-slate-100 shadow-sm">
-                            Escolher Arquivo
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                 </div>
-               )}
             </div>
           </CardContent>
         </Card>
