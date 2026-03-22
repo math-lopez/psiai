@@ -12,37 +12,50 @@ const Index = () => {
 
   useEffect(() => {
     const checkRoleAndRedirect = async () => {
-      // Espera o AuthContext carregar a sessão
       if (authLoading) return;
 
       if (!session) {
-        console.log("[Index] Sem sessão ativa. Indo para /login");
         navigate("/login", { replace: true });
         return;
       }
 
       try {
-        console.log("[Index] Checando banco para:", session.user.id);
+        console.log("[Index] Verificando identidade do usuário:", session.user.id);
         
-        // Verifica se o usuário logado é um paciente
-        const { data: patientAccess, error } = await supabase
+        // 1. Verifica se é um Paciente Ativo
+        const { data: patientAccess } = await supabase
           .from('patient_access')
           .select('id')
           .eq('user_id', session.user.id)
           .maybeSingle();
 
-        if (error) throw error;
-
         if (patientAccess) {
-          console.log("[Index] Paciente detectado. Redirecionando para /portal");
+          console.log("[Index] Identificado como Paciente. Indo para /portal");
           navigate("/portal", { replace: true });
-        } else {
-          console.log("[Index] Psicólogo detectado. Redirecionando para /dashboard");
-          navigate("/dashboard", { replace: true });
+          return;
         }
+
+        // 2. Verifica se é um Psicólogo (tem CRP no perfil)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('crp')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (profile && profile.crp) {
+          console.log("[Index] Identificado como Psicólogo. Indo para /dashboard");
+          navigate("/dashboard", { replace: true });
+          return;
+        }
+
+        // 3. Se não for nenhum dos dois (ex: paciente excluído ou conta nova não configurada)
+        console.log("[Index] Usuário órfão detectado (sem papel definido).");
+        // Forçamos o logout para limpar a sessão de uma conta que não deveria estar aqui
+        await supabase.auth.signOut();
+        navigate("/login", { replace: true });
+
       } catch (err) {
-        console.error("[Index] Erro crítico no redirecionamento:", err);
-        // Em caso de erro, por segurança, deslogamos ou voltamos ao login
+        console.error("[Index] Erro crítico:", err);
         navigate("/login", { replace: true });
       }
     };
@@ -53,8 +66,8 @@ const Index = () => {
   return (
     <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
       <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
-      <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">
-        Autenticando acesso seguro...
+      <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest text-center px-4">
+        Validando permissões de acesso...
       </p>
     </div>
   );
