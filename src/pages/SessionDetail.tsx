@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { 
-  ChevronLeft, Edit, Trash2, Mic, Clock, User, FileText, Sparkles, Loader2, AlertTriangle, Music, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Lock, ClipboardList, Zap, Quote
+  ChevronLeft, Edit, Trash2, Mic, Clock, User, FileText, Sparkles, Loader2, AlertTriangle, Music, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Lock, ClipboardList, Zap, Quote, BrainCircuit, ListChecks, TriangleAlert
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,17 +26,27 @@ const SessionDetail = () => {
   const [processing, setProcessing] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Estados para a nova análise de IA
+  const [aiAnalysis, setAiAnalysis] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
   const fetchData = async () => {
     if (!id) return;
     try {
-      const data = await sessionService.getById(id);
-      setSession(data);
+      const [sessionData, analysisData] = await Promise.all([
+        sessionService.getById(id),
+        sessionService.getSessionAIAnalysis(id)
+      ]);
+      
+      setSession(sessionData);
+      setAiAnalysis(analysisData);
       
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase.from('profiles').select('subscription_tier').eq('id', user?.id).single();
       setTier(profile?.subscription_tier as SubscriptionTier || "free");
     } catch (e) {
-      showError("Erro ao carregar sessão.");
+      showError("Erro ao carregar dados da sessão.");
     } finally {
       setLoading(false);
     }
@@ -56,6 +66,26 @@ const SessionDetail = () => {
       showError(e.message);
     } finally {
       setProcessing(false);
+    }
+  };
+
+  const handleAnalyzeSessionAI = async () => {
+    if (!session?.transcript) {
+      showError("É necessário ter uma transcrição para gerar a análise profunda.");
+      return;
+    }
+    
+    setIsAnalyzing(true);
+    setAnalysisError(null);
+    try {
+      await sessionService.analyzeSessionAI(id!);
+      showSuccess("Análise profunda concluída!");
+      await fetchData();
+    } catch (e: any) {
+      setAnalysisError(e.message || "Erro ao processar análise profunda.");
+      showError("Erro ao processar análise profunda.");
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -144,7 +174,7 @@ const SessionDetail = () => {
               <CardContent>
                 <Button className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-11 font-black shadow-lg shadow-indigo-100" onClick={handleProcessAudio} disabled={processing || isProcessing}>
                   {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  {session.processing_status === 'completed' ? "Reprocessar com IA" : "Processar Transcrição"}
+                  {session.processing_status === 'completed' ? "Reprocessar Transcrição" : "Processar Transcrição"}
                 </Button>
               </CardContent>
             </Card>
@@ -172,22 +202,146 @@ const SessionDetail = () => {
           </Card>
 
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
-            <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-slate-400"><FileText className="h-4 w-4" /> Diário do Psicólogo</CardTitle></CardHeader>
+            <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-slate-400"><FileText className="h-4 w-4" /> Rascunho livre / Notas manuais</CardTitle></CardHeader>
             <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.manual_notes || "Sem notas adicionais."}</p></CardContent>
           </Card>
 
-          {session.processing_status === 'completed' && (
+          {/* NOVO BLOCO: Análise da Sessão com IA */}
+          <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
+            <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+            <CardHeader className="pb-2 border-b border-slate-50 mb-4 flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-indigo-600">
+                <BrainCircuit className="h-4 w-4" /> Análise da Sessão com IA
+              </CardTitle>
+              {aiAnalysis && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleAnalyzeSessionAI} 
+                  disabled={isAnalyzing}
+                  className="h-8 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-indigo-600"
+                >
+                  {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <RefreshCw className="h-3.5 w-3.5 mr-1" />}
+                  Reprocessar
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent className="min-h-[200px] flex flex-col">
+              {isAnalyzing ? (
+                <div className="flex-1 flex flex-col items-center justify-center py-10 gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+                  <p className="text-sm font-bold text-slate-500 animate-pulse">Analisando sessão em profundidade...</p>
+                </div>
+              ) : analysisError ? (
+                <div className="flex-1 flex flex-col items-center justify-center py-10 gap-4">
+                  <div className="h-12 w-12 bg-red-50 text-red-500 rounded-2xl flex items-center justify-center">
+                    <AlertCircle className="h-6 w-6" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-slate-900">Erro na análise profunda</p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-xs">{analysisError}</p>
+                  </div>
+                  <Button onClick={handleAnalyzeSessionAI} className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-11 font-black px-6">
+                    Tentar novamente
+                  </Button>
+                </div>
+              ) : !aiAnalysis ? (
+                <div className="flex-1 flex flex-col items-center justify-center py-12 gap-6 border-2 border-dashed border-slate-100 rounded-[28px]">
+                  <div className="h-14 w-14 bg-indigo-50 text-indigo-400 rounded-2xl flex items-center justify-center">
+                    <Sparkles className="h-7 w-7" />
+                  </div>
+                  <div className="text-center space-y-1">
+                    <p className="text-sm font-black text-slate-900">Nenhuma análise profunda gerada ainda</p>
+                    <p className="text-xs text-slate-500 max-w-xs mx-auto font-medium leading-relaxed">
+                      Gere um relatório estruturado com padrões de comportamento, pontos de atenção e recomendações clínicas automáticas.
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={handleAnalyzeSessionAI} 
+                    disabled={!session.transcript}
+                    className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-12 font-black px-8 shadow-xl shadow-indigo-100"
+                  >
+                    {!session.transcript ? <Lock className="h-4 w-4 mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                    Gerar análise da sessão
+                  </Button>
+                  {!session.transcript && (
+                    <p className="text-[10px] text-amber-600 font-black uppercase tracking-widest">Aguardando transcrição para habilitar</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-8 py-2">
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5" /> Sumário Estruturado
+                    </h4>
+                    <p className="text-sm text-slate-700 leading-relaxed font-medium bg-slate-50/50 p-4 rounded-2xl border border-slate-100/50 italic">
+                      {aiAnalysis.summary}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-400 flex items-center gap-1.5">
+                        <ListChecks className="h-3.5 w-3.5" /> Padrões Identificados
+                      </h4>
+                      <div className="space-y-2">
+                        {aiAnalysis.key_patterns?.map((pattern: string, i: number) => (
+                          <div key={i} className="flex items-start gap-2 p-3 bg-blue-50/30 rounded-xl border border-blue-50 text-xs text-slate-700 font-bold">
+                            <span className="h-1.5 w-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+                            {pattern}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-red-400 flex items-center gap-1.5">
+                        <TriangleAlert className="h-3.5 w-3.5" /> Pontos de Atenção / Riscos
+                      </h4>
+                      <div className="space-y-2">
+                        {aiAnalysis.risk_flags?.length > 0 ? aiAnalysis.risk_flags.map((flag: string, i: number) => (
+                          <div key={i} className="flex items-start gap-2 p-3 bg-red-50/30 rounded-xl border border-red-50 text-xs text-red-700 font-bold">
+                            <span className="h-1.5 w-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
+                            {flag}
+                          </div>
+                        )) : (
+                          <p className="text-[10px] text-slate-400 italic">Nenhum risco detectado pela IA.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-3.5 w-3.5" /> Recomendações Clínicas
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {aiAnalysis.recommendations?.map((rec: string, i: number) => (
+                        <div key={i} className="p-4 bg-emerald-50/30 rounded-2xl border border-emerald-50 text-xs text-emerald-800 font-medium flex gap-3">
+                          <Zap className="h-4 w-4 text-emerald-500 shrink-0" />
+                          {rec}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
+            <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-indigo-900"><Sparkles className="h-5 w-5 text-indigo-500" /> Transcrição Completa</CardTitle></CardHeader>
+            <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.transcript || "Não disponível."}</p></CardContent>
+          </Card>
+
+          {/* Bloqueio do Recurso Ultra para o resumo antigo de IA se o plano não permitir */}
+          {session.processing_status === 'completed' && !aiAnalysis && (
             <div className="space-y-8 pt-6">
               <div className="flex items-center gap-3">
                 <div className="h-px flex-1 bg-slate-100" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Inteligência Artificial</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Insights Rápidos</span>
                 <div className="h-px flex-1 bg-slate-100" />
               </div>
-
-              <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
-                <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-lg font-bold text-indigo-900"><Sparkles className="h-5 w-5 text-indigo-500" /> Transcrição Integrada</CardTitle></CardHeader>
-                <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.transcript || "Não disponível."}</p></CardContent>
-              </Card>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Card className={cn("relative overflow-hidden rounded-[32px] border-none shadow-sm", !isUltra && 'opacity-70 grayscale')}>
@@ -198,7 +352,7 @@ const SessionDetail = () => {
                       <Link to="/assinatura"><Button size="sm" variant="link" className="text-indigo-600 text-xs mt-2 underline">Fazer Upgrade</Button></Link>
                     </div>
                   )}
-                  <CardHeader><CardTitle className="text-sm font-black uppercase tracking-widest text-indigo-400">Pontos Relevantes</CardTitle></CardHeader>
+                  <CardHeader><CardTitle className="text-sm font-black uppercase tracking-widest text-indigo-400">Principais Destaques</CardTitle></CardHeader>
                   <CardContent>
                     {isUltra && session.highlights ? (
                       <ul className="space-y-3">
