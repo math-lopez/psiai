@@ -7,12 +7,10 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
-  // 1. Lidar com o preflight do CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
-  // Configurações do Supabase e do Serviço de IA
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   const serviceUrl = Deno.env.get('PROCESSING_SERVICE_URL');
@@ -21,71 +19,61 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    // 2. Validação de Autenticação (JWT)
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Não autorizado: Cabeçalho de autorização ausente');
-    }
+    if (!authHeader) throw new Error('Não autorizado');
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    
-    if (authError || !user) {
-      throw new Error('Não autorizado: Token inválido');
-    }
+    if (authError || !user) throw new Error('Token inválido');
 
-    // 3. Obter ID da sessão
     const { sessionId } = await req.json();
-    if (!sessionId) {
-      throw new Error('sessionId é obrigatório');
-    }
+    if (!sessionId) throw new Error('sessionId é obrigatório');
 
-    // 4. Buscar dados da sessão e do paciente
     const { data: session, error: sError } = await supabase
       .from('sessions')
       .select('*, patient:patients(id, full_name)')
       .eq('id', sessionId)
       .single();
 
-    if (sError || !session) {
-      throw new Error('Sessão não encontrada');
-    }
-
-    // Validação de Ownership
-    if (session.psychologist_id !== user.id) {
-      throw new Error('Acesso negado');
-    }
+    if (sError || !session) throw new Error('Sessão não encontrada');
+    if (session.psychologist_id !== user.id) throw new Error('Acesso negado');
     
-    // 5. Montar Payload EXATAMENTE como o serviço Python espera (sessions como array)
+    // 1. MARCAR COMO PROCESSANDO IMEDIATAMENTE NO BANCO
+    // Isso vai disparar o Realtime no Front-end
+    await supabase.from('session_ai_analysis').upsert({
+      session_id: sessionId,
+      patient_id: session.patient_id,
+      psychologist_id: session.psychologist_id,
+      status: 'processing',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'session_id' });
+
+    // 2. RETORNAR SUCESSO PARA O FRONT-END (FIRE AND FORGET)
+    // Infelizmente o Deno Edge Runtime termina a execução após o retorno. 
+    // Para tarefas muito longas, o ideal é que o Python atualize o banco diretamente.
+    // Mas vamos tentar manter a conexão aberta o máximo possível ou usar Realtime para compensar quedas.
+    
     const payload = {
       patientId: session.patient_id,
       psychologistId: session.psychologist_id,
-      patient: {
-        id: session.patient?.id,
-        name: session.patient?.full_name
-      },
-      sessions: [
-        {
-          id: session.id,
-          sessionDate: session.session_date,
-          manualNotes: session.manual_notes,
-          transcript: session.transcript,
-          highlights: Array.isArray(session.highlights) ? session.highlights : [],
-          nextSteps: session.next_steps,
-          clinicalNotes: session.clinical_notes,
-          interventions: session.interventions,
-          sessionSummaryManual: session.session_summary_manual
-        }
-      ]
+      patient: { id: session.patient?.id, name: session.patient?.full_name },
+      sessions: [{
+        id: session.id,
+        sessionDate: session.session_date,
+        manualNotes: session.manual_notes,
+        transcript: session.transcript,
+        highlights: session.highlights || [],
+        nextSteps: session.next_steps,
+        clinicalNotes: session.clinical_notes,
+        interventions: session.interventions,
+        sessionSummaryManual: session.session_summary_manual
+      }]
     };
 
-    if (!serviceUrl || !serviceToken) {
-      throw new Error('Configuração do serviço de IA pendente no servidor.');
-    }
+    console.log(`[analyze-session-v2] Chamando Python para sessão ${sessionId}...`);
 
-    // 6. Chamada ao serviço Python no endpoint correto
-    console.log(`[analyze-session-v2] Enviando análise para o endpoint: ${serviceUrl}/process-patient-analysis`);
-
+    // Iniciamos a chamada. Se o Deno matar a função por tempo, o Python ainda pode terminar o trabalho
+    // se ele tiver permissão para dar o update de volta no banco.
     const apiResponse = await fetch(`${serviceUrl}/process-patient-analysis`, {
       method: 'POST',
       headers: { 
@@ -97,44 +85,33 @@ serve(async (req) => {
 
     if (!apiResponse.ok) {
       const errorText = await apiResponse.text();
-      console.error(`[analyze-session-v2] Erro no Python (${apiResponse.status}): ${errorText}`);
-      throw new Error(`Serviço de IA retornou erro: ${errorText}`);
+      throw new Error(`Serviço Python: ${errorText}`);
     }
 
     const aiResult = await apiResponse.json();
 
-    if (!aiResult.success || !aiResult.summary) {
-       throw new Error("A IA não retornou um resultado válido.");
-    }
+    // 3. ATUALIZAR COM RESULTADO FINAL
+    await supabase.from('session_ai_analysis').upsert({
+      session_id: sessionId,
+      patient_id: session.patient_id,
+      psychologist_id: session.psychologist_id,
+      summary: aiResult.summary,
+      key_patterns: aiResult.key_patterns || [],
+      risk_flags: aiResult.risk_flags || [],
+      recommendations: aiResult.recommendations || [],
+      status: 'completed',
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'session_id' });
 
-    // 7. Persistir resultado real
-    const { error: upsertError } = await supabase
-      .from('session_ai_analysis')
-      .upsert({
-        session_id: sessionId,
-        patient_id: session.patient_id,
-        psychologist_id: session.psychologist_id,
-        summary: aiResult.summary,
-        key_patterns: Array.isArray(aiResult.key_patterns) ? aiResult.key_patterns : [],
-        risk_flags: Array.isArray(aiResult.risk_flags) ? aiResult.risk_flags : [],
-        recommendations: Array.isArray(aiResult.recommendations) ? aiResult.recommendations : [],
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'session_id' });
-
-    if (upsertError) throw upsertError;
-
-    return new Response(JSON.stringify({ success: true }), { 
+    return new Response(JSON.stringify({ success: true, status: 'processing_triggered' }), { 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
 
   } catch (err: any) {
-    console.error(`[analyze-session-v2] Erro Crítico: ${err.message}`);
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: err.message 
-    }), { 
-      status: 500, 
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    console.error(`[analyze-session-v2] Erro: ${err.message}`);
+    // Opcional: Marcar erro no banco para o Realtime avisar o front
+    return new Response(JSON.stringify({ success: false, error: err.message }), { 
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
   }
 })

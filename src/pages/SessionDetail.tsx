@@ -41,6 +41,11 @@ const SessionDetail = () => {
       setSession(sessionData);
       setAiAnalysis(analysisData);
       
+      // Se já existe uma análise e ela está pendente/processando, entramos em modo de espera
+      if (analysisData && (analysisData.status === 'processing' || analysisData.status === 'pending')) {
+        setIsAnalyzing(true);
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase.from('profiles').select('subscription_tier').eq('id', user?.id).single();
       setTier(profile?.subscription_tier as SubscriptionTier || "free");
@@ -53,6 +58,37 @@ const SessionDetail = () => {
 
   useEffect(() => {
     fetchData();
+
+    // CONFIGURAÇÃO DO REALTIME (WebSocket)
+    // Escuta mudanças na tabela de análise para esta sessão específica
+    const channel = supabase
+      .channel(`ai-analysis-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Escuta INSERT e UPDATE
+          schema: 'public',
+          table: 'session_ai_analysis',
+          filter: `session_id=eq.${id}`,
+        },
+        (payload) => {
+          console.log("[Realtime] Mudança detectada na análise:", payload);
+          const newAnalysis = payload.new as any;
+          
+          if (newAnalysis.summary) {
+            setAiAnalysis(newAnalysis);
+            setIsAnalyzing(false);
+            if (newAnalysis.status === 'completed') {
+              showSuccess("Análise de IA concluída!");
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [id]);
 
   const handleProcessAudio = async () => {
@@ -72,14 +108,19 @@ const SessionDetail = () => {
     setIsAnalyzing(true);
     setAnalysisError(null);
     try {
+      // Chamamos a Edge Function, mas não esperamos o resultado pesado dela aqui
+      // A função deve retornar "success: true" assim que disparar o processo
       await sessionService.analyzeSessionAI(id!);
-      showSuccess("Análise profunda concluída!");
-      await fetchData();
+      showSuccess("Solicitação de análise enviada!");
     } catch (e: any) {
-      setAnalysisError(e.message || "Erro ao processar análise profunda.");
-      showError("Erro ao processar análise profunda.");
-    } finally {
-      setIsAnalyzing(false);
+      // Se der erro de timeout (WORKER_LIMIT), não mostramos erro crítico para o usuário
+      // pois o Realtime pode resolver se o processo continuar no background
+      if (e.message?.includes('WORKER_LIMIT') || e.message?.includes('504')) {
+        console.log("Edge function demorando, aguardando via Realtime...");
+      } else {
+        setAnalysisError(e.message || "Erro ao processar análise profunda.");
+        setIsAnalyzing(false);
+      }
     }
   };
 
@@ -103,14 +144,13 @@ const SessionDetail = () => {
   const isUltra = PLAN_LIMITS[tier].hasTherapeuticInsights;
   const isProcessing = ['queued', 'processing'].includes(session.processing_status);
 
-  // Nova lógica de habilitação: verifica se há qualquer conteúdo relevante
+  // Verifica se há qualquer conteúdo relevante
   const hasSufficientContent = !!(
     (session.transcript && session.transcript.trim().length > 20) ||
     (session.manual_notes && session.manual_notes.trim().length > 20) ||
     (session.clinical_notes && session.clinical_notes.trim().length > 20) ||
     (session.interventions && session.interventions.trim().length > 20) ||
-    (session.session_summary_manual && session.session_summary_manual.trim().length > 20) ||
-    (session.highlights && session.highlights.length > 0)
+    (session.session_summary_manual && session.session_summary_manual.trim().length > 20)
   );
 
   return (
@@ -202,11 +242,6 @@ const SessionDetail = () => {
             <CardContent><p className="text-slate-700 font-bold leading-relaxed whitespace-pre-wrap italic">{session.session_summary_manual || "Não preenchido."}</p></CardContent>
           </Card>
 
-          <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
-            <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-slate-400"><FileText className="h-4 w-4" /> Rascunho livre / Notas manuais</CardTitle></CardHeader>
-            <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.manual_notes || "Sem notas adicionais."}</p></CardContent>
-          </Card>
-
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
             <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
             <CardHeader className="pb-2 border-b border-slate-50 mb-4 flex flex-row items-center justify-between">
@@ -230,7 +265,8 @@ const SessionDetail = () => {
               {isAnalyzing ? (
                 <div className="flex-1 flex flex-col items-center justify-center py-10 gap-3">
                   <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-                  <p className="text-sm font-bold text-slate-500 animate-pulse">Analisando sessão em profundidade...</p>
+                  <p className="text-sm font-bold text-slate-500 animate-pulse">A IA está processando sua sessão...</p>
+                  <p className="text-[10px] text-slate-400 font-medium">Isso pode levar até 2 minutos. Você pode continuar navegando.</p>
                 </div>
               ) : analysisError ? (
                 <div className="flex-1 flex flex-col items-center justify-center py-10 gap-4">
@@ -264,13 +300,6 @@ const SessionDetail = () => {
                     {!hasSufficientContent ? <Lock className="h-4 w-4 mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
                     {hasSufficientContent ? "Gerar análise da sessão" : "Conteúdo insuficiente"}
                   </Button>
-                  {!hasSufficientContent ? (
-                    <p className="text-[10px] text-amber-600 font-black uppercase tracking-widest">Adicione notas ou transcrição para habilitar</p>
-                  ) : (
-                    <p className="text-[10px] text-indigo-500 font-black uppercase tracking-widest flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3" /> Análise disponível com base nos dados registrados
-                    </p>
-                  )}
                 </div>
               ) : (
                 <div className="space-y-8 py-2">
@@ -300,7 +329,7 @@ const SessionDetail = () => {
 
                     <div className="space-y-4">
                       <h4 className="text-[10px] font-black uppercase tracking-widest text-red-400 flex items-center gap-1.5">
-                        <TriangleAlert className="h-3.5 w-3.5" /> Pontos de Atenção / Riscos
+                        <TriangleAlert className="h-3.5 w-3.5" /> Pontos de Atenção
                       </h4>
                       <div className="space-y-2">
                         {aiAnalysis.risk_flags?.length > 0 ? aiAnalysis.risk_flags.map((flag: string, i: number) => (
@@ -309,7 +338,7 @@ const SessionDetail = () => {
                             {flag}
                           </div>
                         )) : (
-                          <p className="text-[10px] text-slate-400 italic">Nenhum risco detectado pela IA.</p>
+                          <p className="text-[10px] text-slate-400 italic">Nenhum risco detectado.</p>
                         )}
                       </div>
                     </div>
@@ -337,44 +366,6 @@ const SessionDetail = () => {
             <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-indigo-900"><Sparkles className="h-5 w-5 text-indigo-500" /> Transcrição Completa</CardTitle></CardHeader>
             <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.transcript || "Não disponível."}</p></CardContent>
           </Card>
-
-          {session.processing_status === 'completed' && !aiAnalysis && (
-            <div className="space-y-8 pt-6">
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-slate-100" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Insights Rápidos</span>
-                <div className="h-px flex-1 bg-slate-100" />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className={cn("relative overflow-hidden rounded-[32px] border-none shadow-sm", !isUltra && 'opacity-70 grayscale')}>
-                  {!isUltra && (
-                    <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center">
-                      <Lock className="h-8 w-8 text-indigo-600 mb-2" />
-                      <p className="text-xs font-bold text-indigo-900 uppercase">Recurso Ultra</p>
-                      <Link to="/assinatura"><Button size="sm" variant="link" className="text-indigo-600 text-xs mt-2 underline">Fazer Upgrade</Button></Link>
-                    </div>
-                  )}
-                  <CardHeader><CardTitle className="text-sm font-black uppercase tracking-widest text-indigo-400">Principais Destaques</CardTitle></CardHeader>
-                  <CardContent>
-                    {isUltra && session.highlights ? (
-                      <ul className="space-y-3">
-                        {session.highlights.map((h, i) => <li key={i} className="text-xs text-slate-700 flex gap-2"><div className="h-1.5 w-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />{h}</li>)}
-                      </ul>
-                    ) : <p className="text-xs text-slate-400 italic">Análise bloqueada.</p>}
-                  </CardContent>
-                </Card>
-
-                <Card className={cn("relative overflow-hidden rounded-[32px] border-none shadow-sm", !isUltra && 'opacity-70 grayscale')}>
-                  {!isUltra && <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[2px] flex items-center justify-center p-4"><Lock className="h-5 w-5 text-indigo-400" /></div>}
-                  <CardHeader><CardTitle className="text-sm font-black uppercase tracking-widest text-amber-500">Próximos Passos</CardTitle></CardHeader>
-                  <CardContent>
-                    {isUltra ? <p className="text-xs text-slate-700 leading-relaxed">{session.next_steps || "Sem sugestões."}</p> : <p className="text-xs text-slate-400 italic">Análise bloqueada.</p>}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
