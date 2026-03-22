@@ -11,7 +11,7 @@ export const diaryService = {
       .from('patient_access')
       .select('patient_id')
       .eq('user_id', user.id)
-      .single();
+      .maybeSingle();
     
     return data?.patient_id || null;
   },
@@ -41,7 +41,7 @@ export const diaryService = {
         .from('patients')
         .select('psychologist_id')
         .eq('id', log.patient_id)
-        .single();
+        .maybeSingle();
       
       if (patient) {
         psychoId = patient.psychologist_id;
