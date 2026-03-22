@@ -67,7 +67,7 @@ const PatientDiaryPage = () => {
   const activePrompts = prompts.filter(p => p.status === 'active');
 
   return (
-    <div className="space-y-12 animate-in fade-in duration-500">
+    <div className="space-y-12 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight flex items-center gap-3">
@@ -114,26 +114,28 @@ const PatientDiaryPage = () => {
           <History className="h-4 w-4" /> Histórico de Registros
         </h3>
         
-        <div className="grid grid-cols-1 gap-6">
+        <div className="grid grid-cols-1 gap-8">
           {logs.length > 0 ? logs.map((log) => {
             const logDate = new Date(log.created_at);
             const isValidDate = isValid(logDate);
             
             return (
               <div key={log.id} className="group p-8 bg-white border border-slate-100 rounded-[40px] shadow-sm hover:shadow-xl hover:border-indigo-100 transition-all duration-300">
-                <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-6">
-                  <div className="flex items-center gap-5">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                  <div className="flex items-center gap-6">
                     {log.mood ? (
-                      <div className="h-14 w-14 rounded-3xl bg-slate-50 flex items-center justify-center text-3xl shadow-inner group-hover:bg-white group-hover:scale-110 transition-transform">
+                      <div className="h-16 w-16 shrink-0 rounded-3xl bg-slate-50 flex items-center justify-center text-4xl shadow-inner group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all">
                         {log.mood}
                       </div>
                     ) : (
-                      <div className="h-14 w-14 rounded-3xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                        <MessageSquare className="h-7 w-7" />
+                      <div className="h-16 w-16 shrink-0 rounded-3xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                        <MessageSquare className="h-8 w-8" />
                       </div>
                     )}
-                    <div>
-                      <h4 className="font-black text-slate-900 text-xl leading-none mb-2">{log.title || "Anotação do Diário"}</h4>
+                    <div className="min-w-0">
+                      <h4 className="font-black text-slate-900 text-2xl leading-tight mb-2 truncate">
+                        {log.title || "Anotação do Diário"}
+                      </h4>
                       <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
                         <Calendar className="h-3.5 w-3.5" /> 
                         {isValidDate ? format(logDate, "dd 'de' MMMM, yyyy", { locale: ptBR }) : "Data não disponível"}
@@ -141,13 +143,13 @@ const PatientDiaryPage = () => {
                     </div>
                   </div>
                   {log.created_by === 'psychologist' && (
-                    <div className="px-4 py-1.5 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100">
-                      Postado pelo Psicólogo
+                    <div className="px-5 py-2 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-indigo-100 shrink-0">
+                      Compartilhado pelo Psicólogo
                     </div>
                   )}
                 </div>
                 <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-50">
-                  <p className="text-base text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">{log.content}</p>
+                  <p className="text-lg text-slate-600 leading-relaxed whitespace-pre-wrap font-medium">{log.content}</p>
                 </div>
               </div>
             );
