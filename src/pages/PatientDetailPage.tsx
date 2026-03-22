@@ -3,7 +3,7 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { 
-  ChevronLeft, Edit, Plus, Calendar, Mail, Phone, Loader2, ShieldCheck, FileText, User, Sparkles
+  ChevronLeft, Edit, Plus, Calendar, Mail, Phone, Loader2, ShieldCheck, FileText, User, Sparkles, Target
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import { showError } from "@/utils/toast";
 import { PatientAccessManagement } from "@/components/patients/PatientAccessManagement";
 import { LatestSessionSummary } from "@/components/patients/LatestSessionSummary";
 import { SessionTimeline } from "@/components/patients/SessionTimeline";
+import { TreatmentPlanTab } from "@/components/patients/TreatmentPlanTab";
 
 const PatientDetailPage = () => {
   const { id } = useParams();
@@ -95,9 +96,12 @@ const PatientDetailPage = () => {
       </div>
 
       <Tabs defaultValue="overview" className="space-y-8">
-        <TabsList className="bg-slate-100/50 p-1.5 rounded-[24px] border-none h-auto w-fit">
+        <TabsList className="bg-slate-100/50 p-1.5 rounded-[24px] border-none h-auto w-fit overflow-x-auto flex-nowrap">
           <TabsTrigger value="overview" className="rounded-2xl px-8 py-3 font-black text-xs uppercase tracking-widest gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 transition-all">
             <Sparkles className="h-4 w-4" /> Visão Geral
+          </TabsTrigger>
+          <TabsTrigger value="treatment-plan" className="rounded-2xl px-8 py-3 font-black text-xs uppercase tracking-widest gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 transition-all">
+            <Target className="h-4 w-4" /> Plano Terapêutico
           </TabsTrigger>
           <TabsTrigger value="prontuario" className="rounded-2xl px-8 py-3 font-black text-xs uppercase tracking-widest gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 transition-all">
             <FileText className="h-4 w-4" /> Prontuário
@@ -157,6 +161,10 @@ const PatientDetailPage = () => {
               </Card>
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="treatment-plan" className="outline-none">
+          <TreatmentPlanTab patientId={id!} />
         </TabsContent>
 
         <TabsContent value="prontuario" className="outline-none">
