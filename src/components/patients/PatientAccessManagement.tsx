@@ -12,7 +12,8 @@ import {
   Loader2, 
   AlertCircle,
   Copy,
-  CheckCircle2
+  CheckCircle2,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -156,20 +157,31 @@ export const PatientAccessManagement = ({ patientId, patientEmail }: PatientAcce
 
                 <div className="p-6 rounded-3xl bg-indigo-50 border border-indigo-100 space-y-4">
                   <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2">
-                    <ExternalLink className="h-3 w-3" /> Link de Acesso
+                    <ExternalLink className="h-3 w-3" /> {currentStatus === 'active' ? 'Status da Conta' : 'Link de Acesso'}
                   </p>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 bg-white border border-indigo-100 rounded-xl px-4 py-2 text-xs font-mono text-indigo-600 truncate">
-                      {access?.invite_token ? `${window.location.origin}/portal/ativar?token=...` : 'Gerando...'}
+                      {currentStatus === 'active' 
+                        ? 'Conta ativada pelo paciente' 
+                        : access?.invite_token 
+                          ? `${window.location.origin}/portal/ativar?token=...` 
+                          : 'Gerando...'}
                     </div>
-                    <Button 
-                      variant="secondary" 
-                      size="icon" 
-                      className="bg-white hover:bg-indigo-100 text-indigo-600 border border-indigo-100 rounded-xl shrink-0"
-                      onClick={copyInviteLink}
-                    >
-                      {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                    </Button>
+                    {currentStatus === 'invited' && access?.invite_token && (
+                      <Button 
+                        variant="secondary" 
+                        size="icon" 
+                        className="bg-white hover:bg-indigo-100 text-indigo-600 border border-indigo-100 rounded-xl shrink-0"
+                        onClick={copyInviteLink}
+                      >
+                        {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                      </Button>
+                    )}
+                    {currentStatus === 'active' && (
+                      <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+                        <Lock className="h-4 w-4" />
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
