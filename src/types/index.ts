@@ -35,6 +35,9 @@ export interface Session {
   duration_minutes: number;
   record_type: SessionRecordType;
   manual_notes: string | null;
+  clinical_notes: string | null;
+  interventions: string | null;
+  session_summary_manual: string | null;
   audio_file_name: string | null;
   audio_file_path: string | null;
   processing_status: SessionStatus;
@@ -49,7 +52,6 @@ export interface Session {
   additional_notes: string | null;
   created_at: string;
   updated_at: string;
-  // Join fields
   patient?: {
     full_name: string;
   };
