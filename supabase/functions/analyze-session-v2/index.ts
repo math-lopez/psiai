@@ -12,10 +12,11 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  // Utilizando as variáveis de ambiente que já existem no seu projeto
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  const serviceUrl = Deno.env.get('SESSION_ANALYSIS_SERVICE_URL');
-  const serviceToken = Deno.env.get('SESSION_ANALYSIS_SERVICE_TOKEN');
+  const serviceUrl = Deno.env.get('PROCESSING_SERVICE_URL');
+  const serviceToken = Deno.env.get('PROCESSING_SERVICE_PARECER_CLINICO_TOKEN');
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -58,7 +59,7 @@ serve(async (req) => {
       throw new Error('Acesso negado: Você não tem permissão para analisar esta sessão');
     }
     
-    // 5. Regra de conteúdo mínima (qualquer campo útil)
+    // 5. Regra de conteúdo mínima
     const hasContent = !!(
       (session.transcript && session.transcript.trim().length > 10) || 
       (session.manual_notes && session.manual_notes.trim().length > 10) || 
@@ -72,7 +73,7 @@ serve(async (req) => {
       throw new Error('Sessão sem conteúdo suficiente para análise profunda. Adicione notas clínicas ou finalize a transcrição.');
     }
 
-    // 6. Montar Payload para o serviço Python (CamelCase para compatibilidade com Pydantic/Python)
+    // 6. Montar Payload para o serviço Python
     const payload = {
       sessionId: session.id,
       patientId: session.patient_id,
@@ -95,11 +96,11 @@ serve(async (req) => {
     };
 
     if (!serviceUrl || !serviceToken) {
-      console.error("[analyze-session-v2] SESSION_ANALYSIS_SERVICE_URL ou TOKEN não configurados nas env vars");
-      throw new Error('Configuração do serviço de IA pendente no servidor');
+      console.error("[analyze-session-v2] Configuração de serviço (PROCESSING_SERVICE_URL ou TOKEN) ausente no Supabase Vault");
+      throw new Error('Configuração do serviço de IA pendente no servidor. Verifique os secrets do projeto.');
     }
 
-    console.log(`[analyze-session-v2] Chamando serviço Python no Railway para a sessão ${sessionId}...`);
+    console.log(`[analyze-session-v2] Chamando serviço Python em ${serviceUrl} para a sessão ${sessionId}...`);
 
     // 7. Chamada REAL ao serviço Python
     const apiResponse = await fetch(`${serviceUrl}/process-session-analysis`, {
@@ -119,7 +120,6 @@ serve(async (req) => {
 
     const aiResult = await apiResponse.json();
 
-    // Validar se o formato da resposta está correto antes de salvar
     if (!aiResult.success || !aiResult.summary) {
        console.error("[analyze-session-v2] Resposta da IA com formato inválido:", aiResult);
        throw new Error("A IA não conseguiu gerar um resultado válido para esta sessão.");
@@ -127,7 +127,7 @@ serve(async (req) => {
 
     console.log(`[analyze-session-v2] Sucesso! Salvando análise para a sessão ${sessionId}`);
 
-    // 8. Salvar/Atualizar resultado no banco de dados (upsert)
+    // 8. Salvar/Atualizar resultado no banco de dados
     const { error: upsertError } = await supabase
       .from('session_ai_analysis')
       .upsert({
@@ -156,7 +156,7 @@ serve(async (req) => {
       success: false, 
       error: err.message 
     }), { 
-      status: err.message.includes('Acesso negado') ? 403 : 500, 
+      status: 500, 
       headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
     });
   }
