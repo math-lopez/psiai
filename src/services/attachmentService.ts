@@ -25,6 +25,8 @@ export const attachmentService = {
   ): Promise<PatientAttachment> => {
     const timestamp = Date.now();
     const sanitizedName = sanitizeFileName(file.name);
+    
+    // IMPORTANTE: Estrutura /psicologo_id/paciente_id/arquivo para as regras de segurança
     const filePath = `${psychologistId}/${patientId}/${timestamp}-${sanitizedName}`;
 
     // 1. Upload para o Storage
@@ -32,7 +34,12 @@ export const attachmentService = {
       .from(BUCKET_NAME)
       .upload(filePath, file);
 
-    if (storageError) throw storageError;
+    if (storageError) {
+      if (storageError.message.includes('Bucket not found')) {
+        throw new Error('Configuração pendente: O bucket "patient-attachments" precisa ser criado no Dashboard do Supabase.');
+      }
+      throw storageError;
+    }
 
     // 2. Registro no Banco de Dados
     const { data, error: dbError } = await supabase
