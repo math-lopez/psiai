@@ -12,7 +12,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
-  // Utilizando as variáveis de ambiente que já existem no seu projeto
+  // Configurações do Supabase e do Serviço de IA (Secrets)
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   const serviceUrl = Deno.env.get('PROCESSING_SERVICE_URL');
@@ -34,13 +34,13 @@ serve(async (req) => {
       throw new Error('Não autorizado: Token inválido ou expirado');
     }
 
-    // 3. Obter ID da sessão do corpo da requisição
+    // 3. Obter ID da sessão
     const { sessionId } = await req.json();
     if (!sessionId) {
       throw new Error('sessionId é obrigatório');
     }
 
-    console.log(`[analyze-session-v2] Iniciando análise profunda para sessão: ${sessionId} por user: ${user.id}`);
+    console.log(`[analyze-session-v2] Iniciando processamento real para sessão: ${sessionId} (User: ${user.id})`);
 
     // 4. Buscar dados da sessão e do paciente com validação de Ownership
     const { data: session, error: sError } = await supabase
@@ -55,17 +55,17 @@ serve(async (req) => {
 
     // SEGURANÇA: Garantir que o psicólogo autenticado é o dono desta sessão
     if (session.psychologist_id !== user.id) {
-      console.error(`[analyze-session-v2] Tentativa de acesso não autorizado: User ${user.id} tentou analisar sessão ${sessionId} do Psicólogo ${session.psychologist_id}`);
+      console.error(`[analyze-session-v2] Acesso negado: User ${user.id} tentou acessar sessão do user ${session.psychologist_id}`);
       throw new Error('Acesso negado: Você não tem permissão para analisar esta sessão');
     }
     
-    // 5. Regra de conteúdo mínima
+    // 5. Regras de Conteúdo: Validar se existe algo para a IA ler
     const hasContent = !!(
-      (session.transcript && session.transcript.trim().length > 10) || 
-      (session.manual_notes && session.manual_notes.trim().length > 10) || 
-      (session.clinical_notes && session.clinical_notes.trim().length > 10) || 
-      (session.interventions && session.interventions.trim().length > 10) || 
-      (session.session_summary_manual && session.session_summary_manual.trim().length > 10) ||
+      (session.transcript && session.transcript.trim().length > 15) || 
+      (session.manual_notes && session.manual_notes.trim().length > 15) || 
+      (session.clinical_notes && session.clinical_notes.trim().length > 15) || 
+      (session.interventions && session.interventions.trim().length > 15) || 
+      (session.session_summary_manual && session.session_summary_manual.trim().length > 15) ||
       (session.highlights && session.highlights.length > 0)
     );
 
@@ -73,7 +73,7 @@ serve(async (req) => {
       throw new Error('Sessão sem conteúdo suficiente para análise profunda. Adicione notas clínicas ou finalize a transcrição.');
     }
 
-    // 6. Montar Payload para o serviço Python
+    // 6. Montar Payload estruturado para o Python
     const payload = {
       sessionId: session.id,
       patientId: session.patient_id,
@@ -96,13 +96,13 @@ serve(async (req) => {
     };
 
     if (!serviceUrl || !serviceToken) {
-      console.error("[analyze-session-v2] Configuração de serviço (PROCESSING_SERVICE_URL ou TOKEN) ausente no Supabase Vault");
-      throw new Error('Configuração do serviço de IA pendente no servidor. Verifique os secrets do projeto.');
+      console.error("[analyze-session-v2] Configuração do serviço externo incompleta no Vault");
+      throw new Error('Serviço de IA não configurado no servidor.');
     }
 
-    console.log(`[analyze-session-v2] Chamando serviço Python em ${serviceUrl} para a sessão ${sessionId}...`);
+    // 7. Chamada ao serviço Python real
+    console.log(`[analyze-session-v2] Enviando payload clínico para ${serviceUrl}/process-session-analysis...`);
 
-    // 7. Chamada REAL ao serviço Python
     const apiResponse = await fetch(`${serviceUrl}/process-session-analysis`, {
       method: 'POST',
       headers: { 
@@ -114,18 +114,17 @@ serve(async (req) => {
 
     if (!apiResponse.ok) {
       const errorText = await apiResponse.text();
-      console.error(`[analyze-session-v2] Erro na resposta do serviço Python: ${errorText}`);
-      throw new Error(`O serviço de IA retornou um erro inesperado. Tente novamente em instantes.`);
+      console.error(`[analyze-session-v2] Erro na resposta do serviço Python (${apiResponse.status}): ${errorText}`);
+      throw new Error(`O serviço de IA encontrou um problema técnico. Tente novamente em instantes.`);
     }
 
     const aiResult = await apiResponse.json();
 
+    // Validar formato da resposta antes de persistir
     if (!aiResult.success || !aiResult.summary) {
-       console.error("[analyze-session-v2] Resposta da IA com formato inválido:", aiResult);
-       throw new Error("A IA não conseguiu gerar um resultado válido para esta sessão.");
+       console.error("[analyze-session-v2] IA retornou sucesso falso ou sem sumário:", aiResult);
+       throw new Error("A IA não conseguiu processar os dados da sessão com clareza.");
     }
-
-    console.log(`[analyze-session-v2] Sucesso! Salvando análise para a sessão ${sessionId}`);
 
     // 8. Salvar/Atualizar resultado no banco de dados
     const { error: upsertError } = await supabase
@@ -143,8 +142,10 @@ serve(async (req) => {
 
     if (upsertError) {
       console.error("[analyze-session-v2] Erro ao salvar análise no Supabase:", upsertError);
-      throw upsertError;
+      throw new Error("Falha ao salvar os resultados da análise no banco de dados.");
     }
+
+    console.log(`[analyze-session-v2] Análise concluída e salva com sucesso para a sessão ${sessionId}`);
 
     return new Response(JSON.stringify({ success: true }), { 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
