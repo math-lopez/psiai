@@ -11,7 +11,9 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  const serviceUrl = Deno.env.get('PROCESSING_SERVICE_URL'); // https://patient-analysis-service-production.up.railway.app/process-patient-analysis
+  
+  // A URL já deve ser: https://patient-analysis-service-production.up.railway.app/process-patient-analysis
+  const serviceUrl = Deno.env.get('PROCESSING_SERVICE_URL'); 
   const serviceToken = Deno.env.get('PROCESSING_SERVICE_INTERNAL_TOKEN');
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -20,7 +22,9 @@ serve(async (req) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) throw new Error('Não autorizado');
 
-    const { patientId } = await req.json();
+    const body = await req.json();
+    const patientId = body.patientId;
+
     if (!patientId) throw new Error('patientId é obrigatório');
 
     // 1. Coletar dados do paciente e sessões
@@ -34,7 +38,7 @@ serve(async (req) => {
 
     if (!patient) throw new Error('Paciente não encontrado');
 
-    // 2. Formatar o payload EXATAMENTE como o serviço espera (camelCase)
+    // 2. Formatar o payload EXATAMENTE como o seu curl espera
     const payload = {
       patientId: patient.id,
       psychologistId: patient.psychologist_id,
@@ -52,11 +56,13 @@ serve(async (req) => {
       }))
     };
 
-    if (!serviceUrl || !serviceToken) throw new Error('Configuração de IA ausente nas variáveis de ambiente');
+    if (!serviceUrl || !serviceToken) {
+      throw new Error('Configuração de URL ou Token de IA ausente nas variáveis de ambiente');
+    }
 
-    console.log(`[analyze-patient-history] Enviando análise para o serviço: ${serviceUrl}`);
+    console.log(`[analyze-patient-history] Enviando JSON para: ${serviceUrl}`);
 
-    // 3. Chamar o serviço externo
+    // 3. Chamar o serviço externo via POST com JSON
     const response = await fetch(serviceUrl, {
       method: 'POST',
       headers: { 
@@ -67,8 +73,9 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const errorMsg = await response.text();
-      throw new Error(`Erro no Serviço de Análise: ${errorMsg}`);
+      const errorData = await response.text();
+      console.error(`[analyze-patient-history] Erro do serviço externo: ${errorData}`);
+      throw new Error(`Serviço de IA retornou erro: ${errorData}`);
     }
 
     const result = await response.json();
@@ -79,7 +86,7 @@ serve(async (req) => {
     });
 
   } catch (err: any) {
-    console.error(`[analyze-patient-history] Erro: ${err.message}`);
+    console.error(`[analyze-patient-history] Erro crítico: ${err.message}`);
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
