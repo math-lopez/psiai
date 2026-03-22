@@ -173,10 +173,10 @@ const SessionFormPage = () => {
       <form className="space-y-6">
         <Card className="rounded-[32px] border-none shadow-sm bg-white overflow-hidden">
           <CardContent className="p-8 space-y-10">
-            {/* 1. Tipo de Atendimento - AGORA NO TOPO */}
+            {/* 1. Tipo de Atendimento e Audio */}
             <div className="space-y-6">
                <div className="flex items-center justify-between">
-                 <Label className="text-xs font-black uppercase text-slate-400 tracking-widest">Tipo de Atendimento</Label>
+                 <Label className="text-xs font-black uppercase text-slate-400 tracking-widest">1. Tipo de Atendimento</Label>
                  {tier === 'free' && (
                    <Badge variant="outline" className="text-[9px] font-black uppercase border-amber-200 text-amber-600 bg-amber-50">Somente Texto no Plano Free</Badge>
                  )}
@@ -261,7 +261,7 @@ const SessionFormPage = () => {
                             <Upload className="h-6 w-6" />
                           </div>
                           <div>
-                            <p className="text-sm font-black text-slate-900">Clique para fazer upload do áudio da sessão</p>
+                            <p className="text-sm font-black text-slate-900">Upload do áudio da sessão</p>
                             <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">MP3, WAV, M4A ou WebM (Máx. 50MB)</p>
                           </div>
                         </div>
@@ -271,10 +271,10 @@ const SessionFormPage = () => {
                )}
             </div>
 
-            {/* 2. Informações Gerais */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t border-slate-50">
+            {/* 2. Paciente, Data e Hora */}
+            <div className="space-y-8 pt-8 border-t border-slate-50">
               <div className="space-y-2 flex flex-col">
-                <Label className="text-xs font-black uppercase text-slate-400 mb-1">Paciente</Label>
+                <Label className="text-xs font-black uppercase text-slate-400 mb-1">2. Paciente</Label>
                 <Popover open={openPatientSelect} onOpenChange={setOpenPatientSelect}>
                   <PopoverTrigger asChild disabled={!!id}>
                     <Button
@@ -322,9 +322,9 @@ const SessionFormPage = () => {
                 </Popover>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase text-slate-400">Data e Hora</Label>
+                  <Label className="text-xs font-black uppercase text-slate-400">3. Data e Hora</Label>
                   <Input 
                     type="datetime-local" 
                     className="rounded-2xl h-12 border-slate-100 bg-slate-50/30"
@@ -333,7 +333,7 @@ const SessionFormPage = () => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase text-slate-400">Duração (min)</Label>
+                  <Label className="text-xs font-black uppercase text-slate-400">4. Duração (minutos)</Label>
                   <Input 
                     type="number" 
                     className="rounded-2xl h-12 border-slate-100 bg-slate-50/30"
@@ -348,7 +348,7 @@ const SessionFormPage = () => {
             <div className="space-y-6 pt-8 border-t border-slate-50">
               <div className="flex items-center gap-2 text-indigo-600 mb-2">
                 <Stethoscope className="h-5 w-5" />
-                <h3 className="font-black text-xs uppercase tracking-widest">Registro Clínico Estruturado</h3>
+                <h3 className="font-black text-xs uppercase tracking-widest">5. Registro Clínico Estruturado</h3>
               </div>
               
               <div className="grid grid-cols-1 gap-6">
@@ -386,7 +386,7 @@ const SessionFormPage = () => {
 
             {/* 4. Rascunho Livre */}
             <div className="space-y-4 pt-8 border-t border-slate-50">
-               <Label className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Rascunho Livre / Notas Gerais</Label>
+               <Label className="text-[11px] font-black uppercase text-slate-400 tracking-wider">6. Rascunho Livre / Notas Gerais</Label>
                <Textarea 
                 placeholder="Anotações livres que não entram necessariamente no prontuário..." 
                 className="min-h-[120px] rounded-2xl resize-none border-slate-100 bg-slate-50/30 focus:bg-white transition-all"
