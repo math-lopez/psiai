@@ -10,7 +10,9 @@ import {
   History, 
   ClipboardCheck,
   Calendar,
-  MessageSquare
+  MessageSquare,
+  CheckCircle2,
+  ChevronDown
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,12 +20,14 @@ import { PatientLogForm } from "@/components/diary/PatientLogForm";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { showError } from "@/utils/toast";
+import { cn } from "@/lib/utils";
 
 const PatientDiaryPage = () => {
   const [logs, setLogs] = useState<PatientLog[]>([]);
   const [prompts, setPrompts] = useState<PatientLogPrompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [context, setContext] = useState<{ patientId: string; psychologistId: string } | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   // Modais
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -58,6 +62,7 @@ const PatientDiaryPage = () => {
   if (loading) return <div className="py-20 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
 
   const activePrompts = prompts.filter(p => p.status === 'active');
+  const completedPrompts = prompts.filter(p => p.status === 'completed');
 
   return (
     <div className="space-y-10">
@@ -71,11 +76,12 @@ const PatientDiaryPage = () => {
         </Button>
       </div>
 
-      {activePrompts.length > 0 && (
+      {(activePrompts.length > 0 || completedPrompts.length > 0) && (
         <section className="space-y-4">
           <h3 className="text-xs font-black uppercase tracking-widest text-amber-600 px-2 flex items-center gap-2">
-            <ClipboardCheck className="h-4 w-4" /> Tarefas Pendentes
+            <ClipboardCheck className="h-4 w-4" /> Tarefas e Propostas
           </h3>
+          
           <div className="grid grid-cols-1 gap-4">
             {activePrompts.map((p) => (
               <Card key={p.id} className="border-none shadow-md rounded-[32px] overflow-hidden bg-amber-50/50 border-amber-100 border">
@@ -93,6 +99,32 @@ const PatientDiaryPage = () => {
                 </CardContent>
               </Card>
             ))}
+
+            {completedPrompts.length > 0 && (
+              <div className="pt-2">
+                <button 
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 p-2 hover:bg-slate-50 rounded-xl transition-all"
+                >
+                  <span>Tarefas Concluídas ({completedPrompts.length})</span>
+                  <ChevronDown className={cn("h-4 w-4 transition-transform", showHistory && "rotate-180")} />
+                </button>
+                
+                {showHistory && (
+                  <div className="mt-3 space-y-3 animate-in slide-in-from-top-1">
+                    {completedPrompts.map(p => (
+                      <div key={p.id} className="p-5 bg-white border border-slate-50 rounded-[24px] flex items-center justify-between gap-4 opacity-70">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-600 truncate">{p.title}</p>
+                          <p className="text-[10px] text-slate-400">Finalizada em {format(new Date(p.updated_at), 'dd/MM/yy')}</p>
+                        </div>
+                        <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </section>
       )}
