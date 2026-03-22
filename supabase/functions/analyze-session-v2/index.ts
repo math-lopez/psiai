@@ -12,7 +12,7 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
-  // Configurações do Supabase e do Serviço de IA (Secrets configurados no seu Vault)
+  // Configurações do Supabase e do Serviço de IA
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
   const serviceUrl = Deno.env.get('PROCESSING_SERVICE_URL');
@@ -21,7 +21,7 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    // 2. Validação de Autenticação Real (JWT)
+    // 2. Validação de Autenticação (JWT)
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       throw new Error('Não autorizado: Cabeçalho de autorização ausente');
@@ -31,7 +31,7 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
     
     if (authError || !user) {
-      throw new Error('Não autorizado: Token inválido ou expirado');
+      throw new Error('Não autorizado: Token inválido');
     }
 
     // 3. Obter ID da sessão
@@ -40,9 +40,7 @@ serve(async (req) => {
       throw new Error('sessionId é obrigatório');
     }
 
-    console.log(`[analyze-session-v2] Iniciando análise real para sessão: ${sessionId} (Solicitado por: ${user.id})`);
-
-    // 4. Buscar dados da sessão e do paciente com validação de Ownership
+    // 4. Buscar dados da sessão e do paciente
     const { data: session, error: sError } = await supabase
       .from('sessions')
       .select('*, patient:patients(id, full_name)')
@@ -50,60 +48,45 @@ serve(async (req) => {
       .single();
 
     if (sError || !session) {
-      throw new Error('Sessão não encontrada no banco de dados');
+      throw new Error('Sessão não encontrada');
     }
 
-    // SEGURANÇA: Validar se o usuário logado é o dono da sessão
+    // Validação de Ownership
     if (session.psychologist_id !== user.id) {
-      console.error(`[analyze-session-v2] BLOQUEIO DE SEGURANÇA: User ${user.id} tentou acessar sessão do Psicólogo ${session.psychologist_id}`);
-      throw new Error('Acesso negado: Você não tem permissão para analisar esta sessão');
+      throw new Error('Acesso negado');
     }
     
-    // 5. Regras de Conteúdo: Validar se existe algo relevante para a IA analisar
-    const hasContent = !!(
-      (session.transcript && session.transcript.trim().length > 15) || 
-      (session.manual_notes && session.manual_notes.trim().length > 15) || 
-      (session.clinical_notes && session.clinical_notes.trim().length > 15) || 
-      (session.interventions && session.interventions.trim().length > 15) || 
-      (session.session_summary_manual && session.session_summary_manual.trim().length > 15) ||
-      (session.highlights && session.highlights.length > 0)
-    );
-
-    if (!hasContent) {
-      throw new Error('Sessão sem conteúdo clínico suficiente para análise profunda. Por favor, adicione notas ou finalize a transcrição.');
-    }
-
-    // 6. Montar Payload estruturado para o serviço Python
+    // 5. Montar Payload EXATAMENTE como o serviço Python espera (sessions como array)
     const payload = {
-      sessionId: session.id,
       patientId: session.patient_id,
       psychologistId: session.psychologist_id,
       patient: {
         id: session.patient?.id,
         name: session.patient?.full_name
       },
-      session: {
-        id: session.id,
-        sessionDate: session.session_date,
-        manualNotes: session.manual_notes,
-        transcript: session.transcript,
-        highlights: Array.isArray(session.highlights) ? session.highlights : [],
-        nextSteps: session.next_steps,
-        clinicalNotes: session.clinical_notes,
-        interventions: session.interventions,
-        sessionSummaryManual: session.session_summary_manual
-      }
+      sessions: [
+        {
+          id: session.id,
+          sessionDate: session.session_date,
+          manualNotes: session.manual_notes,
+          transcript: session.transcript,
+          highlights: Array.isArray(session.highlights) ? session.highlights : [],
+          nextSteps: session.next_steps,
+          clinicalNotes: session.clinical_notes,
+          interventions: session.interventions,
+          sessionSummaryManual: session.session_summary_manual
+        }
+      ]
     };
 
     if (!serviceUrl || !serviceToken) {
-      console.error("[analyze-session-v2] Erro de configuração: PROCESSING_SERVICE_URL ou TOKEN não encontrados.");
-      throw new Error('Serviço de IA não configurado corretamente no servidor.');
+      throw new Error('Configuração do serviço de IA pendente no servidor.');
     }
 
-    // 7. Chamada ao serviço Python real (Railway)
-    console.log(`[analyze-session-v2] Enviando dados para processamento em: ${serviceUrl}/process-session-analysis`);
+    // 6. Chamada ao serviço Python no endpoint correto
+    console.log(`[analyze-session-v2] Enviando análise para o endpoint: ${serviceUrl}/process-patient-analysis`);
 
-    const apiResponse = await fetch(`${serviceUrl}/process-session-analysis`, {
+    const apiResponse = await fetch(`${serviceUrl}/process-patient-analysis`, {
       method: 'POST',
       headers: { 
         'Authorization': `Bearer ${serviceToken}`,
@@ -114,19 +97,17 @@ serve(async (req) => {
 
     if (!apiResponse.ok) {
       const errorText = await apiResponse.text();
-      console.error(`[analyze-session-v2] Serviço Python retornou erro (${apiResponse.status}): ${errorText}`);
-      throw new Error(`O motor de IA encontrou um erro técnico. Tente novamente em alguns instantes.`);
+      console.error(`[analyze-session-v2] Erro no Python (${apiResponse.status}): ${errorText}`);
+      throw new Error(`Serviço de IA retornou erro: ${errorText}`);
     }
 
     const aiResult = await apiResponse.json();
 
-    // Validar formato da resposta recebida da IA
     if (!aiResult.success || !aiResult.summary) {
-       console.error("[analyze-session-v2] Resposta da IA inválida ou incompleta:", aiResult);
-       throw new Error("A IA retornou um resultado processado com falhas.");
+       throw new Error("A IA não retornou um resultado válido.");
     }
 
-    // 8. Persistir os dados reais no banco de dados
+    // 7. Persistir resultado real
     const { error: upsertError } = await supabase
       .from('session_ai_analysis')
       .upsert({
@@ -140,12 +121,7 @@ serve(async (req) => {
         updated_at: new Date().toISOString()
       }, { onConflict: 'session_id' });
 
-    if (upsertError) {
-      console.error("[analyze-session-v2] Erro ao salvar análise no Supabase:", upsertError);
-      throw new Error("Não foi possível salvar os resultados da análise no banco de dados.");
-    }
-
-    console.log(`[analyze-session-v2] Análise profunda concluída com sucesso para a sessão ${sessionId}`);
+    if (upsertError) throw upsertError;
 
     return new Response(JSON.stringify({ success: true }), { 
       status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
