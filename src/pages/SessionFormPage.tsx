@@ -45,6 +45,7 @@ const SessionFormPage = () => {
   
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [existingAudioName, setExistingAudioName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const initialLoad = useRef(true);
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
 
@@ -79,24 +80,16 @@ const SessionFormPage = () => {
     loadData();
   }, [id]);
 
-  // Lógica de Autosave
+  // Autosave simplificado
   useEffect(() => {
-    if (initialLoad.current) {
-      initialLoad.current = false;
-      return;
-    }
-
+    if (initialLoad.current) { initialLoad.current = false; return; }
     if (!id || loading) return;
-
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
-
     setSaving(true);
     saveTimeout.current = setTimeout(async () => {
-      try {
-        await sessionService.update(id, { ...formData, record_type: recordType });
-      } catch (e) { console.error("Erro no autosave:", e); } finally { setSaving(false); }
+      try { await sessionService.update(id, { ...formData, record_type: recordType }); } 
+      catch (e) { console.error(e); } finally { setSaving(false); }
     }, 1500);
-
     return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
   }, [formData, recordType, id, loading]);
 
@@ -136,137 +129,195 @@ const SessionFormPage = () => {
   if (loading) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-indigo-600" /></div>;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-4 pb-10">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}><ChevronLeft className="h-5 w-5" /></Button>
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" className="rounded-xl" onClick={() => navigate(-1)}><ChevronLeft className="h-5 w-5" /></Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">{id ? "Editar Atendimento" : "Novo Atendimento"}</h1>
-            <p className="text-slate-500 text-sm">Registre os detalhes clínicos da sessão.</p>
+            <h1 className="text-xl font-black text-slate-900">{id ? "Editar Sessão" : "Novo Atendimento"}</h1>
+            {saving && <div className="flex items-center gap-2 text-[10px] font-black uppercase text-indigo-400 animate-pulse"><Loader2 className="h-3 w-3 animate-spin" /> Salvando...</div>}
           </div>
         </div>
-        {saving && <div className="flex items-center gap-2 text-[10px] font-black uppercase text-indigo-400 animate-pulse"><Loader2 className="h-3 w-3 animate-spin" /> Salvando...</div>}
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" className="h-10 rounded-xl" onClick={(e) => handleSave(e, false)} disabled={submitting}>Salvar Rascunho</Button>
+          <Button type="button" className="bg-indigo-600 h-10 rounded-xl font-black px-6 shadow-lg shadow-indigo-100" onClick={(e) => handleSave(e, true)} disabled={submitting}>
+            {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <ClipboardCheck className="h-4 w-4 mr-2" />} Finalizar
+          </Button>
+        </div>
       </div>
 
-      <form className="space-y-6">
-        <Card className="rounded-[32px] border-none shadow-sm bg-white overflow-hidden">
-          <CardContent className="p-8 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Coluna Principal: Tipo e Áudio */}
+        <div className="lg:col-span-2 space-y-6">
+          <Card className="rounded-[28px] border-none shadow-sm overflow-hidden bg-white">
+            <CardContent className="p-6 space-y-6">
+              <div className="flex items-center gap-2 text-indigo-600 border-b border-slate-50 pb-3">
+                <Mic className="h-4 w-4" />
+                <h3 className="font-black text-[10px] uppercase tracking-widest">Configuração da Sessão</h3>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <Label className="text-[10px] font-black uppercase text-slate-400">Tipo de Registro</Label>
+                  <RadioGroup value={recordType} onValueChange={(v: any) => setRecordType(v)} className="flex gap-3">
+                    <div className={cn("flex-1 p-3 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-center gap-2", recordType === 'manual' ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-100')}>
+                      <RadioGroupItem value="manual" id="m" className="sr-only" />
+                      <Label htmlFor="m" className="flex items-center gap-2 cursor-pointer text-xs font-bold">
+                        <FileText className="h-4 w-4 text-slate-400" /> Notas
+                      </Label>
+                    </div>
+                    <div className={cn("flex-1 p-3 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-center gap-2", recordType === 'ambos' ? 'border-indigo-600 bg-indigo-50/50' : 'border-slate-100', tier === 'free' && 'opacity-50 grayscale')}>
+                      <RadioGroupItem value="ambos" id="a" disabled={tier === 'free'} className="sr-only" />
+                      <Label htmlFor="a" className="flex items-center gap-2 cursor-pointer text-xs font-bold">
+                        <Mic className="h-4 w-4 text-indigo-500" /> Áudio + Notas
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                <div className="space-y-4">
+                  <Label className="text-[10px] font-black uppercase text-slate-400">Arquivo de Áudio</Label>
+                  {recordType === 'manual' ? (
+                    <div className="h-12 flex items-center justify-center bg-slate-50 rounded-2xl border border-dashed text-[10px] font-bold text-slate-400 uppercase">
+                      Áudio desativado para este tipo
+                    </div>
+                  ) : (
+                    <div className="relative group">
+                      <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        className="hidden" 
+                        accept="audio/*"
+                        onChange={handleFileChange}
+                      />
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        className={cn("w-full h-12 rounded-2xl border-dashed gap-2 text-xs font-bold", (audioFile || existingAudioName) && "border-indigo-300 bg-indigo-50 text-indigo-700")}
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        {audioFile ? (
+                          <><CheckCircle2 className="h-4 w-4 text-emerald-500" /> {audioFile.name.substring(0, 20)}...</>
+                        ) : existingAudioName ? (
+                          <><Music className="h-4 w-4" /> {existingAudioName}</>
+                        ) : (
+                          <><Upload className="h-4 w-4" /> Selecionar Áudio</>
+                        )}
+                      </Button>
+                      {(audioFile || existingAudioName) && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setAudioFile(null); setExistingAudioName(null); }}
+                          className="absolute -top-2 -right-2 h-6 w-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[28px] border-none shadow-sm overflow-hidden bg-white">
+            <CardContent className="p-6 space-y-6">
+              <div className="flex items-center gap-2 text-indigo-600 border-b border-slate-50 pb-3">
+                <Stethoscope className="h-4 w-4" />
+                <h3 className="font-black text-[10px] uppercase tracking-widest">Atendimento Clínico</h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-600">Notas de Evolução e Sintomas</Label>
+                  <Textarea 
+                    placeholder="Evolução, sintomas, queixas..." 
+                    className="min-h-[140px] rounded-2xl resize-none bg-slate-50/30 border-slate-100"
+                    value={formData.clinical_notes}
+                    onChange={(e) => setFormData({...formData, clinical_notes: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-600">Intervenções Realizadas</Label>
+                  <Textarea 
+                    placeholder="Técnicas e manejo aplicado..." 
+                    className="min-h-[140px] rounded-2xl resize-none bg-slate-50/30 border-slate-100"
+                    value={formData.interventions}
+                    onChange={(e) => setFormData({...formData, interventions: e.target.value})}
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <Label className="text-xs font-black uppercase text-slate-400">Paciente</Label>
+                <Label className="text-xs font-bold text-slate-600">Resumo do Atendimento (Visão Consolidada)</Label>
+                <Textarea 
+                  placeholder="Resuma os pontos principais..." 
+                  className="min-h-[80px] rounded-2xl resize-none bg-slate-50/30 border-slate-100"
+                  value={formData.session_summary_manual}
+                  onChange={(e) => setFormData({...formData, session_summary_manual: e.target.value})}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-600">Anotações Livres / Rascunho</Label>
+                <Textarea 
+                  placeholder="Rascunho livre..." 
+                  className="min-h-[100px] rounded-2xl resize-none bg-white border-slate-100"
+                  value={formData.manual_notes}
+                  onChange={(e) => setFormData({...formData, manual_notes: e.target.value})}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar: Dados do Paciente */}
+        <div className="space-y-6">
+          <Card className="rounded-[28px] border-none shadow-sm overflow-hidden bg-white">
+            <CardHeader className="bg-slate-50/50 pb-4">
+              <CardTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Informações Gerais</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 space-y-4">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-600">Paciente</Label>
                 <Select required value={formData.patient_id} onValueChange={(v) => setFormData({...formData, patient_id: v})} disabled={!!id}>
-                  <SelectTrigger className="rounded-2xl h-12">
-                    <SelectValue placeholder="Selecione o paciente" />
+                  <SelectTrigger className="rounded-xl h-10">
+                    <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
                     {patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase text-slate-400">Data e Hora</Label>
-                  <Input 
-                    type="datetime-local" 
-                    className="rounded-2xl h-12"
-                    value={formData.session_date}
-                    onChange={(e) => setFormData({...formData, session_date: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase text-slate-400">Duração (min)</Label>
-                  <Input 
-                    type="number" 
-                    className="rounded-2xl h-12"
-                    value={formData.duration_minutes}
-                    onChange={(e) => setFormData({...formData, duration_minutes: parseInt(e.target.value)})}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-600">Data e Hora</Label>
+                <Input 
+                  type="datetime-local" 
+                  className="rounded-xl h-10"
+                  value={formData.session_date}
+                  onChange={(e) => setFormData({...formData, session_date: e.target.value})}
+                />
               </div>
-            </div>
-
-            <div className="space-y-6 pt-6 border-t border-slate-50">
-              <div className="flex items-center gap-2 text-indigo-600 mb-2">
-                <Stethoscope className="h-5 w-5" />
-                <h3 className="font-black text-sm uppercase tracking-widest">Registro Clínico</h3>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold text-slate-600">Duração (minutos)</Label>
+                <Input 
+                  type="number" 
+                  className="rounded-xl h-10"
+                  value={formData.duration_minutes}
+                  onChange={(e) => setFormData({...formData, duration_minutes: parseInt(e.target.value)})}
+                />
               </div>
-              
-              <div className="grid grid-cols-1 gap-6">
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-700">Notas Clínicas (Observações de evolução, sintomas, queixas)</Label>
-                  <Textarea 
-                    placeholder="Quais foram as principais observações clínicas hoje?" 
-                    className="min-h-[120px] rounded-2xl resize-none border-slate-100 bg-slate-50/30"
-                    value={formData.clinical_notes}
-                    onChange={(e) => setFormData({...formData, clinical_notes: e.target.value})}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-700">Intervenções Terapêuticas (Técnicas aplicadas, manejo clínico)</Label>
-                  <Textarea 
-                    placeholder="Quais intervenções foram realizadas nesta sessão?" 
-                    className="min-h-[100px] rounded-2xl resize-none border-slate-100 bg-slate-50/30"
-                    value={formData.interventions}
-                    onChange={(e) => setFormData({...formData, interventions: e.target.value})}
-                  />
-                </div>
+            </CardContent>
+          </Card>
 
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-700">Resumo da Sessão (Visão consolidada do atendimento)</Label>
-                  <Textarea 
-                    placeholder="Resuma os pontos principais do atendimento..." 
-                    className="min-h-[100px] rounded-2xl resize-none border-slate-100 bg-slate-50/30"
-                    value={formData.session_summary_manual}
-                    onChange={(e) => setFormData({...formData, session_summary_manual: e.target.value})}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-4 pt-6 border-t border-slate-50">
-               <Label className="text-xs font-black uppercase text-slate-400">Anotações Livres</Label>
-               <Textarea 
-                placeholder="Rascunho livre e anotações gerais..." 
-                className="min-h-[150px] rounded-2xl resize-none border-slate-100"
-                value={formData.manual_notes}
-                onChange={(e) => setFormData({...formData, manual_notes: e.target.value})}
-              />
-            </div>
-
-            <div className="space-y-6 pt-6 border-t border-slate-50">
-               <Label className="text-xs font-black uppercase text-slate-400">Registro de Áudio</Label>
-               <RadioGroup value={recordType} onValueChange={(v: any) => setRecordType(v)} className="flex flex-col md:flex-row gap-4">
-                  <div className={cn("flex-1 p-4 rounded-2xl border-2 transition-all cursor-pointer", recordType === 'manual' ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-50')}>
-                    <RadioGroupItem value="manual" id="m" className="sr-only" />
-                    <Label htmlFor="m" className="flex items-center gap-3 cursor-pointer">
-                      <FileText className="h-5 w-5 text-slate-400" />
-                      <div className="text-sm font-bold">Apenas Notas</div>
-                    </Label>
-                  </div>
-                  <div className={cn("flex-1 p-4 rounded-2xl border-2 transition-all cursor-pointer", recordType === 'ambos' ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-50', tier === 'free' && 'opacity-50 grayscale')}>
-                    <RadioGroupItem value="ambos" id="a" disabled={tier === 'free'} className="sr-only" />
-                    <Label htmlFor="a" className="flex items-center gap-3 cursor-pointer">
-                      <Mic className="h-5 w-5 text-indigo-500" />
-                      <div className="text-sm font-bold">Áudio + Notas</div>
-                    </Label>
-                  </div>
-               </RadioGroup>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="flex flex-col md:flex-row justify-end gap-3">
-          <Button type="button" variant="outline" className="rounded-2xl h-12 px-8" onClick={() => navigate(-1)} disabled={submitting}>Cancelar</Button>
-          <Button type="button" variant="secondary" className="rounded-2xl h-12 px-8 font-bold" disabled={submitting} onClick={(e) => handleSave(e, false)}>
-            {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4 mr-2" />} Salvar Rascunho
-          </Button>
-          <Button type="button" className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-12 px-10 font-black shadow-lg shadow-indigo-100" disabled={submitting} onClick={(e) => handleSave(e, true)}>
-            {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <ClipboardCheck className="h-4 w-4 mr-2" />} Finalizar Sessão
-          </Button>
+          <div className="p-6 rounded-[28px] bg-indigo-600 text-white shadow-xl shadow-indigo-100 space-y-4">
+             <div className="flex items-center gap-2">
+               <Sparkles className="h-5 w-5" />
+               <h4 className="font-black text-xs uppercase tracking-widest">Dica PsiAI</h4>
+             </div>
+             <p className="text-xs leading-relaxed opacity-90 font-medium">Ao finalizar a sessão com áudio, nossa inteligência processará automaticamente os insights, destaques e próximos passos para você.</p>
+          </div>
         </div>
-      </form>
+      </div>
     </div>
   );
 };
