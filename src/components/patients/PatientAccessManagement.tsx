@@ -88,7 +88,7 @@ export const PatientAccessManagement = ({ patientId, patientEmail }: { patientId
               <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Status do Link</p>
               <div className="flex items-center gap-2">
                 <div className="flex-1 bg-white border border-indigo-100 rounded-xl px-4 py-2 text-xs font-mono text-indigo-600 truncate">
-                  {currentStatus === 'active' ? 'Conta já ativada' : access?.invite_token ? `${window.location.origin}/portal/ativar...` : 'Gerando...'}
+                  {currentStatus === 'active' ? 'Conta já ativada' : access?.invite_token ? `${window.location.origin}/portal/ativar?token=${access.invite_token}` : 'Gerando...'}
                 </div>
                 {currentStatus === 'invited' && access?.invite_token && (
                   <Button variant="secondary" size="icon" className="bg-white rounded-xl" onClick={copyInviteLink}>

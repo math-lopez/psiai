@@ -17,6 +17,7 @@ export const accessService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
+    // Gerar um token simples para o convite
     const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 
     const { data, error } = await supabase
