@@ -14,7 +14,8 @@ import {
   Edit,
   Eye,
   EyeOff,
-  Paperclip
+  Paperclip,
+  BookOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -33,7 +34,7 @@ interface LogItemProps {
   onDelete: (id: string) => void;
 }
 
-const logTypeConfig: Record<LogType, { label: string; icon: any; color: string; bg: string }> = {
+const logTypeConfig: Record<string, { label: string; icon: any; color: string; bg: string }> = {
   weekly_journal: { label: 'Diário da Semana', icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50' },
   emotional_record: { label: 'Registro Emocional', icon: Smile, color: 'text-pink-600', bg: 'bg-pink-50' },
   thought_record: { label: 'Registro de Pensamentos', icon: FileText, color: 'text-indigo-600', bg: 'bg-indigo-50' },
@@ -41,9 +42,13 @@ const logTypeConfig: Record<LogType, { label: string; icon: any; color: string; 
   free_entry: { label: 'Anotação Livre', icon: User, color: 'text-slate-600', bg: 'bg-slate-100' },
 };
 
+const defaultConfig = { label: 'Registro', icon: BookOpen, color: 'text-indigo-600', bg: 'bg-indigo-50' };
+
 export const LogItem = ({ log, onEdit, onDelete }: LogItemProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const config = logTypeConfig[log.log_type];
+  
+  // Fallback seguro caso o tipo não exista no mapa
+  const config = logTypeConfig[log.log_type] || defaultConfig;
   const Icon = config.icon;
 
   return (
