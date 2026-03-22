@@ -14,14 +14,16 @@ export const accessService = {
   },
 
   createInvite: async (patientId: string): Promise<PatientAccess> => {
-    // Gerar um token aleatório para o convite
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado");
+
     const inviteToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     
-    // UPSERT: Se já existir um registro, atualiza para 'invited'. Se não, cria.
     const { data, error } = await supabase
       .from('patient_access')
       .upsert({
         patient_id: patientId,
+        psychologist_id: user.id, // Agora gravamos o psicólogo aqui para segurança e performance
         status: 'invited',
         invite_token: inviteToken,
         invited_at: new Date().toISOString(),
