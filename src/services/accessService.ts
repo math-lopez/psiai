@@ -1,0 +1,57 @@
+import { supabase } from "@/integrations/supabase/client";
+import { PatientAccess, AccessStatus } from "@/types/access";
+
+export const accessService = {
+  getAccessByPatientId: async (patientId: string): Promise<PatientAccess | null> => {
+    const { data, error } = await supabase
+      .from('patient_access')
+      .select('*')
+      .eq('patient_id', patientId)
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  createInvite: async (patientId: string): Promise<PatientAccess> => {
+    // Gerar um token aleatório para o convite
+    const inviteToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    
+    // UPSERT: Se já existir um registro, atualiza para 'invited'. Se não, cria.
+    const { data, error } = await supabase
+      .from('patient_access')
+      .upsert({
+        patient_id: patientId,
+        status: 'invited',
+        invite_token: inviteToken,
+        invited_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'patient_id' })
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  updateStatus: async (patientId: string, status: AccessStatus): Promise<void> => {
+    const { error } = await supabase
+      .from('patient_access')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('patient_id', patientId);
+    
+    if (error) throw error;
+  },
+
+  revokeAccess: async (patientId: string): Promise<void> => {
+    const { error } = await supabase
+      .from('patient_access')
+      .update({ 
+        status: 'suspended', 
+        updated_at: new Date().toISOString() 
+      })
+      .eq('patient_id', patientId);
+    
+    if (error) throw error;
+  }
+};
