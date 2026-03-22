@@ -6,7 +6,7 @@ import { Patient, Session } from "@/types";
 import { 
   FileText, Download, ShieldCheck, ClipboardList, Stethoscope, 
   History, Zap, Sparkles, ChevronDown, ChevronUp, ExternalLink,
-  Clock, MessageSquare
+  Clock, MessageSquare, Calendar
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
