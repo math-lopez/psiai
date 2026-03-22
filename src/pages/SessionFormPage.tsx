@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2, Lock, Sparkles, Stethoscope, ClipboardCheck, Info } from "lucide-react";
+import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2, Lock, Sparkles, Stethoscope, ClipboardCheck, Info, FileAudio } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,7 @@ import { cn, getLocalDateTime } from "@/lib/utils";
 const SessionFormPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -114,6 +115,12 @@ const SessionFormPage = () => {
     setExistingAudioName(null);
   };
 
+  const removeFile = () => {
+    setAudioFile(null);
+    setExistingAudioName(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSave = async (e: React.FormEvent, shouldFinish: boolean = false) => {
     e.preventDefault();
     if (!formData.patient_id) { showError("Selecione um paciente."); return; }
@@ -135,14 +142,16 @@ const SessionFormPage = () => {
 
   if (loading) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-indigo-600" /></div>;
 
+  const showAudioUpload = recordType === 'audio' || recordType === 'ambos';
+
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}><ChevronLeft className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-2xl"><ChevronLeft className="h-5 w-5" /></Button>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">{id ? "Editar Atendimento" : "Novo Atendimento"}</h1>
-            <p className="text-slate-500 text-sm">Registre os detalhes clínicos da sessão.</p>
+            <h1 className="text-2xl font-black text-slate-900">{id ? "Editar Atendimento" : "Novo Atendimento"}</h1>
+            <p className="text-slate-500 text-sm font-medium">Registre os detalhes clínicos da sessão.</p>
           </div>
         </div>
         {saving && <div className="flex items-center gap-2 text-[10px] font-black uppercase text-indigo-400 animate-pulse"><Loader2 className="h-3 w-3 animate-spin" /> Salvando...</div>}
@@ -155,10 +164,10 @@ const SessionFormPage = () => {
               <div className="space-y-2">
                 <Label className="text-xs font-black uppercase text-slate-400">Paciente</Label>
                 <Select required value={formData.patient_id} onValueChange={(v) => setFormData({...formData, patient_id: v})} disabled={!!id}>
-                  <SelectTrigger className="rounded-2xl h-12">
+                  <SelectTrigger className="rounded-2xl h-12 border-slate-100 bg-slate-50/30">
                     <SelectValue placeholder="Selecione o paciente" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-2xl">
                     {patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -169,7 +178,7 @@ const SessionFormPage = () => {
                   <Label className="text-xs font-black uppercase text-slate-400">Data e Hora</Label>
                   <Input 
                     type="datetime-local" 
-                    className="rounded-2xl h-12"
+                    className="rounded-2xl h-12 border-slate-100 bg-slate-50/30"
                     value={formData.session_date}
                     onChange={(e) => setFormData({...formData, session_date: e.target.value})}
                   />
@@ -178,7 +187,7 @@ const SessionFormPage = () => {
                   <Label className="text-xs font-black uppercase text-slate-400">Duração (min)</Label>
                   <Input 
                     type="number" 
-                    className="rounded-2xl h-12"
+                    className="rounded-2xl h-12 border-slate-100 bg-slate-50/30"
                     value={formData.duration_minutes}
                     onChange={(e) => setFormData({...formData, duration_minutes: parseInt(e.target.value)})}
                   />
@@ -189,35 +198,35 @@ const SessionFormPage = () => {
             <div className="space-y-6 pt-6 border-t border-slate-50">
               <div className="flex items-center gap-2 text-indigo-600 mb-2">
                 <Stethoscope className="h-5 w-5" />
-                <h3 className="font-black text-sm uppercase tracking-widest">Registro Clínico</h3>
+                <h3 className="font-black text-xs uppercase tracking-widest">Registro Clínico Estruturado</h3>
               </div>
               
               <div className="grid grid-cols-1 gap-6">
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-700">Notas Clínicas (Observações de evolução, sintomas, queixas)</Label>
+                  <Label className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Notas de Evolução e Sintomas</Label>
                   <Textarea 
                     placeholder="Quais foram as principais observações clínicas hoje?" 
-                    className="min-h-[120px] rounded-2xl resize-none border-slate-100 bg-slate-50/30"
+                    className="min-h-[120px] rounded-2xl resize-none border-slate-100 bg-slate-50/30 focus:bg-white transition-all"
                     value={formData.clinical_notes}
                     onChange={(e) => setFormData({...formData, clinical_notes: e.target.value})}
                   />
                 </div>
                 
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-700">Intervenções Terapêuticas (Técnicas aplicadas, manejo clínico)</Label>
+                  <Label className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Intervenções Terapêuticas</Label>
                   <Textarea 
                     placeholder="Quais intervenções foram realizadas nesta sessão?" 
-                    className="min-h-[100px] rounded-2xl resize-none border-slate-100 bg-slate-50/30"
+                    className="min-h-[100px] rounded-2xl resize-none border-slate-100 bg-slate-50/30 focus:bg-white transition-all"
                     value={formData.interventions}
                     onChange={(e) => setFormData({...formData, interventions: e.target.value})}
                   />
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold text-slate-700">Resumo da Sessão (Visão consolidada do atendimento)</Label>
+                  <Label className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Resumo Consolidado</Label>
                   <Textarea 
-                    placeholder="Resuma os pontos principais do atendimento..." 
-                    className="min-h-[100px] rounded-2xl resize-none border-slate-100 bg-slate-50/30"
+                    placeholder="Resuma os pontos principais do atendimento para o prontuário..." 
+                    className="min-h-[100px] rounded-2xl resize-none border-slate-100 bg-slate-50/30 focus:bg-white transition-all"
                     value={formData.session_summary_manual}
                     onChange={(e) => setFormData({...formData, session_summary_manual: e.target.value})}
                   />
@@ -226,45 +235,133 @@ const SessionFormPage = () => {
             </div>
 
             <div className="space-y-4 pt-6 border-t border-slate-50">
-               <Label className="text-xs font-black uppercase text-slate-400">Anotações Livres</Label>
+               <Label className="text-[11px] font-black uppercase text-slate-400 tracking-wider">Rascunho Livre / Notas Gerais</Label>
                <Textarea 
-                placeholder="Rascunho livre e anotações gerais..." 
-                className="min-h-[150px] rounded-2xl resize-none border-slate-100"
+                placeholder="Anotações livres que não entram necessariamente no prontuário..." 
+                className="min-h-[120px] rounded-2xl resize-none border-slate-100 bg-slate-50/30 focus:bg-white transition-all"
                 value={formData.manual_notes}
                 onChange={(e) => setFormData({...formData, manual_notes: e.target.value})}
               />
             </div>
 
-            <div className="space-y-6 pt-6 border-t border-slate-50">
-               <Label className="text-xs font-black uppercase text-slate-400">Registro de Áudio</Label>
-               <RadioGroup value={recordType} onValueChange={(v: any) => setRecordType(v)} className="flex flex-col md:flex-row gap-4">
-                  <div className={cn("flex-1 p-4 rounded-2xl border-2 transition-all cursor-pointer", recordType === 'manual' ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-50')}>
+            <div className="space-y-8 pt-8 border-t border-slate-50">
+               <div className="flex items-center justify-between">
+                 <Label className="text-xs font-black uppercase text-slate-400 tracking-widest">Tipo de Atendimento</Label>
+                 {tier === 'free' && (
+                   <Badge variant="outline" className="text-[9px] font-black uppercase border-amber-200 text-amber-600 bg-amber-50">Somente Texto no Plano Free</Badge>
+                 )}
+               </div>
+
+               <RadioGroup value={recordType} onValueChange={(v: any) => setRecordType(v)} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className={cn(
+                    "relative flex items-center justify-between p-6 rounded-[24px] border-2 transition-all cursor-pointer", 
+                    recordType === 'manual' ? 'border-indigo-600 bg-indigo-50/20' : 'border-slate-50 bg-white hover:border-slate-200'
+                  )}>
                     <RadioGroupItem value="manual" id="m" className="sr-only" />
-                    <Label htmlFor="m" className="flex items-center gap-3 cursor-pointer">
-                      <FileText className="h-5 w-5 text-slate-400" />
-                      <div className="text-sm font-bold">Apenas Notas</div>
+                    <Label htmlFor="m" className="flex items-center gap-4 cursor-pointer w-full">
+                      <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center", recordType === 'manual' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500')}>
+                        <FileText className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-900">Apenas Notas</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Sem processamento de áudio</p>
+                      </div>
                     </Label>
+                    {recordType === 'manual' && <CheckCircle2 className="h-5 w-5 text-indigo-600 absolute top-4 right-4" />}
                   </div>
-                  <div className={cn("flex-1 p-4 rounded-2xl border-2 transition-all cursor-pointer", recordType === 'ambos' ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-50', tier === 'free' && 'opacity-50 grayscale')}>
+
+                  <div className={cn(
+                    "relative flex items-center justify-between p-6 rounded-[24px] border-2 transition-all cursor-pointer", 
+                    recordType === 'ambos' ? 'border-indigo-600 bg-indigo-50/20' : 'border-slate-50 bg-white hover:border-slate-200',
+                    tier === 'free' && 'opacity-50 cursor-not-allowed'
+                  )}>
                     <RadioGroupItem value="ambos" id="a" disabled={tier === 'free'} className="sr-only" />
-                    <Label htmlFor="a" className="flex items-center gap-3 cursor-pointer">
-                      <Mic className="h-5 w-5 text-indigo-500" />
-                      <div className="text-sm font-bold">Áudio + Notas</div>
+                    <Label htmlFor="a" className="flex items-center gap-4 cursor-pointer w-full">
+                      <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center", recordType === 'ambos' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500')}>
+                        <Mic className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-900">Áudio + Notas</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase">Transcrição por IA inclusa</p>
+                      </div>
                     </Label>
+                    {recordType === 'ambos' && <CheckCircle2 className="h-5 w-5 text-indigo-600 absolute top-4 right-4" />}
                   </div>
                </RadioGroup>
+
+               {showAudioUpload && (
+                 <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <Label className="text-[11px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2">
+                      <Music className="h-4 w-4" /> Upload do Áudio da Sessão
+                    </Label>
+                    
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className={cn(
+                        "border-2 border-dashed rounded-[32px] p-10 flex flex-col items-center justify-center gap-4 transition-all cursor-pointer",
+                        audioFile || existingAudioName ? "bg-indigo-50 border-indigo-200" : "bg-slate-50/50 border-slate-100 hover:border-indigo-300 hover:bg-white"
+                      )}
+                    >
+                      <Input 
+                        type="file" 
+                        ref={fileInputRef}
+                        className="hidden" 
+                        accept="audio/*" 
+                        onChange={handleFileChange} 
+                      />
+                      
+                      {audioFile || existingAudioName ? (
+                        <div className="flex flex-col items-center text-center space-y-3">
+                          <div className="h-16 w-16 bg-indigo-600 text-white rounded-3xl flex items-center justify-center shadow-lg shadow-indigo-200">
+                            <FileAudio className="h-8 w-8" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-black text-slate-900">{audioFile?.name || existingAudioName}</p>
+                            <p className="text-[10px] font-bold text-indigo-500 uppercase">Arquivo pronto para processamento</p>
+                          </div>
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={(e) => { e.stopPropagation(); removeFile(); }}
+                            className="text-red-500 hover:text-red-600 hover:bg-red-50 font-bold"
+                          >
+                            <X className="h-4 w-4 mr-2" /> Remover e trocar arquivo
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center text-center space-y-4">
+                          <div className="h-16 w-16 bg-white border-2 border-slate-100 text-slate-300 rounded-3xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Upload className="h-8 w-8" />
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-sm font-black text-slate-900">Selecione o arquivo de áudio</p>
+                            <p className="text-xs text-slate-400 font-medium">MP3, WAV, M4A ou WebM (Máx. 50MB)</p>
+                          </div>
+                          <Button type="button" variant="secondary" className="rounded-2xl px-8 h-10 font-black text-xs uppercase tracking-widest bg-white border border-slate-100 shadow-sm">
+                            Escolher Arquivo
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                 </div>
+               )}
             </div>
           </CardContent>
         </Card>
 
-        <div className="flex flex-col md:flex-row justify-end gap-3">
-          <Button type="button" variant="outline" className="rounded-2xl h-12 px-8" onClick={() => navigate(-1)} disabled={submitting}>Cancelar</Button>
-          <Button type="button" variant="secondary" className="rounded-2xl h-12 px-8 font-bold" disabled={submitting} onClick={(e) => handleSave(e, false)}>
-            {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4 mr-2" />} Salvar Rascunho
-          </Button>
-          <Button type="button" className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-12 px-10 font-black shadow-lg shadow-indigo-100" disabled={submitting} onClick={(e) => handleSave(e, true)}>
-            {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <ClipboardCheck className="h-4 w-4 mr-2" />} Finalizar Sessão
-          </Button>
+        <div className="flex flex-col md:flex-row justify-end gap-4 pb-10">
+          <Button type="button" variant="ghost" className="rounded-2xl h-14 px-8 font-bold text-slate-400 hover:text-slate-600" onClick={() => navigate(-1)} disabled={submitting}>Cancelar</Button>
+          
+          <div className="flex gap-4">
+            <Button type="button" variant="outline" className="flex-1 md:flex-none rounded-2xl h-14 px-8 font-black border-slate-200 bg-white shadow-sm hover:bg-slate-50 gap-2" disabled={submitting} onClick={(e) => handleSave(e, false)}>
+              {submitting ? <Loader2 className="animate-spin h-5 w-5" /> : <Save className="h-5 w-5" />} Salvar Rascunho
+            </Button>
+            
+            <Button type="button" className="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-14 px-10 font-black shadow-xl shadow-indigo-600/20 gap-2" disabled={submitting} onClick={(e) => handleSave(e, true)}>
+              {submitting ? <Loader2 className="animate-spin h-5 w-5" /> : <ClipboardCheck className="h-5 w-5" />} Finalizar Atendimento
+            </Button>
+          </div>
         </div>
       </form>
     </div>
