@@ -19,14 +19,16 @@ import Settings from "./pages/Settings";
 import Subscription from "./pages/Subscription";
 import NotFound from "./pages/NotFound";
 
+// Rotas do Paciente (v81)
+import PatientDashboard from "./pages/PatientDashboard";
+import PatientDiary from "./pages/PatientDiary";
+
 const queryClient = new QueryClient();
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { session, loading } = useAuth();
-  
-  if (loading) return <div className="h-screen w-screen flex items-center justify-center">Carregando...</div>;
+  if (loading) return <div className="h-screen w-screen flex items-center justify-center font-black text-indigo-600 animate-pulse">PsiAI...</div>;
   if (!session) return <Navigate to="/login" replace />;
-  
   return <>{children}</>;
 };
 
@@ -41,6 +43,7 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              {/* Rotas do Psicólogo */}
               <Route path="/" element={<Dashboard />} />
               <Route path="/pacientes" element={<Patients />} />
               <Route path="/pacientes/novo" element={<PatientFormPage />} />
@@ -52,6 +55,10 @@ const App = () => (
               <Route path="/sessoes/:id" element={<SessionDetail />} />
               <Route path="/configuracoes" element={<Settings />} />
               <Route path="/assinatura" element={<Subscription />} />
+
+              {/* Rotas do Portal do Paciente (v81) */}
+              <Route path="/meu-painel" element={<PatientDashboard />} />
+              <Route path="/meu-diario" element={<PatientDiary />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
