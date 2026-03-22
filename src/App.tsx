@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ThemeProvider } from "next-themes";
 import { Analytics } from "@vercel/analytics/react";
 
 import Login from "./pages/Login";
@@ -34,39 +35,41 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner position="top-right" closeButton />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            
-            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-              {/* Rotas do Psicólogo */}
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/pacientes" element={<Patients />} />
-              <Route path="/pacientes/novo" element={<PatientFormPage />} />
-              <Route path="/pacientes/editar/:id" element={<PatientFormPage />} />
-              <Route path="/pacientes/:id" element={<PatientDetailPage />} />
-              <Route path="/sessoes" element={<Sessions />} />
-              <Route path="/sessoes/nova" element={<SessionFormPage />} />
-              <Route path="/sessoes/editar/:id" element={<SessionFormPage />} />
-              <Route path="/sessoes/:id" element={<SessionDetail />} />
-              <Route path="/configuracoes" element={<Settings />} />
-              <Route path="/assinatura" element={<Subscription />} />
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+      <AuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner position="top-right" closeButton />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              
+              <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+                {/* Rotas do Psicólogo */}
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/pacientes" element={<Patients />} />
+                <Route path="/pacientes/novo" element={<PatientFormPage />} />
+                <Route path="/pacientes/editar/:id" element={<PatientFormPage />} />
+                <Route path="/pacientes/:id" element={<PatientDetailPage />} />
+                <Route path="/sessoes" element={<Sessions />} />
+                <Route path="/sessoes/nova" element={<SessionFormPage />} />
+                <Route path="/sessoes/editar/:id" element={<SessionFormPage />} />
+                <Route path="/sessoes/:id" element={<SessionDetail />} />
+                <Route path="/configuracoes" element={<Settings />} />
+                <Route path="/assinatura" element={<Subscription />} />
 
-              {/* Rotas do Portal do Paciente (v81) */}
-              <Route path="/meu-painel" element={<PatientDashboard />} />
-              <Route path="/meu-diario" element={<PatientDiary />} />
-            </Route>
+                {/* Rotas do Portal do Paciente (v81) */}
+                <Route path="/meu-painel" element={<PatientDashboard />} />
+                <Route path="/meu-diario" element={<PatientDiary />} />
+              </Route>
 
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-        <Analytics />
-      </TooltipProvider>
-    </AuthProvider>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+          <Analytics />
+        </TooltipProvider>
+      </AuthProvider>
+    </ThemeProvider>
   </QueryClientProvider>
 );
 

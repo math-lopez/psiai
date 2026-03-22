@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Users, Calendar, Clock, CheckCircle2, Plus, ArrowRight, Loader2, Sparkles, TrendingUp } from "lucide-react";
+import { Users, Calendar, Clock, CheckCircle2, Plus, ArrowRight, Loader2, Sparkles, TrendingUp, ChevronRight } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { sessionService } from "@/services/sessionService";
@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
 
 const StatCard = ({ title, value, icon: Icon, colorClass, bgClass }: any) => (
-  <Card className="overflow-hidden border-none shadow-sm hover:shadow-xl transition-all duration-500 group bg-white">
+  <Card className="overflow-hidden border-none shadow-sm hover:shadow-xl transition-all duration-500 group bg-white dark:bg-slate-900">
     <CardContent className="p-0">
       <div className="flex items-stretch h-32">
         <div className={cn("w-2", bgClass)} />
@@ -26,7 +26,7 @@ const StatCard = ({ title, value, icon: Icon, colorClass, bgClass }: any) => (
               <Icon className="h-4 w-4" />
             </div>
           </div>
-          <div className="text-4xl font-black text-slate-900 tracking-tighter">{value}</div>
+          <div className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter">{value}</div>
         </div>
       </div>
     </CardContent>
@@ -78,14 +78,14 @@ const Dashboard = () => {
     <div className="space-y-10 pb-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div>
-          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Painel de Controle</h1>
+          <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight">Painel de Controle</h1>
           <p className="text-slate-500 mt-1 font-semibold flex items-center gap-2">
             <Calendar className="h-4 w-4 text-indigo-500" /> {format(new Date(), "eeee, dd 'de' MMMM", { locale: ptBR })}
           </p>
         </div>
         <div className="flex flex-wrap gap-4">
           <Link to="/pacientes/novo">
-            <Button variant="outline" className="gap-2 rounded-[20px] h-14 px-8 border-slate-200 bg-white hover:bg-slate-50 font-bold transition-all shadow-sm">
+            <Button variant="outline" className="gap-2 rounded-[20px] h-14 px-8 border-slate-200 bg-white dark:bg-slate-900 hover:bg-slate-50 font-bold transition-all shadow-sm">
               <Plus className="h-4 w-4" /> Novo Paciente
             </Button>
           </Link>
@@ -105,12 +105,12 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-        <Card className="lg:col-span-2 border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
+        <Card className="lg:col-span-2 border-none shadow-sm rounded-[32px] overflow-hidden bg-white dark:bg-slate-900">
           <CardHeader className="p-8 pb-2">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-xl font-black text-slate-900 flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-indigo-50">
+                <CardTitle className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/20">
                     <TrendingUp className="h-5 w-5 text-indigo-600" />
                   </div>
                   Atividade da Clínica
@@ -124,9 +124,9 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
-          <CardHeader className="flex flex-row items-center justify-between p-8 pb-6 border-b border-slate-50">
-            <CardTitle className="text-xl font-black text-slate-900">Novos Pacientes</CardTitle>
+        <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white dark:bg-slate-900">
+          <CardHeader className="flex flex-row items-center justify-between p-8 pb-6 border-b border-slate-50 dark:border-slate-800">
+            <CardTitle className="text-xl font-black text-slate-900 dark:text-white">Novos Pacientes</CardTitle>
             <Link to="/pacientes" className="text-xs font-black text-indigo-600 uppercase tracking-widest hover:text-indigo-700 transition-colors flex items-center gap-2 group">
               Todos <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Link>
@@ -134,13 +134,13 @@ const Dashboard = () => {
           <CardContent className="p-6">
             <div className="space-y-4">
               {patients.length > 0 ? patients.slice(0, 4).map((patient) => (
-                <div key={patient.id} className="flex items-center justify-between p-4 rounded-3xl border border-transparent hover:border-slate-100 hover:bg-slate-50 transition-all group cursor-pointer">
+                <div key={patient.id} className="flex items-center justify-between p-4 rounded-3xl border border-transparent hover:border-slate-100 dark:hover:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all group cursor-pointer">
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-[18px] bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center font-black text-slate-600 group-hover:from-indigo-500 group-hover:to-indigo-600 group-hover:text-white transition-all duration-500">
+                    <div className="h-12 w-12 rounded-[18px] bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center font-black text-slate-600 dark:text-slate-400 group-hover:from-indigo-500 group-hover:to-indigo-600 group-hover:text-white transition-all duration-500">
                       {patient.full_name?.charAt(0) || "P"}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-bold text-slate-900 leading-tight mb-1 truncate">{patient.full_name}</p>
+                      <p className="font-bold text-slate-900 dark:text-white leading-tight mb-1 truncate">{patient.full_name}</p>
                       <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate">{patient.email}</p>
                     </div>
                   </div>
@@ -148,7 +148,7 @@ const Dashboard = () => {
                 </div>
               )) : (
                 <div className="text-center py-10">
-                   <Users className="h-12 w-12 text-slate-100 mx-auto mb-3" />
+                   <Users className="h-12 w-12 text-slate-100 dark:text-slate-800 mx-auto mb-3" />
                    <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Nenhum paciente cadastrado</p>
                 </div>
               )}
@@ -157,9 +157,9 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
-        <CardHeader className="flex flex-row items-center justify-between p-8 pb-6 border-b border-slate-50">
-          <CardTitle className="text-xl font-black text-slate-900">Sessões Recentes</CardTitle>
+      <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white dark:bg-slate-900">
+        <CardHeader className="flex flex-row items-center justify-between p-8 pb-6 border-b border-slate-50 dark:border-slate-800">
+          <CardTitle className="text-xl font-black text-slate-900 dark:text-white">Sessões Recentes</CardTitle>
           <Link to="/sessoes" className="text-xs font-black text-indigo-600 uppercase tracking-widest hover:text-indigo-700 transition-colors flex items-center gap-2 group">
             Histórico Completo <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </Link>
@@ -167,14 +167,14 @@ const Dashboard = () => {
         <CardContent className="p-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {sessions.length > 0 ? sessions.slice(0, 3).map((session) => (
-              <div key={session.id} className="p-6 rounded-[28px] border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/20 transition-all group bg-white shadow-sm">
+              <div key={session.id} className="p-6 rounded-[28px] border border-slate-100 dark:border-slate-800 hover:border-indigo-100 dark:hover:border-indigo-900 hover:bg-indigo-50/20 dark:hover:bg-indigo-900/10 transition-all group bg-white dark:bg-slate-900 shadow-sm">
                 <div className="flex items-start justify-between mb-6">
                   <div className="flex items-center gap-4">
-                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center font-black text-indigo-600 group-hover:scale-110 transition-all duration-500">
+                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 flex items-center justify-center font-black text-indigo-600 group-hover:scale-110 transition-all duration-500">
                       {session.patient?.full_name?.charAt(0) || "P"}
                     </div>
                     <div>
-                      <p className="font-bold text-slate-900 leading-tight mb-1">{session.patient?.full_name}</p>
+                      <p className="font-bold text-slate-900 dark:text-white leading-tight mb-1">{session.patient?.full_name}</p>
                       <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest">
                         {format(new Date(session.session_date), "dd 'de' MMM", { locale: ptBR })} • {format(new Date(session.session_date), "HH:mm", { locale: ptBR })}
                       </p>
@@ -188,7 +188,7 @@ const Dashboard = () => {
                    </div>
                    <div className={cn(
                     "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest",
-                    session.processing_status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                    session.processing_status === 'completed' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
                   )}>
                     {session.processing_status}
                   </div>
@@ -196,7 +196,7 @@ const Dashboard = () => {
               </div>
             )) : (
               <div className="col-span-full text-center py-10">
-                 <Calendar className="h-12 w-12 text-slate-100 mx-auto mb-3" />
+                 <Calendar className="h-12 w-12 text-slate-100 dark:text-slate-800 mx-auto mb-3" />
                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Nenhuma sessão encontrada</p>
               </div>
             )}
