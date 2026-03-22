@@ -14,7 +14,8 @@ import {
   Edit,
   Eye,
   EyeOff,
-  Paperclip
+  Paperclip,
+  HelpCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -33,17 +34,20 @@ interface LogItemProps {
   onDelete: (id: string) => void;
 }
 
-const logTypeConfig: Record<LogType, { label: string; icon: any; color: string; bg: string }> = {
+const logTypeConfig: Record<string, { label: string; icon: any; color: string; bg: string }> = {
   weekly_journal: { label: 'Diário da Semana', icon: Calendar, color: 'text-blue-600', bg: 'bg-blue-50' },
   emotional_record: { label: 'Registro Emocional', icon: Smile, color: 'text-pink-600', bg: 'bg-pink-50' },
   thought_record: { label: 'Registro de Pensamentos', icon: FileText, color: 'text-indigo-600', bg: 'bg-indigo-50' },
   homework: { label: 'Tarefa Terapêutica', icon: Paperclip, color: 'text-amber-600', bg: 'bg-amber-50' },
   free_entry: { label: 'Anotação Livre', icon: User, color: 'text-slate-600', bg: 'bg-slate-100' },
+  unknown: { label: 'Registro', icon: HelpCircle, color: 'text-slate-400', bg: 'bg-slate-50' },
 };
 
 export const LogItem = ({ log, onEdit, onDelete }: LogItemProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const config = logTypeConfig[log.log_type];
+  
+  // Fallback seguro caso o tipo vindo do banco não esteja mapeado
+  const config = logTypeConfig[log.log_type] || logTypeConfig.unknown;
   const Icon = config.icon;
 
   return (
@@ -57,7 +61,7 @@ export const LogItem = ({ log, onEdit, onDelete }: LogItemProps) => {
             <h4 className="font-bold text-slate-900 leading-none mb-1">{log.title || config.label}</h4>
             <div className="flex items-center gap-3">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                {format(new Date(log.created_at), "dd 'de' MMM, yyyy", { locale: ptBR })}
+                {log.created_at ? format(new Date(log.created_at), "dd 'de' MMM, yyyy", { locale: ptBR }) : '-'}
               </span>
               <span className="h-1 w-1 rounded-full bg-slate-200" />
               <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
@@ -104,7 +108,7 @@ export const LogItem = ({ log, onEdit, onDelete }: LogItemProps) => {
           {log.content}
         </p>
         
-        {log.content.length > 200 && (
+        {log.content && log.content.length > 200 && (
           <Button 
             variant="link" 
             className="p-0 h-auto text-[10px] font-black uppercase text-indigo-500 mt-2"
