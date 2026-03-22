@@ -1,3 +1,5 @@
+"use client";
+
 export type SessionStatus = 'draft' | 'queued' | 'processing' | 'completed' | 'error';
 export type SessionRecordType = 'manual' | 'audio' | 'ambos';
 export type PatientStatus = 'ativo' | 'inativo';
