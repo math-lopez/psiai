@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { Session } from "@/types";
 import { 
   Clock, CheckCircle2, AlertCircle, FileText, 
-  Mic, Sparkles, ChevronDown, ChevronUp, History, Info, Stethoscope, ClipboardList
+  Mic, Sparkles, ChevronDown, ChevronUp, History, Info, Stethoscope, ClipboardList, ArrowUpRight
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -44,7 +45,7 @@ const TimelineItem = ({ session }: { session: Session }) => {
       <div className="space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <p className="text-sm font-black text-slate-900">
+            <p className="text-sm font-black text-slate-900 dark:text-white">
               {format(new Date(session.session_date), "dd 'de' MMMM, yyyy 'às' HH:mm", { locale: ptBR })}
             </p>
             <div className="flex items-center gap-3">
@@ -54,33 +55,44 @@ const TimelineItem = ({ session }: { session: Session }) => {
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{session.duration_minutes} min</span>
             </div>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={() => setExpanded(!expanded)}
-            className="rounded-xl gap-2 font-black text-[10px] uppercase tracking-wider text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
-          >
-            {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            {expanded ? "Recolher Detalhes" : "Ver Registro Clínico"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link to={`/sessoes/${session.id}`}>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="rounded-xl gap-2 font-black text-[10px] uppercase tracking-wider text-indigo-600 hover:bg-indigo-50"
+              >
+                Detalhes <ArrowUpRight className="h-3 w-3" />
+              </Button>
+            </Link>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setExpanded(!expanded)}
+              className="rounded-xl gap-2 font-black text-[10px] uppercase tracking-wider text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
+            >
+              {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              {expanded ? "Recolher" : "Registro Clínico"}
+            </Button>
+          </div>
         </div>
 
         <div className={cn(
-          "bg-white border border-slate-100 rounded-[32px] p-8 transition-all duration-300",
-          expanded ? "shadow-xl border-indigo-100 ring-1 ring-indigo-50" : "shadow-sm hover:border-slate-200"
+          "bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-[32px] p-8 transition-all duration-300",
+          expanded ? "shadow-xl border-indigo-100 dark:border-indigo-900/30 ring-1 ring-indigo-50 dark:ring-indigo-900/10" : "shadow-sm hover:border-slate-200 dark:hover:border-slate-700"
         )}>
           {!expanded ? (
             <div className="space-y-4">
               <div className="flex items-start gap-3">
                 <ClipboardList className="h-4 w-4 text-indigo-300 mt-0.5 shrink-0" />
-                <p className="text-sm text-slate-600 italic line-clamp-2 leading-relaxed">
+                <p className="text-sm text-slate-600 dark:text-slate-400 italic line-clamp-2 leading-relaxed">
                   {summaryPreview}
                 </p>
               </div>
               {session.highlights && session.highlights.length > 0 && (
                 <div className="flex flex-wrap gap-2 pt-2">
                   {session.highlights.slice(0, 3).map((h, i) => (
-                    <span key={i} className="px-2.5 py-1 bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase rounded-lg tracking-wider">
+                    <span key={i} className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 text-[9px] font-black uppercase rounded-lg tracking-wider">
                       {h}
                     </span>
                   ))}
@@ -94,7 +106,7 @@ const TimelineItem = ({ session }: { session: Session }) => {
                   <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2">
                     <ClipboardList className="h-3.5 w-3.5" /> Resumo do Atendimento
                   </h4>
-                  <p className="text-sm text-slate-700 leading-relaxed italic">
+                  <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed italic">
                     {session.session_summary_manual || "Não preenchido."}
                   </p>
                 </div>
@@ -103,28 +115,28 @@ const TimelineItem = ({ session }: { session: Session }) => {
                   <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2">
                     <Stethoscope className="h-3.5 w-3.5" /> Intervenções
                   </h4>
-                  <p className="text-sm text-slate-700 leading-relaxed">
+                  <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
                     {session.interventions || "Não preenchido."}
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-8 bg-slate-50/50 p-6 rounded-3xl">
+              <div className="space-y-8 bg-slate-50/50 dark:bg-slate-800/50 p-6 rounded-3xl">
                 <div className="space-y-3">
                   <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
                     <FileText className="h-3.5 w-3.5" /> Notas de Evolução
                   </h4>
-                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
+                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed whitespace-pre-wrap">
                     {session.clinical_notes || "Sem notas clínicas registradas."}
                   </p>
                 </div>
 
                 {session.next_steps && (
-                  <div className="space-y-2 pt-4 border-t border-slate-100">
+                  <div className="space-y-2 pt-4 border-t border-slate-100 dark:border-slate-800">
                     <h4 className="text-[10px] font-black uppercase text-amber-600 tracking-widest flex items-center gap-2">
                       <Sparkles className="h-3.5 w-3.5" /> Próximos Passos (IA)
                     </h4>
-                    <p className="text-xs text-slate-700 font-medium">{session.next_steps}</p>
+                    <p className="text-xs text-slate-700 dark:text-slate-300 font-medium">{session.next_steps}</p>
                   </div>
                 )}
               </div>
@@ -139,9 +151,9 @@ const TimelineItem = ({ session }: { session: Session }) => {
 export const SessionTimeline = ({ sessions }: SessionTimelineProps) => {
   if (!sessions || sessions.length === 0) {
     return (
-      <div className="text-center py-20 bg-white rounded-[32px] shadow-sm">
-        <History className="h-12 w-12 text-slate-100 mx-auto mb-4" />
-        <h3 className="text-slate-900 font-bold">Inicie o acompanhamento</h3>
+      <div className="text-center py-20 bg-white dark:bg-slate-900 rounded-[32px] shadow-sm">
+        <History className="h-12 w-12 text-slate-100 dark:text-slate-800 mx-auto mb-4" />
+        <h3 className="text-slate-900 dark:text-white font-bold">Inicie o acompanhamento</h3>
         <p className="text-slate-400 text-sm mt-1">Nenhuma sessão registrada para este paciente.</p>
       </div>
     );
@@ -154,8 +166,8 @@ export const SessionTimeline = ({ sessions }: SessionTimelineProps) => {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-3 mb-10 px-2">
-        <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase text-xs tracking-widest">Timeline Clínico-Terapêutica</h3>
-        <Badge variant="outline" className="border-slate-200 text-slate-400 font-black text-[10px]">
+        <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tight uppercase text-xs tracking-widest">Timeline Clínico-Terapêutica</h3>
+        <Badge variant="outline" className="border-slate-200 dark:border-slate-800 text-slate-400 font-black text-[10px]">
           {sessions.length} ATENDIMENTOS
         </Badge>
       </div>

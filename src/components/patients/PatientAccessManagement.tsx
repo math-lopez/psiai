@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { accessService } from "@/services/accessService";
 import { PatientAccess } from "@/types/access";
 import { 
-  ShieldCheck, UserPlus, UserMinus, Clock, ExternalLink, Loader2, AlertCircle, Copy, CheckCircle2, Lock
+  ShieldCheck, UserPlus, UserMinus, Clock, ExternalLink, Loader2, AlertCircle, Copy, CheckCircle2, Lock, Trash2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -38,6 +38,16 @@ export const PatientAccessManagement = ({ patientId, patientEmail }: { patientId
     } catch (e) { showError("Erro ao gerar convite."); } finally { setSubmitting(false); }
   };
 
+  const handleRevoke = async () => {
+    if (!confirm("Tem certeza que deseja remover o acesso deste paciente ao portal?")) return;
+    setSubmitting(true);
+    try {
+      await accessService.revokeAccess(patientId);
+      showSuccess("Acesso removido com sucesso.");
+      fetchAccess();
+    } catch (e) { showError("Erro ao remover acesso."); } finally { setSubmitting(false); }
+  };
+
   const copyInviteLink = () => {
     if (!access?.invite_token) return;
     const link = `${window.location.origin}/portal/ativar?token=${access.invite_token}`;
@@ -52,27 +62,34 @@ export const PatientAccessManagement = ({ patientId, patientEmail }: { patientId
   const currentStatus = access?.status || 'inactive';
 
   return (
-    <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white mt-6">
-      <div className={cn("h-1.5 w-full", currentStatus === 'active' ? 'bg-emerald-500' : currentStatus === 'invited' ? 'bg-amber-500' : 'bg-slate-200')} />
+    <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white dark:bg-slate-900 mt-6">
+      <div className={cn("h-1.5 w-full", (currentStatus === 'active' || currentStatus === 'invited') ? 'bg-indigo-500' : 'bg-slate-200 dark:bg-slate-800')} />
       <CardHeader className="p-8 pb-4">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-xl font-black text-slate-900 flex items-center gap-2">
+          <CardTitle className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-indigo-500" /> Acesso ao Portal do Paciente
           </CardTitle>
-          <Badge className={cn("px-3 py-1 border-none text-[10px] font-black uppercase tracking-widest", 
-            currentStatus === 'active' ? 'bg-emerald-100 text-emerald-700' : 
-            currentStatus === 'invited' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
-          )}>
-            {currentStatus === 'active' ? 'Ativo' : currentStatus === 'invited' ? 'Pendente' : 'Sem Acesso'}
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Badge className={cn("px-3 py-1 border-none text-[10px] font-black uppercase tracking-widest", 
+              currentStatus === 'active' ? 'bg-emerald-100 text-emerald-700' : 
+              currentStatus === 'invited' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
+            )}>
+              {currentStatus === 'active' ? 'Ativo' : currentStatus === 'invited' ? 'Pendente' : 'Sem Acesso'}
+            </Badge>
+            {(currentStatus === 'active' || currentStatus === 'invited') && (
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:bg-red-50 rounded-xl" onClick={handleRevoke} disabled={submitting}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
         <CardDescription className="mt-2 font-medium">Controle o que o paciente pode visualizar e registrar no portal dele.</CardDescription>
       </CardHeader>
       <CardContent className="p-8">
-        {currentStatus === 'inactive' ? (
-          <div className="bg-slate-50 rounded-3xl p-8 text-center border border-dashed border-slate-200">
-            <UserPlus className="h-10 w-10 text-slate-300 mx-auto mb-4" />
-            <h4 className="font-bold mb-2">Habilitar Portal</h4>
+        {currentStatus === 'inactive' || currentStatus === 'suspended' ? (
+          <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-8 text-center border border-dashed border-slate-200 dark:border-slate-800">
+            <UserPlus className="h-10 w-10 text-slate-300 dark:text-slate-700 mx-auto mb-4" />
+            <h4 className="font-bold mb-2 dark:text-white">Habilitar Portal</h4>
             <p className="text-sm text-slate-500 mb-6">O paciente receberá um convite para o e-mail {patientEmail}.</p>
             <Button onClick={handleInvite} disabled={submitting} className="bg-indigo-600 rounded-2xl h-12 px-8 font-black">
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Gerar Convite"}
@@ -80,18 +97,18 @@ export const PatientAccessManagement = ({ patientId, patientEmail }: { patientId
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 space-y-2">
+            <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 space-y-2">
               <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Atividade</p>
-              <p className="text-sm font-bold">Último acesso: <span className="text-slate-500 font-medium">{access?.last_access_at ? format(new Date(access.last_access_at), "dd/MM/yyyy", { locale: ptBR }) : 'Nunca'}</span></p>
+              <p className="text-sm font-bold dark:text-white">Último acesso: <span className="text-slate-500 font-medium">{access?.last_access_at ? format(new Date(access.last_access_at), "dd/MM/yyyy", { locale: ptBR }) : 'Nunca'}</span></p>
             </div>
-            <div className="p-6 rounded-3xl bg-indigo-50 border border-indigo-100 space-y-3">
-              <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Status do Link</p>
+            <div className="p-6 rounded-3xl bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-900/30 space-y-3">
+              <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest">Link de Ativação</p>
               <div className="flex items-center gap-2">
-                <div className="flex-1 bg-white border border-indigo-100 rounded-xl px-4 py-2 text-xs font-mono text-indigo-600 truncate">
+                <div className="flex-1 bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/30 rounded-xl px-4 py-2 text-xs font-mono text-indigo-600 dark:text-indigo-400 truncate">
                   {currentStatus === 'active' ? 'Conta já ativada' : access?.invite_token ? `${window.location.origin}/portal/ativar?token=${access.invite_token}` : 'Gerando...'}
                 </div>
                 {currentStatus === 'invited' && access?.invite_token && (
-                  <Button variant="secondary" size="icon" className="bg-white rounded-xl" onClick={copyInviteLink}>
+                  <Button variant="secondary" size="icon" className="bg-white dark:bg-slate-900 rounded-xl" onClick={copyInviteLink}>
                     {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                 )}

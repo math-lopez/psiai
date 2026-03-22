@@ -2,7 +2,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { PatientLog, PatientLogPrompt } from "@/types/diary";
 
 export const diaryService = {
-  // Helpers de Contexto do Paciente
   getPatientContext: async (): Promise<{ patientId: string; psychologistId: string } | null> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
@@ -18,7 +17,6 @@ export const diaryService = {
     return { patientId: data.patient_id, psychologistId: data.psychologist_id };
   },
 
-  // Logs
   listLogs: async (patientId: string): Promise<PatientLog[]> => {
     const { data, error } = await supabase
       .from('patient_logs')
@@ -34,7 +32,6 @@ export const diaryService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    // Se created_by não vier no log, assumimos que é o psicólogo
     const entry = {
       ...log,
       psychologist_id: log.psychologist_id || user.id,
@@ -51,6 +48,18 @@ export const diaryService = {
     return data;
   },
 
+  updateLog: async (id: string, log: Partial<PatientLog>): Promise<PatientLog> => {
+    const { data, error } = await supabase
+      .from('patient_logs')
+      .update(log)
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    return data;
+  },
+
   deleteLog: async (id: string): Promise<void> => {
     const { error } = await supabase
       .from('patient_logs')
@@ -60,7 +69,6 @@ export const diaryService = {
     if (error) throw error;
   },
 
-  // Prompts
   listPrompts: async (patientId: string): Promise<PatientLogPrompt[]> => {
     const { data, error } = await supabase
       .from('patient_log_prompts')
