@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams, Link, useLocation } from "react-router-dom";
-import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2, Lock, Sparkles, Check, ChevronsUpDown, Search, ClipboardList, Zap, Quote, CloudCheck } from "lucide-react";
+import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2, Lock, Sparkles, Check, ChevronsUpDown, Search, ClipboardList, Zap, Quote, Cloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -163,7 +163,12 @@ const SessionFormPage = () => {
             "flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase transition-all duration-500",
             isAutosaving ? "bg-indigo-50 text-indigo-600 animate-pulse" : "bg-emerald-50 text-emerald-600"
           )}>
-            {isAutosaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <CloudCheck className="h-3 w-3" />}
+            {isAutosaving ? <Loader2 className="h-3 w-3 animate-spin" /> : (
+              <div className="flex items-center -space-x-1">
+                <Cloud className="h-3 w-3" />
+                <Check className="h-2 w-2" />
+              </div>
+            )}
             {isAutosaving ? "Salvando alterações..." : "Sincronizado na nuvem"}
           </div>
         )}
