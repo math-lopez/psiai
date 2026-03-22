@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "./components/layout/AppLayout";
+import { PatientPortalLayout } from "./components/layout/PatientPortalLayout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Analytics } from "@vercel/analytics/react";
 
@@ -18,6 +19,10 @@ import SessionDetail from "./pages/SessionDetail";
 import Settings from "./pages/Settings";
 import Subscription from "./pages/Subscription";
 import NotFound from "./pages/NotFound";
+
+// Portal do Paciente
+import ActivateAccount from "./pages/portal/ActivateAccount";
+import PortalDashboard from "./pages/portal/PortalDashboard";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +45,10 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<Login />} />
             
+            {/* Rota de Ativação (Pública com Token) */}
+            <Route path="/portal/ativar" element={<ActivateAccount />} />
+            
+            {/* Área do Psicólogo */}
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/pacientes" element={<Patients />} />
@@ -52,6 +61,13 @@ const App = () => (
               <Route path="/sessoes/:id" element={<SessionDetail />} />
               <Route path="/configuracoes" element={<Settings />} />
               <Route path="/assinatura" element={<Subscription />} />
+            </Route>
+
+            {/* Área do Paciente (Portal) */}
+            <Route element={<ProtectedRoute><PatientPortalLayout /></ProtectedRoute>}>
+              <Route path="/portal" element={<PortalDashboard />} />
+              {/* Reaproveitaremos o DiaryModule no portal na próxima fase */}
+              <Route path="/portal/diario" element={<div className="p-10 text-center font-bold">Módulo de Diário em breve no Portal.</div>} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
