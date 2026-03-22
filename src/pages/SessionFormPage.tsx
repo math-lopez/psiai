@@ -18,7 +18,7 @@ import { patientService } from "@/services/patientService";
 import { sessionService } from "@/services/sessionService";
 import { Patient, SessionRecordType } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
-import { validateAudioFile } from "@/file-utils";
+import { validateAudioFile } from "@/lib/file-utils";
 import { supabase } from "@/integrations/supabase/client";
 import { SubscriptionTier } from "@/config/plans";
 import { getLocalDateTime } from "@/lib/utils";
