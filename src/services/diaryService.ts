@@ -47,9 +47,15 @@ export const diaryService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
+    // Injeta o psychologist_id se ele não estiver presente (caso do psicólogo criando log)
+    const logData = {
+      ...log,
+      psychologist_id: log.psychologist_id || user.id
+    };
+
     const { data, error } = await supabase
       .from('patient_logs')
-      .insert([log])
+      .insert([logData])
       .select()
       .single();
     
