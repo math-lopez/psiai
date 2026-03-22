@@ -9,10 +9,10 @@ import { Loader2 } from "lucide-react";
 const Index = () => {
   const { session, loading: authLoading } = useAuth();
   const navigate = useNavigate();
-  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     const checkRoleAndRedirect = async () => {
+      // Espera o AuthContext carregar a sessão
       if (authLoading) return;
 
       if (!session) {
@@ -21,26 +21,23 @@ const Index = () => {
       }
 
       try {
-        // Verifica se o usuário logado existe na tabela de acesso de pacientes
-        const { data: patientAccess, error } = await supabase
+        // Verifica explicitamente se o usuário logado é um paciente
+        const { data: patientAccess } = await supabase
           .from('patient_access')
           .select('id')
           .eq('user_id', session.user.id)
           .maybeSingle();
 
         if (patientAccess) {
-          // É um paciente, manda para o portal
+          console.log("[Index] Usuário identificado como Paciente. Redirecionando para /portal");
           navigate("/portal", { replace: true });
         } else {
-          // Não é paciente (ou é psicólogo), manda para o dashboard clínico
-          // Nota: No futuro podemos verificar explicitamente a tabela de perfis também
+          console.log("[Index] Usuário identificado como Psicólogo. Redirecionando para /dashboard");
           navigate("/dashboard", { replace: true });
         }
       } catch (err) {
-        console.error("Erro ao redirecionar usuário:", err);
+        console.error("[Index] Erro no redirecionamento:", err);
         navigate("/login", { replace: true });
-      } finally {
-        setChecking(false);
       }
     };
 
@@ -51,7 +48,7 @@ const Index = () => {
     <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
       <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
       <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest">
-        Preparando seu espaço seguro...
+        Organizando seu consultório digital...
       </p>
     </div>
   );
