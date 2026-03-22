@@ -17,10 +17,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 const PortalDashboard = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [prompts, setPrompts] = useState<any[]>([]);
   const [sharedLogs, setSharedLogs] = useState<any[]>([]);
@@ -91,7 +92,10 @@ const PortalDashboard = () => {
                   <h4 className="text-lg font-bold text-slate-900 leading-tight">{p.title}</h4>
                   <p className="text-xs text-slate-500 mt-2 line-clamp-2">{p.description}</p>
                 </div>
-                <Button className="w-full bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-11 font-black gap-2 mt-2">
+                <Button 
+                  onClick={() => navigate("/portal/diario")}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-11 font-black gap-2 mt-2"
+                >
                   Responder <ArrowRight className="h-4 w-4" />
                 </Button>
               </CardContent>
@@ -108,7 +112,7 @@ const PortalDashboard = () => {
       {/* Conteúdos Compartilhados */}
       <section className="space-y-6">
         <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 px-2 flex items-center gap-2">
-          <Sparkles className="h-4 w-4" /> Compartilhado com Você
+          <index className="h-4 w-4" /> Compartilhado com Você
         </h3>
         <div className="space-y-4">
           {sharedLogs.length > 0 ? sharedLogs.map((log) => (

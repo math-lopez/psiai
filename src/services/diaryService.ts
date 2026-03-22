@@ -2,6 +2,20 @@ import { supabase } from "@/integrations/supabase/client";
 import { PatientLog, PatientLogPrompt, LogType, PromptStatus } from "@/types/diary";
 
 export const diaryService = {
+  // Helper para o portal do paciente
+  getMyPatientId: async (): Promise<string | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data } = await supabase
+      .from('patient_access')
+      .select('patient_id')
+      .eq('user_id', user.id)
+      .single();
+    
+    return data?.patient_id || null;
+  },
+
   // Logs / Registros
   listLogs: async (patientId: string): Promise<PatientLog[]> => {
     const { data, error } = await supabase
@@ -20,7 +34,7 @@ export const diaryService = {
 
     const { data, error } = await supabase
       .from('patient_logs')
-      .insert([{ ...log, psychologist_id: user.id }])
+      .insert([{ ...log, psychologist_id: log.psychologist_id || null }])
       .select()
       .single();
     

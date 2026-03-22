@@ -24,6 +24,7 @@ import NotFound from "./pages/NotFound";
 // Portal do Paciente
 import ActivateAccount from "./pages/portal/ActivateAccount";
 import PortalDashboard from "./pages/portal/PortalDashboard";
+import PatientDiaryPage from "./pages/portal/PatientDiaryPage";
 
 const queryClient = new QueryClient();
 
@@ -69,7 +70,7 @@ const App = () => (
             {/* Área do Paciente (Portal) */}
             <Route element={<ProtectedRoute><PatientPortalLayout /></ProtectedRoute>}>
               <Route path="/portal" element={<PortalDashboard />} />
-              <Route path="/portal/diario" element={<div className="p-10 text-center font-bold">Módulo de Diário em breve no Portal.</div>} />
+              <Route path="/portal/diario" element={<PatientDiaryPage />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
