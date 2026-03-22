@@ -69,11 +69,11 @@ export const LogItem = ({ log, onEdit, onDelete }: LogItemProps) => {
 
         <div className="flex items-center gap-2">
           {log.visibility === 'private_to_psychologist' ? (
-            <div className="p-1.5 bg-slate-50 rounded-lg text-slate-400" title="Privado para o psicólogo">
+            <div className="p-1.5 bg-slate-50 rounded-lg text-slate-400" title="Privado: Apenas o psicólogo vê">
               <EyeOff className="h-3.5 w-3.5" />
             </div>
           ) : (
-            <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-500" title="Compartilhado com o paciente">
+            <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-500" title="Compartilhado: Visível para o paciente no futuro portal">
               <Eye className="h-3.5 w-3.5" />
             </div>
           )}

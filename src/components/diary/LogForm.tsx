@@ -21,7 +21,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Loader2, BookOpen, Smile, Eye, EyeOff } from "lucide-react";
+import { Loader2, BookOpen, Smile, Eye, EyeOff, Info } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { cn } from "@/lib/utils";
 
@@ -189,7 +189,7 @@ export const LogForm = ({ isOpen, onClose, onSuccess, patientId, editingLog }: L
               <div>
                 <p className="text-xs font-bold text-slate-900">Visibilidade</p>
                 <p className="text-[10px] text-slate-500">
-                  {formData.visibility === 'shared_with_patient' ? 'O paciente poderá ler este registro futuramente.' : 'Apenas você tem acesso a este conteúdo.'}
+                  {formData.visibility === 'shared_with_patient' ? 'Preparado para visualização no módulo do paciente (Beta).' : 'Apenas você tem acesso a este conteúdo.'}
                 </p>
               </div>
             </div>
@@ -203,6 +203,13 @@ export const LogForm = ({ isOpen, onClose, onSuccess, patientId, editingLog }: L
               </SelectContent>
             </Select>
           </div>
+
+          {formData.visibility === 'shared_with_patient' && (
+            <div className="flex items-center gap-2 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 text-indigo-700">
+              <Info className="h-3.5 w-3.5 shrink-0" />
+              <p className="text-[10px] font-bold">Nota: O paciente ainda não possui login. Este campo define quem verá o dado quando o portal for liberado.</p>
+            </div>
+          )}
 
           <DialogFooter>
             <Button 
