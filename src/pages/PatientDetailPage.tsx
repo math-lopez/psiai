@@ -1,11 +1,22 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { 
-  ChevronLeft, Edit, Plus, Calendar, Mail, Phone, CalendarDays, Loader2, Trash2, AlertTriangle, Tabs, TabsContent, TabsList, TabsTrigger, ShieldCheck, FileText
+  ChevronLeft, Edit, Plus, Calendar, Mail, Phone, CalendarDays, Loader2, Trash2, AlertTriangle, ShieldCheck, FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogTrigger 
+} from "@/components/ui/alert-dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { patientService } from "@/services/patientService";
 import { sessionService } from "@/services/sessionService";
 import { Patient, Session } from "@/types";
@@ -65,8 +76,12 @@ const PatientDetailPage = () => {
 
       <Tabs defaultValue="overview" className="space-y-6">
         <TabsList className="bg-white p-1 rounded-2xl border border-slate-100 h-14 w-fit">
-          <TabsTrigger value="overview" className="rounded-xl px-6 font-bold gap-2"><FileText className="h-4 w-4" /> Prontuário</TabsTrigger>
-          <TabsTrigger value="access" className="rounded-xl px-6 font-bold gap-2"><ShieldCheck className="h-4 w-4" /> Portal do Paciente</TabsTrigger>
+          <TabsTrigger value="overview" className="rounded-xl px-6 font-bold gap-2 focus-visible:ring-0 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+            <FileText className="h-4 w-4" /> Prontuário
+          </TabsTrigger>
+          <TabsTrigger value="access" className="rounded-xl px-6 font-bold gap-2 focus-visible:ring-0 data-[state=active]:bg-indigo-600 data-[state=active]:text-white">
+            <ShieldCheck className="h-4 w-4" /> Portal do Paciente
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
