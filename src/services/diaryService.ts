@@ -7,18 +7,21 @@ export const diaryService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    // Buscamos o vínculo e já trazemos o ID do psicólogo via join (requer RLS liberado na tabela patients)
+    // Buscamos o vínculo diretamente (usando o novo campo psychologist_id que criamos para evitar loops)
     const { data, error } = await supabase
       .from('patient_access')
-      .select('patient_id, patients(psychologist_id)')
+      .select('patient_id, psychologist_id')
       .eq('user_id', user.id)
       .maybeSingle();
     
-    if (error || !data || !data.patients) return null;
+    if (error || !data) {
+      console.error("Erro ao buscar contexto do paciente:", error);
+      return null;
+    }
 
     return {
       patientId: data.patient_id,
-      psychologistId: (data.patients as any).psychologist_id
+      psychologistId: data.psychologist_id
     };
   },
 
