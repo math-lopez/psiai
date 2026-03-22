@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%; /* Um off-white levemente azulado para profundidade */
+    --background: 222 47% 97%; /* Um azul-cinza bem suave para o fundo */
     --foreground: 222.2 84% 4.9%;
 
     --card: 0 0% 100%;
@@ -13,26 +13,26 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 226 70% 55%;
+    --primary: 230 75% 58%; /* Indigo mais vibrante */
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
+    --secondary: 210 40% 93%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 226 70% 96%;
-    --accent-foreground: 226 70% 40%;
+    --accent: 230 75% 96%;
+    --accent-foreground: 230 75% 45%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
+    --border: 214.3 31.8% 90%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 226 70% 55%;
+    --ring: 230 75% 58%;
 
-    --radius: 1.25rem;
+    --radius: 1.5rem; /* Bordas mais arredondadas e amigáveis */
   }
 }
 
@@ -41,17 +41,14 @@
     @apply border-border;
   }
   body {
-    @apply bg-[#F1F5F9] text-foreground antialiased;
+    @apply bg-background text-foreground antialiased;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
 
-.glass-card {
-  @apply bg-white/80 backdrop-blur-md border border-white/40 shadow-sm;
-}
-
-.card-shadow {
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.04), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+/* Efeito de elevação suave para cards */
+.card-premium {
+  @apply bg-white border border-slate-200/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition-all duration-300;
 }
 
 .page-transition {
@@ -61,7 +58,7 @@
 @keyframes slide-up {
   from {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -69,13 +66,13 @@
   }
 }
 
-/* Custom scrollbar */
+/* Scrollbar personalizada mais discreta */
 ::-webkit-scrollbar {
-  width: 5px;
+  width: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  @apply bg-transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-300 rounded-full hover:bg-indigo-300 transition-colors;
+  @apply bg-slate-300 rounded-full hover:bg-indigo-400 transition-colors;
 }

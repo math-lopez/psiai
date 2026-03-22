@@ -14,17 +14,21 @@ import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
 
-const StatCard = ({ title, value, icon: Icon, gradient }: any) => (
-  <Card className="overflow-hidden border-none shadow-sm hover:shadow-md transition-all duration-300">
-    <div className={cn("h-1.5 w-full", gradient)} />
-    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-      <CardTitle className="text-[10px] font-black uppercase tracking-widest text-slate-400">{title}</CardTitle>
-      <div className={cn("p-2 rounded-xl bg-opacity-10", gradient.replace('bg-gradient-to-r', 'text-').replace('from-', '').replace('to-', ''))}>
-        <Icon className="h-4 w-4" />
+const StatCard = ({ title, value, icon: Icon, colorClass, bgClass }: any) => (
+  <Card className="overflow-hidden border-none shadow-sm hover:shadow-xl transition-all duration-500 group bg-white">
+    <CardContent className="p-0">
+      <div className="flex items-stretch h-32">
+        <div className={cn("w-2", bgClass)} />
+        <div className="flex-1 p-6 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{title}</span>
+            <div className={cn("p-2 rounded-xl transition-transform group-hover:scale-110 duration-300", bgClass, colorClass)}>
+              <Icon className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="text-4xl font-black text-slate-900 tracking-tighter">{value}</div>
+        </div>
       </div>
-    </CardHeader>
-    <CardContent>
-      <div className="text-3xl font-black text-slate-900 tracking-tight">{value}</div>
     </CardContent>
   </Card>
 );
@@ -39,7 +43,6 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Verifica se é paciente para redirecionar
         const context = await diaryService.getPatientContext();
         if (context) {
           navigate("/meu-painel", { replace: true });
@@ -72,81 +75,81 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-10 pb-10">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="space-y-10 pb-12">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Visão Geral</h1>
-          <p className="text-slate-500 mt-1 font-medium">Sua clínica em números hoje.</p>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight">Painel de Controle</h1>
+          <p className="text-slate-500 mt-1 font-semibold flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-indigo-500" /> {format(new Date(), "eeee, dd 'de' MMMM", { locale: ptBR })}
+          </p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-4">
           <Link to="/pacientes/novo">
-            <Button variant="outline" className="gap-2 rounded-2xl h-12 px-6 border-slate-200 hover:bg-white hover:border-primary hover:text-primary transition-all">
-              <Plus className="h-4 w-4" /> Paciente
+            <Button variant="outline" className="gap-2 rounded-[20px] h-14 px-8 border-slate-200 bg-white hover:bg-slate-50 font-bold transition-all shadow-sm">
+              <Plus className="h-4 w-4" /> Novo Paciente
             </Button>
           </Link>
           <Link to="/sessoes/nova">
-            <Button className="bg-primary hover:bg-primary/90 rounded-2xl h-12 px-6 shadow-lg shadow-primary/20 gap-2 transition-all">
-              <Sparkles className="h-4 w-4" /> Nova Sessão
+            <Button className="bg-indigo-600 hover:bg-indigo-700 rounded-[20px] h-14 px-8 shadow-xl shadow-indigo-600/20 gap-2 font-black transition-all">
+              <Sparkles className="h-4 w-4" /> Registrar Sessão
             </Button>
           </Link>
         </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Pacientes" value={stats?.totalPatients} icon={Users} gradient="bg-gradient-to-r from-blue-500 to-blue-400" />
-        <StatCard title="Sessões" value={stats?.totalSessions} icon={Calendar} gradient="bg-gradient-to-r from-indigo-500 to-indigo-400" />
-        <StatCard title="Pendentes" value={stats?.pendingProcessing} icon={Clock} gradient="bg-gradient-to-r from-amber-500 to-amber-400" />
-        <StatCard title="Concluídas" value={stats?.completedSessions} icon={CheckCircle2} gradient="bg-gradient-to-r from-emerald-500 to-emerald-400" />
+        <StatCard title="Total Pacientes" value={stats?.totalPatients} icon={Users} bgClass="bg-blue-600" colorClass="text-white" />
+        <StatCard title="Atendimentos" value={stats?.totalSessions} icon={Calendar} bgClass="bg-indigo-600" colorClass="text-white" />
+        <StatCard title="Em Análise" value={stats?.pendingProcessing} icon={Clock} bgClass="bg-amber-500" colorClass="text-white" />
+        <StatCard title="Finalizadas" value={stats?.completedSessions} icon={CheckCircle2} bgClass="bg-emerald-500" colorClass="text-white" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <Card className="lg:col-span-2 border-none shadow-sm rounded-3xl overflow-hidden">
-          <CardHeader className="pb-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <Card className="lg:col-span-2 border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
+          <CardHeader className="p-8 pb-2">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-indigo-500" /> Gestão de Atividades
+                <CardTitle className="text-xl font-black text-slate-900 flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-indigo-50">
+                    <TrendingUp className="h-5 w-5 text-indigo-600" />
+                  </div>
+                  Atividade da Clínica
                 </CardTitle>
-                <CardDescription>Volume de atendimentos por dia</CardDescription>
+                <CardDescription className="font-medium text-slate-400 mt-1">Sessões realizadas nos últimos 7 dias</CardDescription>
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-8 pt-4">
             <ActivityChart sessions={sessions} />
           </CardContent>
         </Card>
 
-        <Card className="border-none shadow-sm rounded-3xl overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between pb-6 border-b border-slate-50">
-            <CardTitle className="text-xl font-bold text-slate-900">Novos Pacientes</CardTitle>
-            <Link to="/pacientes" className="text-sm font-bold text-primary hover:underline flex items-center gap-1 group">
-              Ver tudo <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+        <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
+          <CardHeader className="flex flex-row items-center justify-between p-8 pb-6 border-b border-slate-50">
+            <CardTitle className="text-xl font-black text-slate-900">Novos Pacientes</CardTitle>
+            <Link to="/pacientes" className="text-xs font-black text-indigo-600 uppercase tracking-widest hover:text-indigo-700 transition-colors flex items-center gap-2 group">
+              Todos <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </Link>
           </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-3">
-              {patients.length > 0 ? patients.slice(0, 3).map((patient) => (
-                <div key={patient.id} className="flex items-center justify-between p-4 rounded-2xl border border-transparent hover:border-slate-100 hover:bg-slate-50 transition-all group">
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {patients.length > 0 ? patients.slice(0, 4).map((patient) => (
+                <div key={patient.id} className="flex items-center justify-between p-4 rounded-3xl border border-transparent hover:border-slate-100 hover:bg-slate-50 transition-all group cursor-pointer">
                   <div className="flex items-center gap-4">
-                    <div className="h-10 w-10 rounded-2xl bg-blue-50 flex items-center justify-center font-black text-blue-600 group-hover:scale-110 transition-transform">
+                    <div className="h-12 w-12 rounded-[18px] bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center font-black text-slate-600 group-hover:from-indigo-500 group-hover:to-indigo-600 group-hover:text-white transition-all duration-500">
                       {patient.full_name?.charAt(0) || "P"}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-bold text-slate-900 leading-none mb-1 truncate">{patient.full_name}</p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase truncate">{patient.email}</p>
+                      <p className="font-bold text-slate-900 leading-tight mb-1 truncate">{patient.full_name}</p>
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate">{patient.email}</p>
                     </div>
                   </div>
-                  <div className={cn(
-                    "px-2 py-1 rounded-full text-[8px] font-black uppercase tracking-widest shrink-0",
-                    patient.status === 'ativo' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-700'
-                  )}>
-                    {patient.status}
-                  </div>
+                  <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
                 </div>
               )) : (
                 <div className="text-center py-10">
-                   <Users className="h-10 w-10 text-slate-100 mx-auto mb-2" />
-                   <p className="text-xs text-slate-400 font-medium">Nenhum paciente ainda.</p>
+                   <Users className="h-12 w-12 text-slate-100 mx-auto mb-3" />
+                   <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Nenhum paciente cadastrado</p>
                 </div>
               )}
             </div>
@@ -154,39 +157,47 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      <Card className="border-none shadow-sm rounded-3xl overflow-hidden">
-        <CardHeader className="flex flex-row items-center justify-between pb-6 border-b border-slate-50">
-          <CardTitle className="text-xl font-bold text-slate-900">Sessões Recentes</CardTitle>
-          <Link to="/sessoes" className="text-sm font-bold text-primary hover:underline flex items-center gap-1 group">
-            Ver todas <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+      <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
+        <CardHeader className="flex flex-row items-center justify-between p-8 pb-6 border-b border-slate-50">
+          <CardTitle className="text-xl font-black text-slate-900">Sessões Recentes</CardTitle>
+          <Link to="/sessoes" className="text-xs font-black text-indigo-600 uppercase tracking-widest hover:text-indigo-700 transition-colors flex items-center gap-2 group">
+            Histórico Completo <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </Link>
         </CardHeader>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {sessions.length > 0 ? sessions.slice(0, 4).map((session) => (
-              <div key={session.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-50 hover:border-slate-100 hover:bg-slate-50 transition-all group">
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center font-black text-indigo-600 group-hover:scale-110 transition-transform">
-                    {session.patient?.full_name?.charAt(0) || "P"}
-                  </div>
-                  <div>
-                    <p className="font-bold text-slate-900 leading-none mb-1">{session.patient?.full_name}</p>
-                    <p className="text-[11px] text-slate-400 font-bold uppercase">
-                      {format(new Date(session.session_date), "dd 'de' MMM 'às' HH:mm", { locale: ptBR })}
-                    </p>
+        <CardContent className="p-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {sessions.length > 0 ? sessions.slice(0, 3).map((session) => (
+              <div key={session.id} className="p-6 rounded-[28px] border border-slate-100 hover:border-indigo-100 hover:bg-indigo-50/20 transition-all group bg-white shadow-sm">
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex items-center gap-4">
+                    <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center font-black text-indigo-600 group-hover:scale-110 transition-all duration-500">
+                      {session.patient?.full_name?.charAt(0) || "P"}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 leading-tight mb-1">{session.patient?.full_name}</p>
+                      <p className="text-[10px] text-indigo-400 font-black uppercase tracking-widest">
+                        {format(new Date(session.session_date), "dd 'de' MMM", { locale: ptBR })} • {format(new Date(session.session_date), "HH:mm", { locale: ptBR })}
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <div className={cn(
-                  "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest",
-                  session.processing_status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                )}>
-                  {session.processing_status}
+                <div className="flex items-center justify-between">
+                   <div className="flex items-center gap-2">
+                     <Clock className="h-3 w-3 text-slate-400" />
+                     <span className="text-[11px] font-bold text-slate-500 uppercase">{session.duration_minutes} min</span>
+                   </div>
+                   <div className={cn(
+                    "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest",
+                    session.processing_status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                  )}>
+                    {session.processing_status}
+                  </div>
                 </div>
               </div>
             )) : (
               <div className="col-span-full text-center py-10">
-                 <Calendar className="h-10 w-10 text-slate-100 mx-auto mb-2" />
-                 <p className="text-xs text-slate-400 font-medium">Nenhuma sessão registrada.</p>
+                 <Calendar className="h-12 w-12 text-slate-100 mx-auto mb-3" />
+                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Nenhuma sessão encontrada</p>
               </div>
             )}
           </div>
