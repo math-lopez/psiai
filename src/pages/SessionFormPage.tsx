@@ -21,7 +21,7 @@ import { showSuccess, showError } from "@/utils/toast";
 import { validateAudioFile } from "@/lib/file-utils";
 import { supabase } from "@/integrations/supabase/client";
 import { SubscriptionTier } from "@/config/plans";
-import { getLocalDateTime } from "@/lib/utils";
+import { cn, getLocalDateTime } from "@/lib/utils";
 
 const SessionFormPage = () => {
   const { id } = useParams();
