@@ -43,6 +43,30 @@ export const sessionService = {
     return data as Session;
   },
 
+  // Busca a análise profunda de IA da sessão
+  getSessionAIAnalysis: async (sessionId: string) => {
+    const { data, error } = await supabase
+      .from('session_ai_analysis')
+      .select('*')
+      .eq('session_id', sessionId)
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data;
+  },
+
+  // Solicita a geração da análise profunda via Edge Function
+  analyzeSessionAI: async (sessionId: string) => {
+    // Nota: Esta função deve chamar uma Edge Function que processa o texto da sessão
+    // Usaremos a mesma lógica de invocar funções do Supabase
+    const { data, error } = await supabase.functions.invoke('analyze-session-v2', {
+      body: { sessionId }
+    });
+    
+    if (error) throw error;
+    return data;
+  },
+
   create: async (session: any, audioFile?: File): Promise<Session> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
