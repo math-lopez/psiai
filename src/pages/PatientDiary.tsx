@@ -49,20 +49,20 @@ const PatientDiary = () => {
         ...newLog,
         patient_id: context.patientId,
         psychologist_id: context.psychologistId,
-        log_type: 'general',
+        log_type: 'free_entry', // Alterado de 'general' para 'free_entry' para maior compatibilidade
         created_by: 'patient'
       });
       showSuccess("Registro salvo no diário!");
       setNewLog({ ...newLog, content: "" });
       fetchData();
-    } catch (e) {
-      showError("Erro ao salvar.");
+    } catch (e: any) {
+      showError(e.message || "Erro ao salvar.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) return <div className="h-[60vh] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  if (loading) return <div className="h-[60vh] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-10">
