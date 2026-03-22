@@ -1,16 +1,17 @@
-export type LogType = 'mood' | 'thought' | 'exercise' | 'general';
+export type LogType = 'weekly_journal' | 'emotional_record' | 'thought_record' | 'homework' | 'free_entry' | 'general';
 export type PromptStatus = 'active' | 'completed' | 'archived';
-export type VisibilityType = 'private_to_patient' | 'shared_with_psychologist' | 'private_to_psychologist' | 'shared_with_patient';
+export type VisibilityType = 'private_to_psychologist' | 'shared_with_patient' | 'private_to_patient' | 'shared_with_psychologist';
 
 export interface PatientLog {
   id: string;
   patient_id: string;
   psychologist_id: string;
+  title: string | null;
   content: string;
-  mood: string | null;
   log_type: LogType;
+  mood: string | null;
   visibility: VisibilityType;
-  created_by: 'patient' | 'psychologist';
+  created_by: 'psychologist' | 'patient';
   created_at: string;
   updated_at: string;
   attachments?: PatientLogAttachment[];

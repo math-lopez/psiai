@@ -3,7 +3,7 @@
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { 
-  ChevronLeft, Edit, Plus, Calendar, Mail, Phone, Loader2, ShieldCheck, FileText, User, Sparkles, Target
+  ChevronLeft, Edit, Plus, Calendar, Mail, Phone, Loader2, ShieldCheck, FileText, User, Sparkles, Target, Book
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import { PatientAccessManagement } from "@/components/patients/PatientAccessMana
 import { LatestSessionSummary } from "@/components/patients/LatestSessionSummary";
 import { SessionTimeline } from "@/components/patients/SessionTimeline";
 import { TreatmentPlanTab } from "@/components/patients/TreatmentPlanTab";
+import { DiaryTab } from "@/components/patients/DiaryTab";
 
 const PatientDetailPage = () => {
   const { id } = useParams();
@@ -103,6 +104,9 @@ const PatientDetailPage = () => {
           <TabsTrigger value="treatment-plan" className="rounded-2xl px-8 py-3 font-black text-xs uppercase tracking-widest gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 transition-all">
             <Target className="h-4 w-4" /> Plano Terapêutico
           </TabsTrigger>
+          <TabsTrigger value="diary" className="rounded-2xl px-8 py-3 font-black text-xs uppercase tracking-widest gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 transition-all">
+            <Book className="h-4 w-4" /> Diário
+          </TabsTrigger>
           <TabsTrigger value="prontuario" className="rounded-2xl px-8 py-3 font-black text-xs uppercase tracking-widest gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-indigo-600 transition-all">
             <FileText className="h-4 w-4" /> Prontuário
           </TabsTrigger>
@@ -165,6 +169,10 @@ const PatientDetailPage = () => {
 
         <TabsContent value="treatment-plan" className="outline-none">
           <TreatmentPlanTab patientId={id!} />
+        </TabsContent>
+
+        <TabsContent value="diary" className="outline-none">
+          <DiaryTab patientId={id!} />
         </TabsContent>
 
         <TabsContent value="prontuario" className="outline-none">
