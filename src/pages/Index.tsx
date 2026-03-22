@@ -48,11 +48,11 @@ const Index = () => {
           return;
         }
 
-        // 3. Se não for nenhum dos dois (ex: paciente excluído ou conta nova não configurada)
-        console.log("[Index] Usuário órfão detectado (sem papel definido).");
-        // Forçamos o logout para limpar a sessão de uma conta que não deveria estar aqui
+        // 3. Usuário sem papel (Órfão)
+        console.warn("[Index] Usuário sem permissões detectado.");
         await supabase.auth.signOut();
-        navigate("/login", { replace: true });
+        // Redireciona com parâmetro de erro para o login mostrar a toast de aviso
+        navigate("/login?error=no-access", { replace: true });
 
       } catch (err) {
         console.error("[Index] Erro crítico:", err);
