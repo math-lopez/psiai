@@ -12,7 +12,8 @@ import {
   Trash2,
   AlertTriangle,
   Target,
-  BookOpen
+  BookOpen,
+  Lock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,6 +39,7 @@ import { LatestSessionFeature } from "@/components/patients/LatestSessionFeature
 import { TreatmentPlanModule } from "@/components/treatment/TreatmentPlanModule";
 import { DiaryModule } from "@/components/diary/DiaryModule";
 import { DiaryOverviewWidget } from "@/components/diary/DiaryOverviewWidget";
+import { PatientAccessManagement } from "@/components/patients/PatientAccessManagement";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { showError, showSuccess } from "@/utils/toast";
@@ -222,7 +224,7 @@ const PatientDetailPage = () => {
           </Card>
         </div>
 
-        {/* Conteúdo Principal: Overview / Timeline / Treatment Plan / Diary */}
+        {/* Conteúdo Principal: Overview / Timeline / Treatment Plan / Diary / Access */}
         <div className="lg:col-span-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="bg-slate-100/50 p-1.5 rounded-3xl h-auto mb-10 gap-2 border border-slate-100 flex-wrap justify-start">
@@ -250,6 +252,12 @@ const PatientDetailPage = () => {
               >
                 Parecer Clínico <Badge className="h-5 px-1.5 bg-indigo-50 text-indigo-600 border-none text-[8px] font-black">AI BETA</Badge>
               </TabsTrigger>
+              <TabsTrigger 
+                value="access" 
+                className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
+              >
+                Acesso do Paciente <Lock className="h-4 w-4" />
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
@@ -268,6 +276,10 @@ const PatientDetailPage = () => {
 
             <TabsContent value="analysis" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
               <LongitudinalAnalysis patientId={id!} />
+            </TabsContent>
+
+            <TabsContent value="access" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
+              <PatientAccessManagement patientId={id!} patientEmail={patient.email} />
             </TabsContent>
           </Tabs>
         </div>
