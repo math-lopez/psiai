@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { Link } from "react-router-dom";
 import { Session } from "@/types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -13,10 +14,10 @@ import {
   AlertCircle, 
   CheckCircle2, 
   Loader2,
-  StickyNote,
   Footprints,
   Quote,
-  ClipboardList
+  ClipboardList,
+  ArrowRight
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -67,7 +68,14 @@ export const SessionTimelineItem = ({ session }: SessionTimelineItemProps) => {
               <Clock className="h-3 w-3" /> {session.duration_minutes} min
             </span>
           </div>
-          {getStatusBadge(session.processing_status)}
+          <div className="flex items-center gap-2">
+            {getStatusBadge(session.processing_status)}
+            <Link to={`/sessoes/${session.id}`}>
+              <Button variant="ghost" size="sm" className="h-8 rounded-xl px-3 gap-2 text-[10px] font-black uppercase text-primary hover:bg-primary/5">
+                Acessar <ArrowRight className="h-3 w-3" />
+              </Button>
+            </Link>
+          </div>
         </div>
 
         <div className="space-y-5">
@@ -139,9 +147,16 @@ export const SessionTimelineItem = ({ session }: SessionTimelineItemProps) => {
             </div>
           )}
 
-          <Button variant="ghost" size="sm" onClick={() => setIsExpanded(!isExpanded)} className="w-full mt-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 rounded-2xl gap-2 h-10 text-xs font-bold">
-            {isExpanded ? <>Recolher Registro <ChevronUp className="h-4 w-4" /></> : <>Ver Prontuário Completo <ChevronDown className="h-4 w-4" /></>}
-          </Button>
+          <div className="flex gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setIsExpanded(!isExpanded)} className="flex-1 mt-2 text-slate-500 hover:text-slate-700 hover:bg-slate-50 rounded-2xl gap-2 h-10 text-xs font-bold">
+              {isExpanded ? <>Recolher Registro <ChevronUp className="h-4 w-4" /></> : <>Ver Prontuário Rápido <ChevronDown className="h-4 w-4" /></>}
+            </Button>
+            <Link to={`/sessoes/${session.id}`} className="flex-1 mt-2">
+              <Button variant="secondary" size="sm" className="w-full bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded-2xl gap-2 h-10 text-xs font-black uppercase">
+                Acessar Completo <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     </div>
