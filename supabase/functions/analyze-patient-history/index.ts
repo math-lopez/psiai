@@ -11,8 +11,7 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  // Usaremos a URL específica fornecida para análise de histórico
-  const serviceUrl = "https://patient-analysis-service-production.up.railway.app/process-patient-analysis";
+  const serviceUrl = Deno.env.get('PROCESSING_SERVICE_URL'); // https://patient-analysis-service-production.up.railway.app/process-patient-analysis
   const serviceToken = Deno.env.get('PROCESSING_SERVICE_INTERNAL_TOKEN');
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -27,12 +26,7 @@ serve(async (req) => {
     // 1. Coletar dados do paciente e sessões
     const [patientRes, sessionsRes] = await Promise.all([
       supabase.from('patients').select('*').eq('id', patientId).single(),
-      supabase.from('sessions')
-        .select('*')
-        .eq('patient_id', patientId)
-        .eq('processing_status', 'completed')
-        .order('session_date', { ascending: false })
-        .limit(10)
+      supabase.from('sessions').select('*').eq('patient_id', patientId).order('session_date', { ascending: false }).limit(10)
     ]);
 
     const patient = patientRes.data;
@@ -40,7 +34,7 @@ serve(async (req) => {
 
     if (!patient) throw new Error('Paciente não encontrado');
 
-    // 2. Formatar o payload EXATAMENTE como o seu serviço espera
+    // 2. Formatar o payload EXATAMENTE como o serviço espera (camelCase)
     const payload = {
       patientId: patient.id,
       psychologistId: patient.psychologist_id,
@@ -58,11 +52,11 @@ serve(async (req) => {
       }))
     };
 
-    if (!serviceToken) throw new Error('Token de serviço (PROCESSING_SERVICE_INTERNAL_TOKEN) não configurado');
+    if (!serviceUrl || !serviceToken) throw new Error('Configuração de IA ausente nas variáveis de ambiente');
 
-    console.log(`[analyze-patient-history] Enviando JSON de análise para: ${serviceUrl}`);
+    console.log(`[analyze-patient-history] Enviando análise para o serviço: ${serviceUrl}`);
 
-    // 3. Chamar o serviço externo (JSON puro via POST)
+    // 3. Chamar o serviço externo
     const response = await fetch(serviceUrl, {
       method: 'POST',
       headers: { 
@@ -74,7 +68,7 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorMsg = await response.text();
-      throw new Error(`Serviço de Análise retornou erro: ${errorMsg}`);
+      throw new Error(`Erro no Serviço de Análise: ${errorMsg}`);
     }
 
     const result = await response.json();
@@ -85,7 +79,7 @@ serve(async (req) => {
     });
 
   } catch (err: any) {
-    console.error(`[analyze-patient-history] Erro Crítico: ${err.message}`);
+    console.error(`[analyze-patient-history] Erro: ${err.message}`);
     return new Response(JSON.stringify({ error: err.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
