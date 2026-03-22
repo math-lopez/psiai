@@ -32,7 +32,6 @@ export const patientService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    // Verificar Limites do Plano
     const { data: profile } = await supabase
       .from('profiles')
       .select('subscription_tier')
@@ -42,7 +41,6 @@ export const patientService = {
     const tier = (profile?.subscription_tier as SubscriptionTier) || 'free';
     const limit = PLAN_LIMITS[tier].maxPatients;
 
-    // Conta apenas os pacientes DESTE psicólogo para validar o limite
     const { count } = await supabase
       .from('patients')
       .select('*', { count: 'exact', head: true })
@@ -74,12 +72,16 @@ export const patientService = {
     return data as Patient;
   },
 
+  /**
+   * DELETE 3.0: Chama a Edge Function para limpeza total (DB + Storage + Auth)
+   */
   delete: async (id: string): Promise<void> => {
-    const { error } = await supabase
-      .from('patients')
-      .delete()
-      .eq('id', id);
+    const { data, error } = await supabase.functions.invoke('delete-patient-complete', {
+      body: { patientId: id }
+    });
     
-    if (error) throw error;
+    if (error || (data && !data.success)) {
+      throw new Error(data?.error || "Erro ao realizar a exclusão completa do paciente.");
+    }
   }
 };
