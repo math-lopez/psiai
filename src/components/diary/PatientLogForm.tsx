@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Smile, Heart, MessageSquare } from "lucide-react";
+import { Loader2, Smile, Heart } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +23,7 @@ interface PatientLogFormProps {
   onClose: () => void;
   onSuccess: () => void;
   patientId: string;
+  psychologistId: string; // Novo campo obrigatório
   promptId?: string | null;
   initialType?: LogType;
 }
@@ -37,7 +38,7 @@ const moods = [
   { emoji: "😴", label: "Cansado" },
 ];
 
-export const PatientLogForm = ({ isOpen, onClose, onSuccess, patientId, promptId, initialType }: PatientLogFormProps) => {
+export const PatientLogForm = ({ isOpen, onClose, onSuccess, patientId, psychologistId, promptId, initialType }: PatientLogFormProps) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: "",
@@ -55,8 +56,9 @@ export const PatientLogForm = ({ isOpen, onClose, onSuccess, patientId, promptId
       await diaryService.createLog({
         ...formData,
         patient_id: patientId,
+        psychologist_id: psychologistId, // Enviando o ID do psicólogo corretamente
         created_by: 'patient',
-        visibility: 'shared_with_patient' // Paciente sempre compartilha com o psicólogo
+        visibility: 'shared_with_patient'
       });
 
       if (promptId) {
@@ -67,8 +69,8 @@ export const PatientLogForm = ({ isOpen, onClose, onSuccess, patientId, promptId
       onSuccess();
       onClose();
       setFormData({ title: "", content: "", log_type: "free_entry", mood: "" });
-    } catch (e) {
-      showError("Erro ao salvar registro.");
+    } catch (e: any) {
+      showError(e.message || "Erro ao salvar registro.");
     } finally {
       setLoading(false);
     }

@@ -8,25 +8,22 @@ import {
   Plus, 
   Loader2, 
   History, 
-  Sparkles, 
   ClipboardCheck,
   Calendar,
-  MessageSquare,
-  ArrowRight
+  MessageSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { PatientLogForm } from "@/components/diary/PatientLogForm";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { cn } from "@/lib/utils";
 import { showError } from "@/utils/toast";
 
 const PatientDiaryPage = () => {
   const [logs, setLogs] = useState<PatientLog[]>([]);
   const [prompts, setPrompts] = useState<PatientLogPrompt[]>([]);
   const [loading, setLoading] = useState(true);
-  const [patientId, setPatientId] = useState<string | null>(null);
+  const [context, setContext] = useState<{ patientId: string; psychologistId: string } | null>(null);
 
   // Modais
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -34,13 +31,16 @@ const PatientDiaryPage = () => {
 
   const fetchData = async () => {
     try {
-      const pid = await diaryService.getMyPatientId();
-      if (!pid) return;
-      setPatientId(pid);
+      const ctx = await diaryService.getPatientContext();
+      if (!ctx) {
+        showError("Não foi possível identificar seu vínculo clínico. Contate seu psicólogo.");
+        return;
+      }
+      setContext(ctx);
 
       const [l, p] = await Promise.all([
-        diaryService.listLogs(pid),
-        diaryService.listPrompts(pid)
+        diaryService.listLogs(ctx.patientId),
+        diaryService.listPrompts(ctx.patientId)
       ]);
       setLogs(l);
       setPrompts(p);
@@ -71,7 +71,6 @@ const PatientDiaryPage = () => {
         </Button>
       </div>
 
-      {/* Seção de Tarefas Pendentes */}
       {activePrompts.length > 0 && (
         <section className="space-y-4">
           <h3 className="text-xs font-black uppercase tracking-widest text-amber-600 px-2 flex items-center gap-2">
@@ -98,7 +97,6 @@ const PatientDiaryPage = () => {
         </section>
       )}
 
-      {/* Histórico de Registros */}
       <section className="space-y-6">
         <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 px-2 flex items-center gap-2">
           <History className="h-4 w-4" /> Histórico de Registros
@@ -142,12 +140,13 @@ const PatientDiaryPage = () => {
         </div>
       </section>
 
-      {patientId && (
+      {context && (
         <PatientLogForm 
           isOpen={isFormOpen}
           onClose={() => { setIsFormOpen(false); setActivePromptId(null); }}
           onSuccess={fetchData}
-          patientId={patientId}
+          patientId={context.patientId}
+          psychologistId={context.psychologistId}
           promptId={activePromptId}
         />
       )}

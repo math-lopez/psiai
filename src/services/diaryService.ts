@@ -2,18 +2,30 @@ import { supabase } from "@/integrations/supabase/client";
 import { PatientLog, PatientLogPrompt, LogType, PromptStatus } from "@/types/diary";
 
 export const diaryService = {
-  // Helper para o portal do paciente
-  getMyPatientId: async (): Promise<string | null> => {
+  // Retorna os IDs necessários para o portal do paciente
+  getPatientContext: async (): Promise<{ patientId: string; psychologistId: string } | null> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    const { data } = await supabase
+    // Buscamos o vínculo e já trazemos o ID do psicólogo via join (requer RLS liberado na tabela patients)
+    const { data, error } = await supabase
       .from('patient_access')
-      .select('patient_id')
+      .select('patient_id, patients(psychologist_id)')
       .eq('user_id', user.id)
       .maybeSingle();
     
-    return data?.patient_id || null;
+    if (error || !data || !data.patients) return null;
+
+    return {
+      patientId: data.patient_id,
+      psychologistId: (data.patients as any).psychologist_id
+    };
+  },
+
+  // Mantido para compatibilidade, mas prefira getPatientContext
+  getMyPatientId: async (): Promise<string | null> => {
+    const context = await diaryService.getPatientContext();
+    return context?.patientId || null;
   },
 
   // Logs / Registros
@@ -32,28 +44,9 @@ export const diaryService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    let psychoId = log.psychologist_id;
-
-    // Se não temos o ID do psicólogo (caso do paciente criando registro), 
-    // buscamos o psicólogo vinculado a esse paciente na tabela 'patients'
-    if (!psychoId && log.patient_id) {
-      const { data: patient } = await supabase
-        .from('patients')
-        .select('psychologist_id')
-        .eq('id', log.patient_id)
-        .maybeSingle();
-      
-      if (patient) {
-        psychoId = patient.psychologist_id;
-      }
-    }
-
     const { data, error } = await supabase
       .from('patient_logs')
-      .insert([{ 
-        ...log, 
-        psychologist_id: psychoId 
-      }])
+      .insert([log])
       .select()
       .single();
     
