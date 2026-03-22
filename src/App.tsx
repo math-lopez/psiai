@@ -8,6 +8,7 @@ import { PatientPortalLayout } from "./components/layout/PatientPortalLayout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Analytics } from "@vercel/analytics/react";
 
+import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Patients from "./pages/Patients";
@@ -43,6 +44,8 @@ const App = () => (
         <Sonner position="top-right" closeButton />
         <BrowserRouter>
           <Routes>
+            {/* Rota Raiz: Redirecionador Inteligente */}
+            <Route path="/" element={<Index />} />
             <Route path="/login" element={<Login />} />
             
             {/* Rota de Ativação (Pública com Token) */}
@@ -50,7 +53,7 @@ const App = () => (
             
             {/* Área do Psicólogo */}
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/pacientes" element={<Patients />} />
               <Route path="/pacientes/novo" element={<PatientFormPage />} />
               <Route path="/pacientes/editar/:id" element={<PatientFormPage />} />
@@ -66,7 +69,6 @@ const App = () => (
             {/* Área do Paciente (Portal) */}
             <Route element={<ProtectedRoute><PatientPortalLayout /></ProtectedRoute>}>
               <Route path="/portal" element={<PortalDashboard />} />
-              {/* Reaproveitaremos o DiaryModule no portal na próxima fase */}
               <Route path="/portal/diario" element={<div className="p-10 text-center font-bold">Módulo de Diário em breve no Portal.</div>} />
             </Route>
 

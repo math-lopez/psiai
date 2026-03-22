@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Users, label: "Pacientes", path: "/pacientes" },
   { icon: CalendarDays, label: "Sessões", path: "/sessoes" },
   { icon: Settings, label: "Configurações", path: "/configuracoes" },
