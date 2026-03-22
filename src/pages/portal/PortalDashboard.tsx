@@ -11,10 +11,13 @@ import {
   ArrowRight, 
   Loader2,
   Calendar,
-  CheckCircle2
+  CheckCircle2,
+  Files,
+  Upload
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AttachmentModule } from "@/components/attachments/AttachmentModule";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link, useNavigate } from "react-router-dom";
@@ -26,6 +29,7 @@ const PortalDashboard = () => {
   const [prompts, setPrompts] = useState<any[]>([]);
   const [sharedLogs, setSharedLogs] = useState<any[]>([]);
   const [patientInfo, setPatientInfo] = useState<any>(null);
+  const [accessInfo, setAccessInfo] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -39,6 +43,7 @@ const PortalDashboard = () => {
           .single();
 
         if (access) {
+          setAccessInfo(access);
           setPatientInfo(access.patients);
           
           // 2. Buscar Prompts Ativos
@@ -75,44 +80,70 @@ const PortalDashboard = () => {
         <p className="text-slate-500 font-medium italic">Seu espaço seguro para registros e acompanhamento terapêutico.</p>
       </div>
 
-      {/* Tarefas / Prompts */}
-      <section className="space-y-6">
-        <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 px-2 flex items-center gap-2">
-          <ClipboardCheck className="h-4 w-4" /> Atividades Propostas
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {prompts.length > 0 ? prompts.map((p) => (
-            <Card key={p.id} className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white hover:shadow-md transition-all">
-              <CardContent className="p-6 flex flex-col justify-between h-full space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="px-2 py-0.5 bg-amber-50 text-amber-600 rounded-md text-[8px] font-black uppercase tracking-widest">Aguardando</span>
-                    {p.due_date && <span className="text-[10px] text-slate-400 font-bold">Até {format(new Date(p.due_date), "dd/MM")}</span>}
-                  </div>
-                  <h4 className="text-lg font-bold text-slate-900 leading-tight">{p.title}</h4>
-                  <p className="text-xs text-slate-500 mt-2 line-clamp-2">{p.description}</p>
-                </div>
-                <Button 
-                  onClick={() => navigate("/portal/diario")}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-11 font-black gap-2 mt-2"
-                >
-                  Responder <ArrowRight className="h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          )) : (
-            <div className="col-span-full py-12 text-center bg-slate-50 rounded-[32px] border border-dashed border-slate-200">
-               <CheckCircle2 className="h-10 w-10 text-emerald-300 mx-auto mb-3" />
-               <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">Tudo em dia por aqui!</p>
-            </div>
-          )}
-        </div>
-      </section>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="md:col-span-2 border-none shadow-sm rounded-[32px] bg-white overflow-hidden">
+           <CardHeader className="pb-4">
+              <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                <Files className="h-4 w-4" /> Meus Documentos e Materiais
+              </CardTitle>
+           </CardHeader>
+           <CardContent>
+              {accessInfo && (
+                <AttachmentModule 
+                  patientId={accessInfo.patient_id} 
+                  psychologistId={accessInfo.psychologist_id} 
+                  role="patient" 
+                />
+              )}
+           </CardContent>
+        </Card>
 
-      {/* Conteúdos Compartilhados */}
+        <div className="space-y-6">
+          <section className="space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-widest text-amber-600 px-2 flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4" /> Atividades
+            </h3>
+            <div className="grid grid-cols-1 gap-4">
+              {prompts.length > 0 ? prompts.slice(0, 2).map((p) => (
+                <Card key={p.id} className="border-none shadow-sm rounded-[24px] bg-amber-50/50 border border-amber-100">
+                  <CardContent className="p-5 space-y-3">
+                    <p className="text-sm font-bold text-slate-900 leading-tight">{p.title}</p>
+                    <Button 
+                      onClick={() => navigate("/portal/diario")}
+                      className="w-full bg-amber-500 hover:bg-amber-600 rounded-xl h-9 text-xs font-black"
+                    >
+                      Responder
+                    </Button>
+                  </CardContent>
+                </Card>
+              )) : (
+                <div className="p-8 text-center bg-slate-50 rounded-[24px] border border-dashed border-slate-200">
+                   <CheckCircle2 className="h-8 w-8 text-emerald-300 mx-auto mb-2" />
+                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Tudo em dia!</p>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <Card className="border-none shadow-sm rounded-[32px] bg-indigo-600 text-white overflow-hidden">
+             <CardContent className="p-6 space-y-4">
+                <div className="h-10 w-10 rounded-2xl bg-white/20 flex items-center justify-center">
+                  <Cloud className="h-5 w-5" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-white">Prontuário Digital</h4>
+                  <p className="text-[10px] text-indigo-100 leading-relaxed mt-1">
+                    Aqui você pode subir exames, laudos ou materiais que deseja compartilhar com seu terapeuta com total segurança.
+                  </p>
+                </div>
+             </CardContent>
+          </Card>
+        </div>
+      </div>
+
       <section className="space-y-6">
         <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 px-2 flex items-center gap-2">
-          <index className="h-4 w-4" /> Compartilhado com Você
+          <BookOpen className="h-4 w-4" /> Compartilhado com Você
         </h3>
         <div className="space-y-4">
           {sharedLogs.length > 0 ? sharedLogs.map((log) => (
@@ -133,28 +164,12 @@ const PortalDashboard = () => {
               </div>
             </Link>
           )) : (
-            <div className="p-12 text-center">
-              <p className="text-sm text-slate-400 italic">O psicólogo ainda não compartilhou materiais específicos com você.</p>
+            <div className="p-12 text-center bg-white rounded-[32px] border border-dashed border-slate-100">
+              <p className="text-xs text-slate-400 italic">Nenhum registro compartilhado recentemente.</p>
             </div>
           )}
         </div>
       </section>
-
-      <div className="bg-indigo-600 rounded-[40px] p-8 text-white relative overflow-hidden">
-        <div className="absolute top-0 right-0 h-40 w-40 bg-white/10 rounded-full -mr-20 -mt-20 blur-2xl" />
-        <div className="relative z-10 max-w-xl">
-           <h3 className="text-xl font-black mb-2 flex items-center gap-2"><Clock className="h-5 w-5" /> Entre Sessões</h3>
-           <p className="text-sm text-indigo-100 leading-relaxed font-medium">
-             Este é um espaço para você registrar seus pensamentos e sentimentos no momento em que eles acontecem. 
-             Seu psicólogo terá acesso a esses registros para enriquecer os próximos encontros.
-           </p>
-           <Link to="/portal/diario">
-            <Button className="mt-6 bg-white text-indigo-600 hover:bg-indigo-50 rounded-2xl px-8 font-black">
-              Ir para o Diário
-            </Button>
-           </Link>
-        </div>
-      </div>
     </div>
   );
 };

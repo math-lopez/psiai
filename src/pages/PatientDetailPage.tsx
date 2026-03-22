@@ -13,7 +13,8 @@ import {
   Target,
   BookOpen,
   Lock,
-  Clock
+  Clock,
+  Files
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +33,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { patientService } from "@/services/patientService";
 import { sessionService } from "@/services/sessionService";
+import { patientId as authPatientId } from "@/services/diaryService"; // Use diaryService to get psychologistId context
+import { useAuth } from "@/contexts/AuthContext";
 import { Patient, Session } from "@/types";
 import { LongitudinalAnalysis } from "@/components/patients/LongitudinalAnalysis";
 import { PatientTimeline } from "@/components/patients/PatientTimeline";
@@ -40,6 +43,7 @@ import { TreatmentPlanModule } from "@/components/treatment/TreatmentPlanModule"
 import { DiaryModule } from "@/components/diary/DiaryModule";
 import { DiaryOverviewWidget } from "@/components/diary/DiaryOverviewWidget";
 import { PatientAccessManagement } from "@/components/patients/PatientAccessManagement";
+import { AttachmentModule } from "@/components/attachments/AttachmentModule";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { showError, showSuccess } from "@/utils/toast";
@@ -47,6 +51,7 @@ import { cn } from "@/lib/utils";
 
 const PatientDetailPage = () => {
   const { id } = useParams();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -233,27 +238,32 @@ const PatientDetailPage = () => {
                 value="treatment" 
                 className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
               >
-                Plano Terapêutico <Target className="h-4 w-4" />
+                Plano <Target className="h-4 w-4" />
               </TabsTrigger>
               <TabsTrigger 
                 value="diary" 
                 className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
               >
-                Diário e Registros <BookOpen className="h-4 w-4" />
+                Diário <BookOpen className="h-4 w-4" />
+              </TabsTrigger>
+              <TabsTrigger 
+                value="documents" 
+                className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
+              >
+                Documentos <Files className="h-4 w-4" />
               </TabsTrigger>
               <TabsTrigger 
                 value="analysis" 
                 disabled
                 className="rounded-2xl px-6 py-3 font-black text-sm opacity-40 cursor-not-allowed flex gap-2 grayscale"
               >
-                Parecer Clínico <Clock className="h-3 w-3" />
-                <Badge className="h-4 px-1 bg-slate-200 text-slate-500 border-none text-[7px] font-black">BREVE</Badge>
+                Parecer <Clock className="h-3 w-3" />
               </TabsTrigger>
               <TabsTrigger 
                 value="access" 
                 className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
               >
-                Acesso do Paciente <Lock className="h-4 w-4" />
+                Acesso <Lock className="h-4 w-4" />
               </TabsTrigger>
             </TabsList>
 
@@ -270,8 +280,8 @@ const PatientDetailPage = () => {
               <DiaryModule patientId={id!} />
             </TabsContent>
 
-            <TabsContent value="analysis" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
-              <LongitudinalAnalysis patientId={id!} />
+            <TabsContent value="documents" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
+              <AttachmentModule patientId={id!} psychologistId={user?.id!} role="psychologist" />
             </TabsContent>
 
             <TabsContent value="access" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
