@@ -149,55 +149,69 @@ export const AttachmentModule = ({ patientId, psychologistId, role }: Attachment
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filtered.length > 0 ? filtered.map((item) => (
-          <Card key={item.id} className="group border-none shadow-sm hover:shadow-md hover:border-indigo-100 border bg-white rounded-[32px] overflow-hidden transition-all">
-            <CardContent className="p-6 space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                  <FileText className="h-6 w-6" />
-                </div>
-                <div className="flex items-center gap-1">
-                  {role === 'psychologist' && (
-                    item.visibility === 'shared_with_patient' ? 
-                    <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg" title="Compartilhado"><Share2 className="h-3.5 w-3.5" /></div> :
-                    <div className="p-1.5 bg-slate-100 text-slate-400 rounded-lg" title="Privado"><Lock className="h-3.5 w-3.5" /></div>
-                  )}
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-                        <MoreVertical className="h-4 w-4 text-slate-400" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="rounded-2xl">
-                      <DropdownMenuItem onClick={() => handleDownload(item.file_path, item.file_name)} className="font-bold gap-2">
-                        <Download className="h-4 w-4" /> Baixar
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDelete(item)} className="text-red-600 font-bold gap-2">
-                        <Trash2 className="h-4 w-4" /> Excluir
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
+        {filtered.length > 0 ? filtered.map((item) => {
+          // Lógica de permissão de exclusão:
+          // Psicólogo pode apagar tudo. Paciente só pode apagar o que ele mesmo subiu.
+          const canDelete = role === 'psychologist' || item.uploaded_by === 'patient';
 
-              <div>
-                <h4 className="font-bold text-slate-900 truncate pr-4" title={item.file_name}>{item.file_name}</h4>
-                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-1">
-                  {format(new Date(item.created_at), "dd/MM/yyyy")} • {(item.file_size / 1024).toFixed(1)} KB
-                </p>
-              </div>
+          return (
+            <Card key={item.id} className="group border-none shadow-sm hover:shadow-md hover:border-indigo-100 border bg-white rounded-[32px] overflow-hidden transition-all">
+              <CardContent className="p-6 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                    <FileText className="h-6 w-6" />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {role === 'psychologist' && (
+                      item.visibility === 'shared_with_patient' ? 
+                      <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg" title="Compartilhado"><Share2 className="h-3.5 w-3.5" /></div> :
+                      <div className="p-1.5 bg-slate-100 text-slate-400 rounded-lg" title="Privado"><Lock className="h-3.5 w-3.5" /></div>
+                    )}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                          <MoreVertical className="h-4 w-4 text-slate-400" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="rounded-2xl">
+                        <DropdownMenuItem onClick={() => handleDownload(item.file_path, item.file_name)} className="font-bold gap-2">
+                          <Download className="h-4 w-4" /> Baixar
+                        </DropdownMenuItem>
+                        {canDelete && (
+                          <DropdownMenuItem onClick={() => handleDelete(item)} className="text-red-600 font-bold gap-2">
+                            <Trash2 className="h-4 w-4" /> Excluir
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
 
-              <div className="pt-2 flex items-center gap-2">
-                 <span className={cn(
-                   "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md",
-                   item.uploaded_by === 'patient' ? "bg-amber-50 text-amber-600" : "bg-slate-50 text-slate-500"
-                 )}>
-                   De: {item.uploaded_by === 'patient' ? 'Paciente' : 'Você'}
-                 </span>
-              </div>
-            </CardContent>
-          </Card>
-        )) : (
+                <div>
+                  <h4 className="font-bold text-slate-900 truncate pr-4" title={item.file_name}>{item.file_name}</h4>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mt-1">
+                    {format(new Date(item.created_at), "dd/MM/yyyy")} • {(item.file_size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+
+                <div className="pt-2 flex items-center gap-2">
+                   <span className={cn(
+                     "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md",
+                     item.uploaded_by === 'patient' 
+                      ? (role === 'patient' ? "bg-indigo-50 text-indigo-600" : "bg-amber-50 text-amber-600")
+                      : "bg-slate-50 text-slate-500"
+                   )}>
+                     Enviado por: {
+                       item.uploaded_by === 'patient' 
+                        ? (role === 'patient' ? 'Você' : 'Paciente') 
+                        : (role === 'psychologist' ? 'Você' : 'Psicólogo')
+                     }
+                   </span>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        }) : (
           <div className="col-span-full py-20 text-center bg-white rounded-[40px] border border-dashed border-slate-200">
              <Cloud className="h-12 w-12 text-slate-200 mx-auto mb-4" />
              <p className="text-sm text-slate-400 font-bold uppercase tracking-widest">Nenhum arquivo encontrado.</p>
@@ -206,7 +220,7 @@ export const AttachmentModule = ({ patientId, psychologistId, role }: Attachment
       </div>
 
       <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-        <DialogContent className="rounded-[32px] border-none shadow-2xl p-8 max-w-md">
+        <DialogContent className="rounded-[32px] border-none shadow-2xl p-8 max-md:w-[95vw]">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black flex items-center gap-3">
               <Upload className="text-indigo-600 h-6 w-6" /> Subir Documento
@@ -247,7 +261,7 @@ export const AttachmentModule = ({ patientId, psychologistId, role }: Attachment
               <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-start gap-3">
                 <Share2 className="h-4 w-4 text-indigo-600 mt-0.5" />
                 <p className="text-[10px] font-bold text-indigo-800 leading-relaxed">
-                  Arquivos enviados por você são automaticamente compartilhados com seu psicólogo para fins de acompanhamento.
+                  Arquivos enviados por você são automaticamente compartilhados com seu psicólogo para acompanhamento clínico.
                 </p>
               </div>
             )}
