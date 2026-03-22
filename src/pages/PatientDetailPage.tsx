@@ -11,7 +11,8 @@ import {
   Loader2, 
   Trash2,
   AlertTriangle,
-  Target
+  Target,
+  BookOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,6 +36,8 @@ import { LongitudinalAnalysis } from "@/components/patients/LongitudinalAnalysis
 import { PatientTimeline } from "@/components/patients/PatientTimeline";
 import { LatestSessionFeature } from "@/components/patients/LatestSessionFeature";
 import { TreatmentPlanModule } from "@/components/treatment/TreatmentPlanModule";
+import { DiaryModule } from "@/components/diary/DiaryModule";
+import { DiaryOverviewWidget } from "@/components/diary/DiaryOverviewWidget";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { showError, showSuccess } from "@/utils/toast";
@@ -43,6 +46,7 @@ import { cn } from "@/lib/utils";
 const PatientDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("overview");
   const [patient, setPatient] = useState<Patient | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
@@ -218,9 +222,9 @@ const PatientDetailPage = () => {
           </Card>
         </div>
 
-        {/* Conteúdo Principal: Overview / Timeline / Treatment Plan */}
+        {/* Conteúdo Principal: Overview / Timeline / Treatment Plan / Diary */}
         <div className="lg:col-span-3">
-          <Tabs defaultValue="overview" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="bg-slate-100/50 p-1.5 rounded-3xl h-auto mb-10 gap-2 border border-slate-100 flex-wrap justify-start">
               <TabsTrigger 
                 value="overview" 
@@ -235,6 +239,12 @@ const PatientDetailPage = () => {
                 Plano Terapêutico <Target className="h-4 w-4" />
               </TabsTrigger>
               <TabsTrigger 
+                value="diary" 
+                className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
+              >
+                Diário e Registros <BookOpen className="h-4 w-4" />
+              </TabsTrigger>
+              <TabsTrigger 
                 value="analysis" 
                 className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
               >
@@ -244,10 +254,16 @@ const PatientDetailPage = () => {
 
             <TabsContent value="overview" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
               <PatientTimeline sessions={sessions} />
+              {/* Resumo do Diário na Visão Geral */}
+              <DiaryOverviewWidget patientId={id!} onViewMore={() => setActiveTab("diary")} />
             </TabsContent>
 
             <TabsContent value="treatment" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
               <TreatmentPlanModule patientId={id!} />
+            </TabsContent>
+
+            <TabsContent value="diary" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
+              <DiaryModule patientId={id!} />
             </TabsContent>
 
             <TabsContent value="analysis" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
