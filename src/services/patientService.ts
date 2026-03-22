@@ -4,9 +4,13 @@ import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
 
 export const patientService = {
   list: async (): Promise<Patient[]> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado");
+
     const { data, error } = await supabase
       .from('patients')
       .select('*')
+      .eq('psychologist_id', user.id)
       .order('full_name', { ascending: true });
     
     if (error) throw error;
@@ -38,9 +42,11 @@ export const patientService = {
     const tier = (profile?.subscription_tier as SubscriptionTier) || 'free';
     const limit = PLAN_LIMITS[tier].maxPatients;
 
+    // Conta apenas os pacientes DESTE psicólogo para validar o limite
     const { count } = await supabase
       .from('patients')
-      .select('*', { count: 'exact', head: true });
+      .select('*', { count: 'exact', head: true })
+      .eq('psychologist_id', user.id);
 
     if (count !== null && count >= limit) {
       throw new Error(`Limite atingido! Seu plano ${PLAN_LIMITS[tier].name} permite apenas ${limit} pacientes. Faça um upgrade para continuar.`);
