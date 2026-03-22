@@ -11,24 +11,32 @@ serve(async (req) => {
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-  const serviceToken = Deno.env.get('PROCESSING_SERVICE_INTERNAL_TOKEN');
   
-  // URL específica para análise conforme seu exemplo de curl bem-sucedido
+  // Usando o token específico para o Parecer Clínico que você tem configurado
+  const serviceToken = Deno.env.get('PROCESSING_SERVICE_PARECER_CLINICO_TOKEN') || Deno.env.get('PROCESSING_SERVICE_INTERNAL_TOKEN');
+  
+  // URL correta do serviço de análise de histórico (JSON)
   const ANALYSIS_URL = "https://patient-analysis-service-production.up.railway.app/process-patient-analysis";
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) throw new Error('Não autorizado');
+    if (!authHeader) throw new Error('Não autorizado: Token ausente');
 
-    const { patientId } = await req.json();
+    const body = await req.json();
+    const patientId = body.patientId;
+
     if (!patientId) throw new Error('patientId é obrigatório');
 
-    // 1. Buscar dados do paciente e sessões
+    // 1. Buscar dados do paciente e as últimas 10 sessões para contexto
     const [patientRes, sessionsRes] = await Promise.all([
       supabase.from('patients').select('*').eq('id', patientId).single(),
-      supabase.from('sessions').select('*').eq('patient_id', patientId).order('session_date', { ascending: false }).limit(10)
+      supabase.from('sessions')
+        .select('id, session_date, manual_notes, transcript, highlights, next_steps')
+        .eq('patient_id', patientId)
+        .order('session_date', { ascending: false })
+        .limit(10)
     ]);
 
     const patient = patientRes.data;
@@ -36,7 +44,7 @@ serve(async (req) => {
 
     if (!patient) throw new Error('Paciente não encontrado');
 
-    // 2. Montar o payload conforme o curl (camelCase e estrutura aninhada)
+    // 2. Montar o payload JSON conforme esperado pelo serviço de análise
     const payload = {
       patientId: patient.id,
       psychologistId: patient.psychologist_id,
@@ -54,9 +62,9 @@ serve(async (req) => {
       }))
     };
 
-    console.log(`[analyze-patient-history] Enviando análise JSON para: ${ANALYSIS_URL}`);
+    console.log(`[analyze-patient-history] Enviando análise para o serviço correto: ${ANALYSIS_URL}`);
 
-    // 3. Chamar o serviço externo
+    // 3. Fazer a requisição POST enviando JSON puro
     const response = await fetch(ANALYSIS_URL, {
       method: 'POST',
       headers: { 
@@ -68,11 +76,12 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[analyze-patient-history] Resposta de erro: ${errorText}`);
-      throw new Error(`Erro no Serviço de Análise: ${errorText}`);
+      console.error(`[analyze-patient-history] Erro no serviço externo: ${errorText}`);
+      throw new Error(`Serviço de Análise retornou erro: ${errorText}`);
     }
 
     const result = await response.json();
+    
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
