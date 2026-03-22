@@ -2,6 +2,22 @@ import { supabase } from "@/integrations/supabase/client";
 import { PatientLog, PatientLogPrompt } from "@/types/diary";
 
 export const diaryService = {
+  // Helpers de Contexto do Paciente
+  getPatientContext: async (): Promise<{ patientId: string; psychologistId: string } | null> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data, error } = await supabase
+      .from('patient_access')
+      .select('patient_id, psychologist_id')
+      .eq('user_id', user.id)
+      .eq('status', 'active')
+      .maybeSingle();
+    
+    if (error || !data) return null;
+    return { patientId: data.patient_id, psychologistId: data.psychologist_id };
+  },
+
   // Logs
   listLogs: async (patientId: string): Promise<PatientLog[]> => {
     const { data, error } = await supabase
@@ -18,13 +34,16 @@ export const diaryService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
+    // Se created_by não vier no log, assumimos que é o psicólogo
+    const entry = {
+      ...log,
+      psychologist_id: log.psychologist_id || user.id,
+      created_by: log.created_by || 'psychologist'
+    };
+
     const { data, error } = await supabase
       .from('patient_logs')
-      .insert([{ 
-        ...log, 
-        psychologist_id: user.id,
-        created_by: 'psychologist'
-      }])
+      .insert([entry])
       .select()
       .single();
     
