@@ -32,9 +32,19 @@ serve(async (req) => {
       .single();
 
     if (sError || !session) throw new Error('Sessão não encontrada');
-    if (!session.transcript && !session.manual_notes) throw new Error('Sessão sem conteúdo para análise');
+    
+    // Regra de conteúdo mínima: transcrição, notas manuais ou qualquer campo clínico
+    const hasContent = !!(
+      session.transcript || 
+      session.manual_notes || 
+      session.clinical_notes || 
+      session.interventions || 
+      session.session_summary_manual
+    );
 
-    // SIMULAÇÃO DE ANÁLISE IA (Aqui você integraria com OpenAI/Anthropic no futuro)
+    if (!hasContent) throw new Error('Sessão sem conteúdo suficiente para análise. Adicione notas ou transcrição.');
+
+    // SIMULAÇÃO DE ANÁLISE IA (Futura integração real aqui)
     const mockAnalysis = {
       summary: "O paciente demonstrou progresso significativo na regulação emocional. Relatou melhora nos conflitos familiares, embora ainda apresente resistência ao abordar traumas de infância.",
       key_patterns: [

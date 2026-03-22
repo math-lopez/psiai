@@ -26,7 +26,6 @@ const SessionDetail = () => {
   const [processing, setProcessing] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Estados para a nova análise de IA
   const [aiAnalysis, setAiAnalysis] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
@@ -70,11 +69,6 @@ const SessionDetail = () => {
   };
 
   const handleAnalyzeSessionAI = async () => {
-    if (!session?.transcript) {
-      showError("É necessário ter uma transcrição para gerar a análise profunda.");
-      return;
-    }
-    
     setIsAnalyzing(true);
     setAnalysisError(null);
     try {
@@ -108,6 +102,16 @@ const SessionDetail = () => {
 
   const isUltra = PLAN_LIMITS[tier].hasTherapeuticInsights;
   const isProcessing = ['queued', 'processing'].includes(session.processing_status);
+
+  // Nova lógica de habilitação: verifica se há qualquer conteúdo relevante
+  const hasSufficientContent = !!(
+    (session.transcript && session.transcript.trim().length > 20) ||
+    (session.manual_notes && session.manual_notes.trim().length > 20) ||
+    (session.clinical_notes && session.clinical_notes.trim().length > 20) ||
+    (session.interventions && session.interventions.trim().length > 20) ||
+    (session.session_summary_manual && session.session_summary_manual.trim().length > 20) ||
+    (session.highlights && session.highlights.length > 0)
+  );
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 pb-20">
@@ -149,7 +153,6 @@ const SessionDetail = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Sidebar Informativa */}
         <div className="space-y-6">
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
             <div className="h-1.5 w-full bg-slate-100" />
@@ -181,9 +184,7 @@ const SessionDetail = () => {
           )}
         </div>
 
-        {/* Conteúdo Principal */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Seção Clínica Estruturada */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
               <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-blue-500"><ClipboardList className="h-4 w-4" /> Notas Clínicas</CardTitle></CardHeader>
@@ -206,7 +207,6 @@ const SessionDetail = () => {
             <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.manual_notes || "Sem notas adicionais."}</p></CardContent>
           </Card>
 
-          {/* NOVO BLOCO: Análise da Sessão com IA */}
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
             <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
             <CardHeader className="pb-2 border-b border-slate-50 mb-4 flex flex-row items-center justify-between">
@@ -258,14 +258,18 @@ const SessionDetail = () => {
                   </div>
                   <Button 
                     onClick={handleAnalyzeSessionAI} 
-                    disabled={!session.transcript}
+                    disabled={!hasSufficientContent}
                     className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-12 font-black px-8 shadow-xl shadow-indigo-100"
                   >
-                    {!session.transcript ? <Lock className="h-4 w-4 mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
-                    Gerar análise da sessão
+                    {!hasSufficientContent ? <Lock className="h-4 w-4 mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                    {hasSufficientContent ? "Gerar análise da sessão" : "Conteúdo insuficiente"}
                   </Button>
-                  {!session.transcript && (
-                    <p className="text-[10px] text-amber-600 font-black uppercase tracking-widest">Aguardando transcrição para habilitar</p>
+                  {!hasSufficientContent ? (
+                    <p className="text-[10px] text-amber-600 font-black uppercase tracking-widest">Adicione notas ou transcrição para habilitar</p>
+                  ) : (
+                    <p className="text-[10px] text-indigo-500 font-black uppercase tracking-widest flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" /> Análise disponível com base nos dados registrados
+                    </p>
                   )}
                 </div>
               ) : (
@@ -334,7 +338,6 @@ const SessionDetail = () => {
             <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.transcript || "Não disponível."}</p></CardContent>
           </Card>
 
-          {/* Bloqueio do Recurso Ultra para o resumo antigo de IA se o plano não permitir */}
           {session.processing_status === 'completed' && !aiAnalysis && (
             <div className="space-y-8 pt-6">
               <div className="flex items-center gap-3">
