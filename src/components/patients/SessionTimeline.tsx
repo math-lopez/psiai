@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Session } from "@/types";
 import { 
   Clock, CheckCircle2, AlertCircle, FileText, 
-  Mic, Sparkles, ChevronDown, ChevronUp, History, Info
+  Mic, Sparkles, ChevronDown, ChevronUp, History, Info, Stethoscope, ClipboardList
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,59 +28,59 @@ const TimelineItem = ({ session }: { session: Session }) => {
   };
 
   const status = statusConfig[session.processing_status] || statusConfig.draft;
-  const transcriptPreview = session.transcript ? session.transcript.substring(0, 200) + "..." : "Sem transcrição disponível.";
+  const summaryPreview = session.session_summary_manual || session.manual_notes || "Sem resumo disponível.";
 
   return (
-    <div className="relative pl-10 pb-12 group last:pb-0">
-      {/* Linha da Timeline */}
+    <div className="relative pl-12 pb-12 group last:pb-0">
       <div className="absolute left-[19px] top-0 bottom-0 w-[2px] bg-slate-100 group-last:bg-transparent" />
       
-      {/* Círculo do Status */}
       <div className={cn(
-        "absolute left-0 top-0 h-10 w-10 rounded-2xl border-4 border-white shadow-sm flex items-center justify-center z-10 transition-transform group-hover:scale-110",
-        session.processing_status === 'completed' ? 'bg-emerald-500' : 
-        session.processing_status === 'error' ? 'bg-red-500' : 'bg-slate-300'
+        "absolute left-0 top-0 h-10 w-10 rounded-2xl border-4 border-white shadow-md flex items-center justify-center z-10 transition-all group-hover:scale-105",
+        session.processing_status === 'completed' ? 'bg-indigo-600' : 'bg-slate-300'
       )}>
         {session.record_type === 'manual' ? <FileText className="h-4 w-4 text-white" /> : <Mic className="h-4 w-4 text-white" />}
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
+          <div className="space-y-1">
             <p className="text-sm font-black text-slate-900">
               {format(new Date(session.session_date), "dd 'de' MMMM, yyyy 'às' HH:mm", { locale: ptBR })}
             </p>
-            <div className="flex items-center gap-3 mt-1">
-              <Badge className={cn("border-none px-2 py-0.5 text-[9px] font-black uppercase tracking-widest", status.class)}>
+            <div className="flex items-center gap-3">
+              <Badge className={cn("border-none px-2 py-0.5 text-[8px] font-black uppercase tracking-widest", status.class)}>
                 {status.label}
               </Badge>
-              <span className="text-[10px] font-bold text-slate-400 uppercase">{session.duration_minutes} min</span>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{session.duration_minutes} min</span>
             </div>
           </div>
           <Button 
             variant="ghost" 
             size="sm" 
             onClick={() => setExpanded(!expanded)}
-            className="rounded-xl gap-2 font-bold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50"
+            className="rounded-xl gap-2 font-black text-[10px] uppercase tracking-wider text-slate-400 hover:text-indigo-600 hover:bg-indigo-50"
           >
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            {expanded ? "Recolher" : "Ver detalhes"}
+            {expanded ? "Recolher Detalhes" : "Ver Registro Clínico"}
           </Button>
         </div>
 
         <div className={cn(
-          "bg-white border border-slate-100 rounded-3xl p-6 transition-all duration-300",
+          "bg-white border border-slate-100 rounded-[32px] p-8 transition-all duration-300",
           expanded ? "shadow-xl border-indigo-100 ring-1 ring-indigo-50" : "shadow-sm hover:border-slate-200"
         )}>
           {!expanded ? (
-            <div className="space-y-3">
-              <p className="text-sm text-slate-600 italic line-clamp-2">
-                {session.manual_notes || "Nenhuma nota inserida."}
-              </p>
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <ClipboardList className="h-4 w-4 text-indigo-300 mt-0.5 shrink-0" />
+                <p className="text-sm text-slate-600 italic line-clamp-2 leading-relaxed">
+                  {summaryPreview}
+                </p>
+              </div>
               {session.highlights && session.highlights.length > 0 && (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 pt-2">
                   {session.highlights.slice(0, 3).map((h, i) => (
-                    <span key={i} className="px-2 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-bold rounded-lg truncate max-w-[150px]">
+                    <span key={i} className="px-2.5 py-1 bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase rounded-lg tracking-wider">
                       {h}
                     </span>
                   ))}
@@ -88,52 +88,45 @@ const TimelineItem = ({ session }: { session: Session }) => {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-top-2 duration-300">
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
-                    <FileText className="h-3 w-3" /> Notas Manuais
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="space-y-8">
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2">
+                    <ClipboardList className="h-3.5 w-3.5" /> Resumo do Atendimento
                   </h4>
-                  <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
-                    {session.manual_notes || "Sem notas."}
+                  <p className="text-sm text-slate-700 leading-relaxed italic">
+                    {session.session_summary_manual || "Não preenchido."}
                   </p>
                 </div>
                 
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <h4 className="text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2">
-                    <Sparkles className="h-3 w-3" /> Transcrição Inteligente
+                    <Stethoscope className="h-3.5 w-3.5" /> Intervenções
                   </h4>
-                  <p className="text-xs text-slate-600 leading-relaxed max-h-[200px] overflow-y-auto pr-2 scrollbar-thin">
-                    {session.transcript || "Transcrição não disponível."}
+                  <p className="text-sm text-slate-700 leading-relaxed">
+                    {session.interventions || "Não preenchido."}
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-6 bg-slate-50/50 p-4 rounded-2xl">
-                <div className="space-y-2">
-                  <h4 className="text-[10px] font-black uppercase text-indigo-600 tracking-widest flex items-center gap-2">
-                    <Info className="h-3 w-3" /> Destaques (Highlights)
+              <div className="space-y-8 bg-slate-50/50 p-6 rounded-3xl">
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
+                    <FileText className="h-3.5 w-3.5" /> Notas de Evolução
                   </h4>
-                  <ul className="space-y-2">
-                    {session.highlights && session.highlights.length > 0 ? (
-                      session.highlights.map((h, i) => (
-                        <li key={i} className="text-xs text-slate-700 flex gap-2 font-medium">
-                          <div className="h-1 w-1 rounded-full bg-indigo-400 mt-1.5 shrink-0" />
-                          {h}
-                        </li>
-                      ))
-                    ) : <li className="text-xs text-slate-400 italic">Sem destaques processados.</li>}
-                  </ul>
-                </div>
-
-                <div className="space-y-2 pt-4 border-t border-slate-100">
-                  <h4 className="text-[10px] font-black uppercase text-amber-600 tracking-widest flex items-center gap-2">
-                    <ArrowRight className="h-3 w-3" /> Próximos Passos
-                  </h4>
-                  <p className="text-xs text-slate-700 font-medium">
-                    {session.next_steps || "Sem sugestões definidas."}
+                  <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-wrap">
+                    {session.clinical_notes || "Sem notas clínicas registradas."}
                   </p>
                 </div>
+
+                {session.next_steps && (
+                  <div className="space-y-2 pt-4 border-t border-slate-100">
+                    <h4 className="text-[10px] font-black uppercase text-amber-600 tracking-widest flex items-center gap-2">
+                      <Sparkles className="h-3.5 w-3.5" /> Próximos Passos (IA)
+                    </h4>
+                    <p className="text-xs text-slate-700 font-medium">{session.next_steps}</p>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -146,25 +139,24 @@ const TimelineItem = ({ session }: { session: Session }) => {
 export const SessionTimeline = ({ sessions }: SessionTimelineProps) => {
   if (!sessions || sessions.length === 0) {
     return (
-      <div className="text-center py-20 bg-white rounded-[32px] border-none shadow-sm">
-        <History className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-        <h3 className="text-slate-900 font-bold">Nenhuma sessão encontrada</h3>
-        <p className="text-slate-400 text-sm mt-1">Este paciente ainda não possui atendimentos registrados.</p>
+      <div className="text-center py-20 bg-white rounded-[32px] shadow-sm">
+        <History className="h-12 w-12 text-slate-100 mx-auto mb-4" />
+        <h3 className="text-slate-900 font-bold">Inicie o acompanhamento</h3>
+        <p className="text-slate-400 text-sm mt-1">Nenhuma sessão registrada para este paciente.</p>
       </div>
     );
   }
 
-  // Ordena por data decrescente (mais recente primeiro)
   const sortedSessions = [...sessions].sort((a, b) => 
     new Date(b.session_date).getTime() - new Date(a.session_date).getTime()
   );
 
   return (
     <div className="space-y-2">
-      <div className="flex items-center gap-3 mb-8">
-        <h3 className="text-xl font-black text-slate-900">Timeline Terapêutica</h3>
-        <Badge variant="outline" className="border-slate-200 text-slate-500 font-bold">
-          {sessions.length} atendimentos
+      <div className="flex items-center gap-3 mb-10 px-2">
+        <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase text-xs tracking-widest">Timeline Clínico-Terapêutica</h3>
+        <Badge variant="outline" className="border-slate-200 text-slate-400 font-black text-[10px]">
+          {sessions.length} ATENDIMENTOS
         </Badge>
       </div>
       <div className="relative">
@@ -175,5 +167,3 @@ export const SessionTimeline = ({ sessions }: SessionTimelineProps) => {
     </div>
   );
 };
-
-import { ArrowRight } from "lucide-react";

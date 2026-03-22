@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2, Lock, Sparkles } from "lucide-react";
+import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2, Lock, Sparkles, Stethoscope, ClipboardCheck, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ import { patientService } from "@/services/patientService";
 import { sessionService } from "@/services/sessionService";
 import { Patient, SessionRecordType } from "@/types";
 import { showSuccess, showError } from "@/utils/toast";
-import { validateAudioFile } from "@/lib/file-utils";
+import { validateAudioFile } from "@/file-utils";
 import { supabase } from "@/integrations/supabase/client";
 import { SubscriptionTier } from "@/config/plans";
 import { getLocalDateTime } from "@/lib/utils";
@@ -29,6 +29,7 @@ const SessionFormPage = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [recordType, setRecordType] = useState<SessionRecordType>("ambos");
   const [tier, setTier] = useState<SubscriptionTier>("free");
   
@@ -37,27 +38,22 @@ const SessionFormPage = () => {
     session_date: getLocalDateTime(),
     duration_minutes: 50,
     manual_notes: "",
+    clinical_notes: "",
+    interventions: "",
+    session_summary_manual: "",
   });
   
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [existingAudioName, setExistingAudioName] = useState<string | null>(null);
+  const initialLoad = useRef(true);
+  const saveTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user?.id)
-          .maybeSingle();
-        
-        if (!profileError && profile?.subscription_tier) {
-          setTier(profile.subscription_tier as SubscriptionTier);
-        } else {
-          setTier("free");
-        }
+        const { data: profile } = await supabase.from('profiles').select('*').eq('id', user?.id).maybeSingle();
+        setTier(profile?.subscription_tier as SubscriptionTier || "free");
 
         const pats = await patientService.list();
         setPatients(pats);
@@ -70,47 +66,57 @@ const SessionFormPage = () => {
               session_date: new Date(session.session_date).toISOString().slice(0, 16),
               duration_minutes: session.duration_minutes,
               manual_notes: session.manual_notes || "",
+              clinical_notes: session.clinical_notes || "",
+              interventions: session.interventions || "",
+              session_summary_manual: session.session_summary_manual || "",
             });
             setRecordType(session.record_type);
             setExistingAudioName(session.audio_file_name);
           }
         }
-      } catch (e) {
-        console.error("Erro ao carregar dados:", e);
-      } finally {
-        setLoading(false);
-      }
+      } catch (e) { console.error(e); } finally { setLoading(false); }
     };
     loadData();
   }, [id]);
 
+  // Lógica de Autosave
+  useEffect(() => {
+    if (initialLoad.current) {
+      initialLoad.current = false;
+      return;
+    }
+
+    if (!id || loading) return;
+
+    if (saveTimeout.current) clearTimeout(saveTimeout.current);
+
+    setSaving(true);
+    saveTimeout.current = setTimeout(async () => {
+      try {
+        await sessionService.update(id, { ...formData, record_type: recordType });
+      } catch (e) { console.error("Erro no autosave:", e); } finally { setSaving(false); }
+    }, 1500);
+
+    return () => { if (saveTimeout.current) clearTimeout(saveTimeout.current); };
+  }, [formData, recordType, id, loading]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (tier === 'free') {
-      showError("Seu plano atual não permite transcrição de áudio.");
+      showError("Upgrade necessário para áudio.");
       e.target.value = '';
       return;
     }
     const file = e.target.files?.[0];
     if (!file) return;
-
     const validation = validateAudioFile(file);
-    if (!validation.valid) {
-      showError(validation.error!);
-      e.target.value = '';
-      return;
-    }
-
+    if (!validation.valid) { showError(validation.error!); e.target.value = ''; return; }
     setAudioFile(file);
     setExistingAudioName(null);
   };
 
   const handleSave = async (e: React.FormEvent, shouldFinish: boolean = false) => {
     e.preventDefault();
-    if (!formData.patient_id) {
-      showError("Por favor, selecione um paciente.");
-      return;
-    }
-
+    if (!formData.patient_id) { showError("Selecione um paciente."); return; }
     setSubmitting(true);
     try {
       let savedSession;
@@ -119,69 +125,60 @@ const SessionFormPage = () => {
       } else {
         savedSession = await sessionService.create({ ...formData, record_type: recordType }, audioFile || undefined);
       }
-
       if (shouldFinish) {
         await sessionService.finishSession(savedSession.id);
-        showSuccess(audioFile || existingAudioName ? "Sessão enviada para processamento!" : "Sessão finalizada com sucesso!");
-      } else {
-        showSuccess("Rascunho salvo com sucesso!");
-      }
+        showSuccess("Sessão finalizada!");
+      } else { showSuccess("Rascunho salvo!"); }
       navigate("/sessoes");
-    } catch (error: any) {
-      showError(error.message || "Erro ao salvar sessão");
-    } finally {
-      setSubmitting(false);
-    }
+    } catch (error: any) { showError(error.message || "Erro ao salvar"); } finally { setSubmitting(false); }
   };
 
   if (loading) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-indigo-600" /></div>;
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">{id ? "Editar Sessão" : "Nova Sessão"}</h1>
-          <p className="text-slate-500">Registre os detalhes do atendimento.</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}><ChevronLeft className="h-5 w-5" /></Button>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">{id ? "Editar Atendimento" : "Novo Atendimento"}</h1>
+            <p className="text-slate-500 text-sm">Registre os detalhes clínicos da sessão.</p>
+          </div>
         </div>
+        {saving && <div className="flex items-center gap-2 text-[10px] font-black uppercase text-indigo-400 animate-pulse"><Loader2 className="h-3 w-3 animate-spin" /> Salvando...</div>}
       </div>
 
       <form className="space-y-6">
-        <Card>
-          <CardContent className="p-6 space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="rounded-[32px] border-none shadow-sm bg-white overflow-hidden">
+          <CardContent className="p-8 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-2">
-                <Label htmlFor="patient">Paciente *</Label>
+                <Label className="text-xs font-black uppercase text-slate-400">Paciente</Label>
                 <Select required value={formData.patient_id} onValueChange={(v) => setFormData({...formData, patient_id: v})} disabled={!!id}>
-                  <SelectTrigger>
+                  <SelectTrigger className="rounded-2xl h-12">
                     <SelectValue placeholder="Selecione o paciente" />
                   </SelectTrigger>
                   <SelectContent>
-                    {patients.map(p => (
-                      <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>
-                    ))}
+                    {patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="date">Data e Hora *</Label>
+                  <Label className="text-xs font-black uppercase text-slate-400">Data e Hora</Label>
                   <Input 
-                    id="date" 
                     type="datetime-local" 
-                    required 
+                    className="rounded-2xl h-12"
                     value={formData.session_date}
                     onChange={(e) => setFormData({...formData, session_date: e.target.value})}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="duration">Duração (min)</Label>
+                  <Label className="text-xs font-black uppercase text-slate-400">Duração (min)</Label>
                   <Input 
-                    id="duration" 
                     type="number" 
+                    className="rounded-2xl h-12"
                     value={formData.duration_minutes}
                     onChange={(e) => setFormData({...formData, duration_minutes: parseInt(e.target.value)})}
                   />
@@ -189,121 +186,84 @@ const SessionFormPage = () => {
               </div>
             </div>
 
-            <div className="space-y-4 pt-4 border-t">
-              <Label>Tipo de Registro</Label>
-              <RadioGroup 
-                value={recordType} 
-                className="flex flex-col md:flex-row gap-4"
-                onValueChange={(v: any) => {
-                  if (v === 'ambos' && tier === 'free') {
-                    showError("Upgrade necessário para gravar áudio.");
-                    return;
-                  }
-                  setRecordType(v);
-                }}
-              >
-                <div className="flex items-center space-x-2 border p-4 rounded-lg flex-1 cursor-pointer">
-                  <RadioGroupItem value="manual" id="manual" />
-                  <Label htmlFor="manual" className="flex items-center gap-2 cursor-pointer">
-                    <FileText className="h-4 w-4" /> Apenas Anotações
-                  </Label>
-                </div>
-                <div className={`flex items-center space-x-2 border p-4 rounded-lg flex-1 cursor-pointer relative ${tier === 'free' ? 'opacity-60 bg-slate-50' : ''}`}>
-                  <RadioGroupItem value="ambos" id="ambos" disabled={tier === 'free'} />
-                  <Label htmlFor="ambos" className="flex items-center gap-2 cursor-pointer">
-                    <Mic className="h-4 w-4" /> Áudio + Notas
-                    {tier === 'free' && <Lock className="h-3 w-3 text-slate-400" />}
-                  </Label>
-                </div>
-              </RadioGroup>
+            <div className="space-y-6 pt-6 border-t border-slate-50">
+              <div className="flex items-center gap-2 text-indigo-600 mb-2">
+                <Stethoscope className="h-5 w-5" />
+                <h3 className="font-black text-sm uppercase tracking-widest">Registro Clínico</h3>
+              </div>
               
-              {tier === 'free' && (
-                <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg flex items-center gap-3">
-                  <Sparkles className="h-4 w-4 text-amber-600" />
-                  <p className="text-xs text-amber-700">
-                    O plano gratuito não permite gravação de áudio. <Link to="/assinatura" className="font-bold underline">Faça upgrade</Link> para transcrever suas sessões.
-                  </p>
+              <div className="grid grid-cols-1 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-700">Notas Clínicas (Observações de evolução, sintomas, queixas)</Label>
+                  <Textarea 
+                    placeholder="Quais foram as principais observações clínicas hoje?" 
+                    className="min-h-[120px] rounded-2xl resize-none border-slate-100 bg-slate-50/30"
+                    value={formData.clinical_notes}
+                    onChange={(e) => setFormData({...formData, clinical_notes: e.target.value})}
+                  />
                 </div>
-              )}
+                
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-700">Intervenções Terapêuticas (Técnicas aplicadas, manejo clínico)</Label>
+                  <Textarea 
+                    placeholder="Quais intervenções foram realizadas nesta sessão?" 
+                    className="min-h-[100px] rounded-2xl resize-none border-slate-100 bg-slate-50/30"
+                    value={formData.interventions}
+                    onChange={(e) => setFormData({...formData, interventions: e.target.value})}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-slate-700">Resumo da Sessão (Visão consolidada do atendimento)</Label>
+                  <Textarea 
+                    placeholder="Resuma os pontos principais do atendimento..." 
+                    className="min-h-[100px] rounded-2xl resize-none border-slate-100 bg-slate-50/30"
+                    value={formData.session_summary_manual}
+                    onChange={(e) => setFormData({...formData, session_summary_manual: e.target.value})}
+                  />
+                </div>
+              </div>
             </div>
 
-            {(recordType === 'audio' || recordType === 'ambos') && tier !== 'free' && (
-              <div className="space-y-4 pt-4 border-t">
-                <Label className="flex items-center gap-2 text-indigo-600 font-semibold">
-                  <Music className="h-4 w-4" /> Arquivo de Áudio
-                </Label>
-                
-                {existingAudioName || audioFile ? (
-                  <div className="flex items-center justify-between p-4 bg-indigo-50 border border-indigo-100 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-indigo-100 rounded-full">
-                        <Mic className="h-4 w-4 text-indigo-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-indigo-900">
-                          {audioFile ? audioFile.name : existingAudioName}
-                        </p>
-                        <p className="text-xs text-indigo-500">
-                          {audioFile ? `${(audioFile.size / (1024 * 1024)).toFixed(2)} MB` : "Arquivo já enviado"}
-                        </p>
-                      </div>
-                    </div>
-                    <Button 
-                      type="button" 
-                      variant="ghost" 
-                      size="sm" 
-                      className="text-indigo-600 hover:text-indigo-800"
-                      onClick={() => {
-                        setAudioFile(null);
-                        setExistingAudioName(null);
-                      }}
-                    >
-                      <X className="h-4 w-4 mr-1" /> Substituir
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <input 
-                      type="file" 
-                      accept=".mp3,.wav,.m4a,.webm,audio/*"
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                      onChange={handleFileChange}
-                    />
-                    <div className="border-2 border-dashed border-slate-200 rounded-lg p-10 text-center hover:bg-slate-50 transition-colors">
-                      <div className="flex flex-col items-center gap-2">
-                        <Upload className="h-8 w-8 text-slate-400" />
-                        <p className="text-slate-500 font-medium">Clique para selecionar ou arraste o áudio</p>
-                        <p className="text-xs text-slate-400">Formatos aceitos: MP3, WAV, M4A, WebM (Max 50MB)</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="space-y-4 pt-4 border-t">
-              <Label className="font-semibold text-slate-700">Anotações do Psicólogo</Label>
-              <Textarea 
-                placeholder="Escreva livremente sobre a sessão..." 
-                className="min-h-[250px] resize-none"
+            <div className="space-y-4 pt-6 border-t border-slate-50">
+               <Label className="text-xs font-black uppercase text-slate-400">Anotações Livres</Label>
+               <Textarea 
+                placeholder="Rascunho livre e anotações gerais..." 
+                className="min-h-[150px] rounded-2xl resize-none border-slate-100"
                 value={formData.manual_notes}
                 onChange={(e) => setFormData({...formData, manual_notes: e.target.value})}
               />
+            </div>
+
+            <div className="space-y-6 pt-6 border-t border-slate-50">
+               <Label className="text-xs font-black uppercase text-slate-400">Registro de Áudio</Label>
+               <RadioGroup value={recordType} onValueChange={(v: any) => setRecordType(v)} className="flex flex-col md:flex-row gap-4">
+                  <div className={cn("flex-1 p-4 rounded-2xl border-2 transition-all cursor-pointer", recordType === 'manual' ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-50')}>
+                    <RadioGroupItem value="manual" id="m" className="sr-only" />
+                    <Label htmlFor="m" className="flex items-center gap-3 cursor-pointer">
+                      <FileText className="h-5 w-5 text-slate-400" />
+                      <div className="text-sm font-bold">Apenas Notas</div>
+                    </Label>
+                  </div>
+                  <div className={cn("flex-1 p-4 rounded-2xl border-2 transition-all cursor-pointer", recordType === 'ambos' ? 'border-indigo-600 bg-indigo-50/30' : 'border-slate-50', tier === 'free' && 'opacity-50 grayscale')}>
+                    <RadioGroupItem value="ambos" id="a" disabled={tier === 'free'} className="sr-only" />
+                    <Label htmlFor="a" className="flex items-center gap-3 cursor-pointer">
+                      <Mic className="h-5 w-5 text-indigo-500" />
+                      <div className="text-sm font-bold">Áudio + Notas</div>
+                    </Label>
+                  </div>
+               </RadioGroup>
             </div>
           </CardContent>
         </Card>
 
         <div className="flex flex-col md:flex-row justify-end gap-3">
-          <Button type="button" variant="outline" onClick={() => navigate(-1)} disabled={submitting}>
-            Cancelar
+          <Button type="button" variant="outline" className="rounded-2xl h-12 px-8" onClick={() => navigate(-1)} disabled={submitting}>Cancelar</Button>
+          <Button type="button" variant="secondary" className="rounded-2xl h-12 px-8 font-bold" disabled={submitting} onClick={(e) => handleSave(e, false)}>
+            {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4 mr-2" />} Salvar Rascunho
           </Button>
-          <Button type="button" variant="secondary" className="gap-2" disabled={submitting} onClick={(e) => handleSave(e, false)}>
-            {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <Save className="h-4 w-4" />}
-            Salvar Rascunho
-          </Button>
-          <Button type="button" className="bg-indigo-600 hover:bg-indigo-700 gap-2 h-11 px-8" disabled={submitting} onClick={(e) => handleSave(e, true)}>
-            {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-            Finalizar Sessão
+          <Button type="button" className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-12 px-10 font-black shadow-lg shadow-indigo-100" disabled={submitting} onClick={(e) => handleSave(e, true)}>
+            {submitting ? <Loader2 className="animate-spin h-4 w-4" /> : <ClipboardCheck className="h-4 w-4 mr-2" />} Finalizar Sessão
           </Button>
         </div>
       </form>
