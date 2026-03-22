@@ -173,12 +173,86 @@ const SessionFormPage = () => {
       <form className="space-y-6">
         <Card className="rounded-[32px] border-none shadow-sm bg-white overflow-hidden">
           <CardContent className="p-8 space-y-10">
-            {/* 1. Tipo de Atendimento e Audio */}
+            
+            {/* 1. Paciente */}
             <div className="space-y-6">
+              <div className="space-y-2 flex flex-col">
+                <Label className="text-xs font-black uppercase text-slate-400 mb-1">1. Paciente</Label>
+                <Popover open={openPatientSelect} onOpenChange={setOpenPatientSelect}>
+                  <PopoverTrigger asChild disabled={!!id}>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openPatientSelect}
+                      className={cn(
+                        "w-full justify-between rounded-2xl h-12 border-slate-100 bg-slate-50/30 font-medium px-4",
+                        !formData.patient_id && "text-slate-400"
+                      )}
+                    >
+                      {selectedPatient ? selectedPatient.full_name : "Buscar paciente pelo nome..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0 rounded-2xl overflow-hidden shadow-2xl border-none" align="start">
+                    <Command className="rounded-2xl">
+                      <CommandInput placeholder="Digite o nome..." className="h-12 border-none focus:ring-0" />
+                      <CommandList className="max-h-[300px]">
+                        <CommandEmpty className="py-6 text-center text-sm text-slate-500">Nenhum paciente encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {patients.map((patient) => (
+                            <CommandItem
+                              key={patient.id}
+                              value={patient.full_name}
+                              onSelect={() => {
+                                setFormData({ ...formData, patient_id: patient.id });
+                                setOpenPatientSelect(false);
+                              }}
+                              className="px-4 py-3 cursor-pointer hover:bg-indigo-50 transition-colors"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 text-indigo-600",
+                                  formData.patient_id === patient.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <span className="font-bold text-slate-700">{patient.full_name}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase text-slate-400">2. Data e Hora</Label>
+                  <Input 
+                    type="datetime-local" 
+                    className="rounded-2xl h-12 border-slate-100 bg-slate-50/30"
+                    value={formData.session_date}
+                    onChange={(e) => setFormData({...formData, session_date: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-black uppercase text-slate-400">3. Duração (minutos)</Label>
+                  <Input 
+                    type="number" 
+                    className="rounded-2xl h-12 border-slate-100 bg-slate-50/30"
+                    value={formData.duration_minutes}
+                    onChange={(e) => setFormData({...formData, duration_minutes: parseInt(e.target.value)})}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 3. Tipo de Atendimento e Audio */}
+            <div className="space-y-6 pt-8 border-t border-slate-50">
                <div className="flex items-center justify-between">
-                 <Label className="text-xs font-black uppercase text-slate-400 tracking-widest">1. Tipo de Atendimento</Label>
+                 <Label className="text-xs font-black uppercase text-slate-400 tracking-widest">4. Tipo de Registro do Atendimento</Label>
                  {tier === 'free' && (
-                   <Badge variant="outline" className="text-[9px] font-black uppercase border-amber-200 text-amber-600 bg-amber-50">Somente Texto no Plano Free</Badge>
+                   <Badge variant="outline" className="text-[9px] font-black uppercase border-amber-200 text-amber-600 bg-amber-50">IA somente em Planos Pagos</Badge>
                  )}
                </div>
 
@@ -220,7 +294,7 @@ const SessionFormPage = () => {
                </RadioGroup>
 
                {showAudioUpload && (
-                 <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+                 <div className="animate-in fade-in slide-in-from-top-4 duration-500 pt-2">
                     <div 
                       onClick={() => fileInputRef.current?.click()}
                       className={cn(
@@ -271,80 +345,7 @@ const SessionFormPage = () => {
                )}
             </div>
 
-            {/* 2. Paciente, Data e Hora */}
-            <div className="space-y-8 pt-8 border-t border-slate-50">
-              <div className="space-y-2 flex flex-col">
-                <Label className="text-xs font-black uppercase text-slate-400 mb-1">2. Paciente</Label>
-                <Popover open={openPatientSelect} onOpenChange={setOpenPatientSelect}>
-                  <PopoverTrigger asChild disabled={!!id}>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={openPatientSelect}
-                      className={cn(
-                        "w-full justify-between rounded-2xl h-12 border-slate-100 bg-slate-50/30 font-medium px-4",
-                        !formData.patient_id && "text-slate-400"
-                      )}
-                    >
-                      {selectedPatient ? selectedPatient.full_name : "Buscar paciente..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[300px] p-0 rounded-2xl overflow-hidden shadow-2xl border-none" align="start">
-                    <Command className="rounded-2xl">
-                      <CommandInput placeholder="Digite o nome..." className="h-12 border-none focus:ring-0" />
-                      <CommandList className="max-h-[300px]">
-                        <CommandEmpty className="py-6 text-center text-sm text-slate-500">Nenhum paciente encontrado.</CommandEmpty>
-                        <CommandGroup>
-                          {patients.map((patient) => (
-                            <CommandItem
-                              key={patient.id}
-                              value={patient.full_name}
-                              onSelect={() => {
-                                setFormData({ ...formData, patient_id: patient.id });
-                                setOpenPatientSelect(false);
-                              }}
-                              className="px-4 py-3 cursor-pointer hover:bg-indigo-50 transition-colors"
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4 text-indigo-600",
-                                  formData.patient_id === patient.id ? "opacity-100" : "opacity-0"
-                                )}
-                              />
-                              <span className="font-bold text-slate-700">{patient.full_name}</span>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase text-slate-400">3. Data e Hora</Label>
-                  <Input 
-                    type="datetime-local" 
-                    className="rounded-2xl h-12 border-slate-100 bg-slate-50/30"
-                    value={formData.session_date}
-                    onChange={(e) => setFormData({...formData, session_date: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs font-black uppercase text-slate-400">4. Duração (minutos)</Label>
-                  <Input 
-                    type="number" 
-                    className="rounded-2xl h-12 border-slate-100 bg-slate-50/30"
-                    value={formData.duration_minutes}
-                    onChange={(e) => setFormData({...formData, duration_minutes: parseInt(e.target.value)})}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* 3. Registro Clínico Estruturado */}
+            {/* 4. Registro Clínico Estruturado */}
             <div className="space-y-6 pt-8 border-t border-slate-50">
               <div className="flex items-center gap-2 text-indigo-600 mb-2">
                 <Stethoscope className="h-5 w-5" />
@@ -384,7 +385,7 @@ const SessionFormPage = () => {
               </div>
             </div>
 
-            {/* 4. Rascunho Livre */}
+            {/* 5. Rascunho Livre */}
             <div className="space-y-4 pt-8 border-t border-slate-50">
                <Label className="text-[11px] font-black uppercase text-slate-400 tracking-wider">6. Rascunho Livre / Notas Gerais</Label>
                <Textarea 
