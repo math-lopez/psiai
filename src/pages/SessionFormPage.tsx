@@ -1,19 +1,30 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, CheckCircle2, Lock, Sparkles, Stethoscope, ClipboardCheck, Info, FileAudio } from "lucide-react";
+import { 
+  ChevronLeft, Save, Upload, Mic, FileText, Loader2, X, Music, 
+  CheckCircle2, Lock, Sparkles, Stethoscope, ClipboardCheck, 
+  Info, FileAudio, Check, ChevronsUpDown, Search as SearchIcon
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Card, CardContent } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
 import { patientService } from "@/services/patientService";
 import { sessionService } from "@/services/sessionService";
 import { Patient, SessionRecordType } from "@/types";
@@ -33,6 +44,7 @@ const SessionFormPage = () => {
   const [saving, setSaving] = useState(false);
   const [recordType, setRecordType] = useState<SessionRecordType>("ambos");
   const [tier, setTier] = useState<SubscriptionTier>("free");
+  const [openPatientSelect, setOpenPatientSelect] = useState(false);
   
   const [formData, setFormData] = useState({
     patient_id: "",
@@ -143,6 +155,7 @@ const SessionFormPage = () => {
   if (loading) return <div className="p-10 text-center"><Loader2 className="animate-spin mx-auto h-8 w-8 text-indigo-600" /></div>;
 
   const showAudioUpload = recordType === 'audio' || recordType === 'ambos';
+  const selectedPatient = patients.find((p) => p.id === formData.patient_id);
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -161,16 +174,53 @@ const SessionFormPage = () => {
         <Card className="rounded-[32px] border-none shadow-sm bg-white overflow-hidden">
           <CardContent className="p-8 space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <div className="space-y-2">
-                <Label className="text-xs font-black uppercase text-slate-400">Paciente</Label>
-                <Select required value={formData.patient_id} onValueChange={(v) => setFormData({...formData, patient_id: v})} disabled={!!id}>
-                  <SelectTrigger className="rounded-2xl h-12 border-slate-100 bg-slate-50/30">
-                    <SelectValue placeholder="Selecione o paciente" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl">
-                    {patients.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-2 flex flex-col">
+                <Label className="text-xs font-black uppercase text-slate-400 mb-1">Paciente</Label>
+                <Popover open={openPatientSelect} onOpenChange={setOpenPatientSelect}>
+                  <PopoverTrigger asChild disabled={!!id}>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={openPatientSelect}
+                      className={cn(
+                        "w-full justify-between rounded-2xl h-12 border-slate-100 bg-slate-50/30 font-medium px-4",
+                        !formData.patient_id && "text-slate-400"
+                      )}
+                    >
+                      {selectedPatient ? selectedPatient.full_name : "Buscar paciente..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0 rounded-2xl overflow-hidden shadow-2xl border-none" align="start">
+                    <Command className="rounded-2xl">
+                      <CommandInput placeholder="Digite o nome..." className="h-12 border-none focus:ring-0" />
+                      <CommandList className="max-h-[300px]">
+                        <CommandEmpty className="py-6 text-center text-sm text-slate-500">Nenhum paciente encontrado.</CommandEmpty>
+                        <CommandGroup>
+                          {patients.map((patient) => (
+                            <CommandItem
+                              key={patient.id}
+                              value={patient.full_name}
+                              onSelect={() => {
+                                setFormData({ ...formData, patient_id: patient.id });
+                                setOpenPatientSelect(false);
+                              }}
+                              className="px-4 py-3 cursor-pointer hover:bg-indigo-50 transition-colors"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4 text-indigo-600",
+                                  formData.patient_id === patient.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <span className="font-bold text-slate-700">{patient.full_name}</span>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
