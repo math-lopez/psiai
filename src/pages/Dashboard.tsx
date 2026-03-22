@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Users, Calendar, Clock, CheckCircle2, Plus, ArrowRight, Loader2, Sparkles, TrendingUp } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { sessionService } from "@/services/sessionService";
 import { patientService } from "@/services/patientService";
+import { diaryService } from "@/services/diaryService";
 import { DashboardStats, Session, Patient } from "@/types";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -29,6 +30,7 @@ const StatCard = ({ title, value, icon: Icon, gradient }: any) => (
 );
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -37,6 +39,13 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Verifica se é paciente para redirecionar
+        const context = await diaryService.getPatientContext();
+        if (context) {
+          navigate("/meu-painel", { replace: true });
+          return;
+        }
+
         const [s, sess, pats] = await Promise.all([
           sessionService.getStats(),
           sessionService.list(),
@@ -52,7 +61,7 @@ const Dashboard = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [navigate]);
 
   if (loading) {
     return (
