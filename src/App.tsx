@@ -7,6 +7,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { PatientPortalLayout } from "./components/layout/PatientPortalLayout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 import Index from "./pages/Index";
 import Login from "./pages/Login";
@@ -77,6 +78,7 @@ const App = () => (
           </Routes>
         </BrowserRouter>
         <Analytics />
+        <SpeedInsights />
       </TooltipProvider>
     </AuthProvider>
   </QueryClientProvider>
