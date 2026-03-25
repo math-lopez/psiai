@@ -175,16 +175,87 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
   return (
     <div className="space-y-8 pb-10">
       {!activePlan ? (
-        // Estado Vazio (Sem Plano Ativo)
-        <div className="text-center py-24 bg-white rounded-[48px] border border-dashed border-slate-200 animate-in fade-in zoom-in duration-500">
-          <div className="h-24 w-24 bg-indigo-50 rounded-[32px] flex items-center justify-center mx-auto mb-6 shadow-sm">
-            <Target className="h-12 w-12 text-indigo-300" />
+        <div className="space-y-8">
+          {/* Estado Vazio (Sem Plano Ativo) */}
+          <div className="text-center py-24 bg-white rounded-[48px] border border-dashed border-slate-200 animate-in fade-in zoom-in duration-500">
+            <div className="h-24 w-24 bg-indigo-50 rounded-[32px] flex items-center justify-center mx-auto mb-6 shadow-sm">
+              <Target className="h-12 w-12 text-indigo-300" />
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 mb-2">Traçar Nova Rota</h3>
+            <p className="text-slate-500 max-w-sm mx-auto mb-10 font-medium">
+              Não há um plano terapêutico ativo para este paciente no momento.
+            </p>
+            <Button
+              onClick={() => {
+                setPlanForm({ title: "", description: "" });
+                setIsEditingPlan(false);
+                setIsPlanDialogOpen(true);
+              }}
+              className="bg-primary hover:bg-primary/90 rounded-[20px] h-14 px-12 shadow-xl shadow-primary/20 gap-3 font-black text-lg transition-all active:scale-95"
+            >
+              <Plus className="h-6 w-6" /> Começar Planejamento
+            </Button>
           </div>
-          <h3 className="text-2xl font-black text-slate-900 mb-2">Traçar Nova Rota</h3>
-          <p className="text-slate-500 max-w-sm mx-auto mb-10 font-medium">Não há um plano terapêutico ativo para este paciente no momento.</p>
-          <Button onClick={() => { setPlanForm({ title: '', description: '' }); setIsEditingPlan(false); setIsPlanDialogOpen(true); }} className="bg-primary hover:bg-primary/90 rounded-[20px] h-14 px-12 shadow-xl shadow-primary/20 gap-3 font-black text-lg transition-all active:scale-95">
-            <Plus className="h-6 w-6" /> Começar Planejamento
-          </Button>
+
+          {/* Histórico (mesmo sem plano ativo) */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 px-4 flex items-center gap-2">
+              <History className="h-4 w-4" /> Histórico de Planos
+            </h3>
+
+            {historyPlans.length > 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {historyPlans.map((plan) => (
+                  <Card
+                    key={plan.id}
+                    onClick={() => setViewingHistoryPlan(plan)}
+                    className="border-none shadow-sm rounded-[32px] bg-white hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer group overflow-hidden"
+                  >
+                    <div
+                      className={cn(
+                        "h-1.5 w-full",
+                        plan.status === "completed" ? "bg-emerald-400" : "bg-slate-200"
+                      )}
+                    />
+                    <CardContent className="p-6 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Badge
+                          className={cn(
+                            "px-2.5 py-1",
+                            plan.status === "completed"
+                              ? "bg-emerald-50 text-emerald-600"
+                              : "bg-slate-50 text-slate-400"
+                          )}
+                        >
+                          {plan.status === "completed" ? "Concluído" : "Arquivado"}
+                        </Badge>
+                        <div className="h-8 w-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-300 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-all">
+                          <Eye className="h-4 w-4" />
+                        </div>
+                      </div>
+                      <h4 className="font-bold text-slate-800 leading-tight group-hover:text-indigo-600 transition-colors line-clamp-1">
+                        {plan.title}
+                      </h4>
+                      <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                        <Calendar className="h-3 w-3" />
+                        <span>
+                          {format(new Date(plan.start_date), "MMM/yy")} —{" "}
+                          {plan.end_date ? format(new Date(plan.end_date), "MMM/yy") : "Fim"}
+                        </span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="py-20 text-center bg-slate-50/30 rounded-[32px] border border-dashed border-slate-100 flex flex-col items-center gap-3">
+                <History className="h-10 w-10 text-slate-100" />
+                <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">
+                  Sem histórico
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         // Visualização do Plano Ativo
