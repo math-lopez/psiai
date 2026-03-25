@@ -46,17 +46,23 @@ export const PromptForm = ({ isOpen, onClose, onSuccess, patientId }: PromptForm
 
     setLoading(true);
     try {
-      await diaryService.createPrompt({
+      // Ajuste crucial: se due_date for string vazia, enviamos null para o banco
+      const payload = {
         ...formData,
+        due_date: formData.due_date ? new Date(formData.due_date).toISOString() : null,
         patient_id: patientId,
-        status: 'active'
-      });
+        status: 'active' as const
+      };
+
+      await diaryService.createPrompt(payload);
+      
       showSuccess("Tarefa atribuída!");
       onSuccess();
       onClose();
       setFormData({ title: "", description: "", prompt_type: "homework", due_date: "" });
-    } catch (e) {
-      showError("Erro ao criar tarefa.");
+    } catch (e: any) {
+      console.error("Erro ao criar prompt:", e);
+      showError(e.message || "Erro ao criar tarefa.");
     } finally {
       setLoading(false);
     }

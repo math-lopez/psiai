@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { LogType } from "@/types/diary";
+import { LogType, PatientLog } from "@/types/diary";
 import { diaryService } from "@/services/diaryService";
 import { 
   Dialog, 
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Smile, Heart, Sparkles } from "lucide-react";
+import { Loader2, Smile, Heart } from "lucide-react";
 import { showSuccess, showError } from "@/utils/toast";
 import { cn } from "@/lib/utils";
 
@@ -23,7 +23,7 @@ interface PatientLogFormProps {
   onClose: () => void;
   onSuccess: () => void;
   patientId: string;
-  psychologistId: string;
+  psychologistId: string; // Novo campo obrigatório
   promptId?: string | null;
   initialType?: LogType;
 }
@@ -56,7 +56,7 @@ export const PatientLogForm = ({ isOpen, onClose, onSuccess, patientId, psycholo
       await diaryService.createLog({
         ...formData,
         patient_id: patientId,
-        psychologist_id: psychologistId,
+        psychologist_id: psychologistId, // Enviando o ID do psicólogo corretamente
         created_by: 'patient',
         visibility: 'shared_with_patient'
       });
@@ -78,71 +78,64 @@ export const PatientLogForm = ({ isOpen, onClose, onSuccess, patientId, psycholo
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="rounded-[40px] border-none shadow-2xl p-6 md:p-10 max-w-xl w-[95vw] max-h-[90vh] overflow-y-auto no-scrollbar">
-        <DialogHeader className="text-center md:text-left">
-          <DialogTitle className="text-3xl font-black flex items-center justify-center md:justify-start gap-3">
-            <div className="bg-pink-100 p-2.5 rounded-2xl">
-              <Heart className="text-pink-500 h-7 w-7 fill-pink-500" /> 
-            </div>
-            {promptId ? "Minha Resposta" : "Como estou agora?"}
+      <DialogContent className="rounded-[32px] border-none shadow-2xl p-6 md:p-8 max-w-lg w-[95vw]">
+        <DialogHeader>
+          <DialogTitle className="text-2xl font-black flex items-center gap-3">
+            <Heart className="text-pink-500 h-6 w-6" /> 
+            {promptId ? "Responder Tarefa" : "Como você está?"}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-8 py-6">
-          <div className="space-y-4">
-            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
-              <Smile className="h-4 w-4" /> Escolha seu humor predominante
+        <form onSubmit={handleSubmit} className="space-y-6 py-4">
+          <div className="space-y-3">
+            <Label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2">
+              <Smile className="h-3 w-3" /> Seu humor agora
             </Label>
-            <div className="flex flex-wrap gap-3 justify-center md:justify-start">
+            <div className="flex flex-wrap gap-2">
               {moods.map((m) => (
                 <button
                   key={m.label}
                   type="button"
                   onClick={() => setFormData({...formData, mood: m.emoji})}
-                  title={m.label}
                   className={cn(
-                    "flex flex-col items-center justify-center h-16 w-16 rounded-2xl border-2 transition-all duration-300",
-                    formData.mood === m.emoji 
-                      ? "bg-indigo-600 border-indigo-600 text-white scale-110 shadow-lg shadow-indigo-100" 
-                      : "bg-white border-slate-100 text-3xl hover:border-indigo-200 hover:bg-slate-50"
+                    "flex flex-col items-center gap-1 p-3 rounded-2xl border transition-all active:scale-95",
+                    formData.mood === m.emoji ? "bg-indigo-50 border-indigo-200 shadow-sm" : "bg-white border-slate-100"
                   )}
                 >
-                  <span className={cn("transition-all", formData.mood === m.emoji ? "text-3xl" : "text-2xl")}>
-                    {m.emoji}
-                  </span>
+                  <span className="text-2xl">{m.emoji}</span>
                 </button>
               ))}
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">O que está acontecendo?</Label>
+            <Label className="text-[10px] font-black uppercase text-slate-400">Título (Opcional)</Label>
+            <Input 
+              placeholder="Dê um nome a esse registro..." 
+              className="h-12 rounded-2xl border-slate-200 font-bold"
+              value={formData.title}
+              onChange={(e) => setFormData({...formData, title: e.target.value})}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black uppercase text-slate-400">O que aconteceu?</Label>
             <Textarea 
-              placeholder="Escreva sobre seus pensamentos, sentimentos ou sobre o que aconteceu..." 
-              className="min-h-[200px] rounded-3xl border-slate-100 bg-slate-50/50 p-6 focus:bg-white focus:border-indigo-300 transition-all resize-none text-lg font-medium leading-relaxed"
+              placeholder="Sinta-se à vontade para escrever o que está pensando ou sentindo..." 
+              className="min-h-[150px] rounded-2xl border-slate-200 resize-none leading-relaxed text-sm"
               required
               value={formData.content}
               onChange={(e) => setFormData({...formData, content: e.target.value})}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Título do Momento (Opcional)</Label>
-            <Input 
-              placeholder="Dê um nome a este registro..." 
-              className="h-14 rounded-2xl border-slate-100 bg-slate-50/50 px-6 font-bold focus:bg-white focus:border-indigo-300 transition-all"
-              value={formData.title}
-              onChange={(e) => setFormData({...formData, title: e.target.value})}
-            />
-          </div>
-
-          <DialogFooter className="pt-4">
+          <DialogFooter>
             <Button 
               type="submit" 
               disabled={loading || !formData.content}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 rounded-3xl h-16 font-black shadow-xl shadow-indigo-100 text-xl gap-3 transition-transform active:scale-95"
+              className="w-full bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-14 font-black shadow-lg shadow-indigo-100 text-lg"
             >
-              {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : <><Sparkles className="h-6 w-6" /> Salvar no Meu Diário</>}
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : "Salvar no Meu Diário"}
             </Button>
           </DialogFooter>
         </form>

@@ -12,10 +12,13 @@ import {
   Loader2,
   Calendar,
   CheckCircle2,
-  Heart
+  Files,
+  Upload,
+  Cloud
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { AttachmentModule } from "@/components/attachments/AttachmentModule";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link, useNavigate } from "react-router-dom";
@@ -27,11 +30,13 @@ const PortalDashboard = () => {
   const [prompts, setPrompts] = useState<any[]>([]);
   const [sharedLogs, setSharedLogs] = useState<any[]>([]);
   const [patientInfo, setPatientInfo] = useState<any>(null);
+  const [accessInfo, setAccessInfo] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
       if (!user) return;
       try {
+        // 1. Buscar vínculo do paciente
         const { data: access } = await supabase
           .from('patient_access')
           .select('*, patients(*)')
@@ -39,8 +44,10 @@ const PortalDashboard = () => {
           .single();
 
         if (access) {
+          setAccessInfo(access);
           setPatientInfo(access.patients);
           
+          // 2. Buscar Prompts Ativos
           const { data: p } = await supabase
             .from('patient_log_prompts')
             .select('*')
@@ -48,6 +55,7 @@ const PortalDashboard = () => {
             .eq('status', 'active');
           setPrompts(p || []);
 
+          // 3. Buscar Registros Compartilhados
           const { data: l } = await supabase
             .from('patient_logs')
             .select('*')
@@ -64,128 +72,105 @@ const PortalDashboard = () => {
     fetchData();
   }, [user]);
 
-  if (loading) return (
-    <div className="h-[60vh] flex items-center justify-center">
-      <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-    </div>
-  );
-
-  const firstName = patientInfo?.full_name?.split(' ')[0];
+  if (loading) return <div className="py-20 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
 
   return (
-    <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="space-y-4">
-        <h1 className="text-5xl font-black text-slate-900 tracking-tight leading-tight">
-          Olá, {firstName}! <Heart className="inline-block h-10 w-10 text-pink-500 ml-2 animate-pulse" />
-        </h1>
-        <p className="text-xl text-slate-500 font-medium max-w-2xl leading-relaxed">
-          Este é o seu porto seguro. Aqui você pode registrar como se sente e acompanhar sua evolução terapêutica.
-        </p>
+    <div className="space-y-10">
+      <div className="space-y-2">
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Olá, {patientInfo?.full_name?.split(' ')[0]}!</h1>
+        <p className="text-slate-500 font-medium italic">Seu espaço seguro para registros e acompanhamento terapêutico.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-10">
-          {/* Tarefas / Prompts */}
-          <section className="space-y-6">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 px-4 flex items-center gap-2">
-              <ClipboardCheck className="h-4 w-4" /> Atividades Propostas
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className="md:col-span-2 border-none shadow-sm rounded-[32px] bg-white overflow-hidden">
+           <CardHeader className="pb-4">
+              <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                <Files className="h-4 w-4" /> Meus Documentos e Materiais
+              </CardTitle>
+           </CardHeader>
+           <CardContent>
+              {accessInfo && (
+                <AttachmentModule 
+                  patientId={accessInfo.patient_id} 
+                  psychologistId={accessInfo.psychologist_id} 
+                  role="patient" 
+                />
+              )}
+           </CardContent>
+        </Card>
+
+        <div className="space-y-6">
+          <section className="space-y-4">
+            <h3 className="text-xs font-black uppercase tracking-widest text-amber-600 px-2 flex items-center gap-2">
+              <ClipboardCheck className="h-4 w-4" /> Atividades
             </h3>
             <div className="grid grid-cols-1 gap-4">
-              {prompts.length > 0 ? prompts.map((p) => (
-                <Card key={p.id} className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white hover:shadow-xl transition-all group">
-                  <CardContent className="p-8 flex items-center justify-between gap-6">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <span className="px-2.5 py-1 bg-amber-50 text-amber-600 rounded-lg text-[9px] font-black uppercase tracking-widest">Aguardando</span>
-                        {p.due_date && <span className="text-[10px] text-slate-400 font-bold">Até {format(new Date(p.due_date), "dd/MM")}</span>}
-                      </div>
-                      <h4 className="text-xl font-black text-slate-900 leading-tight group-hover:text-indigo-600 transition-colors">{p.title}</h4>
-                      <p className="text-sm text-slate-500 mt-2 line-clamp-1">{p.description}</p>
-                    </div>
+              {prompts.length > 0 ? prompts.slice(0, 2).map((p) => (
+                <Card key={p.id} className="border-none shadow-sm rounded-[24px] bg-amber-50/50 border border-amber-100">
+                  <CardContent className="p-5 space-y-3">
+                    <p className="text-sm font-bold text-slate-900 leading-tight">{p.title}</p>
                     <Button 
                       onClick={() => navigate("/portal/diario")}
-                      className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-14 px-8 font-black gap-2 shadow-lg shadow-indigo-100 shrink-0"
+                      className="w-full bg-amber-500 hover:bg-amber-600 rounded-xl h-9 text-xs font-black"
                     >
-                      Responder <ArrowRight className="h-5 w-5" />
+                      Responder
                     </Button>
                   </CardContent>
                 </Card>
               )) : (
-                <div className="py-16 text-center bg-white rounded-[40px] border border-dashed border-slate-200">
-                   <CheckCircle2 className="h-12 w-12 text-emerald-300 mx-auto mb-4" />
-                   <p className="text-sm text-slate-400 font-black uppercase tracking-widest">Tudo em dia!</p>
+                <div className="p-8 text-center bg-slate-50 rounded-[24px] border border-dashed border-slate-200">
+                   <CheckCircle2 className="h-8 w-8 text-emerald-300 mx-auto mb-2" />
+                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Tudo em dia!</p>
                 </div>
               )}
             </div>
           </section>
 
-          {/* Conteúdos Compartilhados */}
-          <section className="space-y-6">
-            <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 px-4 flex items-center gap-2">
-              <BookOpen className="h-4 w-4" /> Materiais Compartilhados
-            </h3>
-            <div className="grid grid-cols-1 gap-4">
-              {sharedLogs.length > 0 ? sharedLogs.map((log) => (
-                <Link key={log.id} to={`/portal/diario`} className="block group">
-                  <div className="p-8 bg-white border border-slate-100 rounded-[40px] shadow-sm group-hover:shadow-xl group-hover:border-indigo-100 transition-all duration-300 flex items-center justify-between">
-                    <div className="flex items-center gap-6">
-                      <div className="h-14 w-14 rounded-3xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-all">
-                        <BookOpen className="h-7 w-7" />
-                      </div>
-                      <div>
-                        <h4 className="font-black text-slate-900 text-lg leading-none mb-2">{log.title || "Registro Compartilhado"}</h4>
-                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-2">
-                          <Calendar className="h-3.5 w-3.5" /> {format(new Date(log.created_at), "dd 'de' MMMM", { locale: ptBR })}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="h-10 w-10 rounded-full border border-slate-100 flex items-center justify-center group-hover:bg-indigo-50 group-hover:border-indigo-100 group-hover:text-indigo-600 transition-all">
-                      <ArrowRight className="h-5 w-5" />
-                    </div>
-                  </div>
-                </Link>
-              )) : (
-                <div className="p-12 text-center opacity-50">
-                  <p className="text-sm font-bold uppercase tracking-widest text-slate-400 italic">O psicólogo ainda não compartilhou materiais específicos.</p>
+          <Card className="border-none shadow-sm rounded-[32px] bg-indigo-600 text-white overflow-hidden">
+             <CardContent className="p-6 space-y-4">
+                <div className="h-10 w-10 rounded-2xl bg-white/20 flex items-center justify-center">
+                  <Cloud className="h-5 w-5" />
                 </div>
-              )}
-            </div>
-          </section>
-        </div>
-
-        <div className="space-y-8">
-          <div className="bg-indigo-600 rounded-[48px] p-8 text-white relative overflow-hidden shadow-2xl shadow-indigo-200">
-            <div className="absolute top-0 right-0 h-48 w-48 bg-white/10 rounded-full -mr-24 -mt-24 blur-3xl" />
-            <div className="relative z-10 space-y-6">
-               <div className="h-14 w-14 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
-                <Clock className="h-7 w-7" />
-               </div>
-               <div>
-                 <h3 className="text-2xl font-black mb-3 leading-tight">Momentos entre Sessões</h3>
-                 <p className="text-indigo-100 leading-relaxed font-medium">
-                   Não espere a próxima sessão para falar. Registre seus sentimentos agora e compartilhe com seu psicólogo.
-                 </p>
-               </div>
-               <Link to="/portal/diario" className="block">
-                <Button className="w-full bg-white text-indigo-600 hover:bg-indigo-50 rounded-2xl h-14 font-black text-lg transition-transform hover:scale-105 active:scale-95">
-                  Abrir Meu Diário
-                </Button>
-               </Link>
-            </div>
-          </div>
-
-          <Card className="border-none shadow-sm rounded-[32px] bg-white overflow-hidden">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400">Dica do Dia</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-slate-600 leading-relaxed font-medium">
-                "A autoconsciência é o primeiro passo para a mudança profunda. O ato de escrever ajuda o cérebro a processar emoções complexas."
-              </p>
-            </CardContent>
+                <div>
+                  <h4 className="font-bold text-white">Prontuário Digital</h4>
+                  <p className="text-[10px] text-indigo-100 leading-relaxed mt-1">
+                    Aqui você pode subir exames, laudos ou materiais que deseja compartilhar com seu terapeuta com total segurança.
+                  </p>
+                </div>
+             </CardContent>
           </Card>
         </div>
       </div>
+
+      <section className="space-y-6">
+        <h3 className="text-xs font-black uppercase tracking-widest text-slate-400 px-2 flex items-center gap-2">
+          <BookOpen className="h-4 w-4" /> Compartilhado com Você
+        </h3>
+        <div className="space-y-4">
+          {sharedLogs.length > 0 ? sharedLogs.map((log) => (
+            <Link key={log.id} to={`/portal/diario`} className="block group">
+              <div className="p-6 bg-white border border-slate-100 rounded-[32px] shadow-sm group-hover:shadow-md group-hover:border-indigo-100 transition-all flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <div className="h-12 w-12 rounded-2xl bg-indigo-50 flex items-center justify-center text-indigo-600 group-hover:scale-110 transition-transform">
+                    <BookOpen className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 leading-none mb-2">{log.title || "Registro Compartilhado"}</h4>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest flex items-center gap-2">
+                      <Calendar className="h-3 w-3" /> {format(new Date(log.created_at), "dd 'de' MMMM", { locale: ptBR })}
+                    </p>
+                  </div>
+                </div>
+                <ArrowRight className="h-5 w-5 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-1 transition-all" />
+              </div>
+            </Link>
+          )) : (
+            <div className="p-12 text-center bg-white rounded-[32px] border border-dashed border-slate-100">
+              <p className="text-xs text-slate-400 italic">Nenhum registro compartilhado recentemente.</p>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 };

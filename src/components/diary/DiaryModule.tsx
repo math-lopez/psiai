@@ -1,19 +1,18 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { PatientLog, PatientLogPrompt, LogType, PromptType } from "@/types/diary";
+import { PatientLog, PatientLogPrompt, LogType } from "@/types/diary";
 import { diaryService } from "@/services/diaryService";
 import { 
   BookOpen, 
   Plus, 
   Loader2, 
-  Filter, 
   Search, 
   ClipboardCheck, 
   LayoutGrid,
   History,
-  AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +21,6 @@ import { LogItem } from "./LogItem";
 import { LogForm } from "./LogForm";
 import { PromptForm } from "./PromptForm";
 import { showError, showSuccess } from "@/utils/toast";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -37,6 +35,7 @@ export const DiaryModule = ({ patientId }: DiaryModuleProps) => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeFilter, setActiveFilter] = useState<LogType | 'all'>('all');
+  const [showPromptHistory, setShowPromptHistory] = useState(false);
 
   // Modais
   const [isLogFormOpen, setIsLogFormOpen] = useState(false);
@@ -76,7 +75,7 @@ export const DiaryModule = ({ patientId }: DiaryModuleProps) => {
   const handleUpdatePromptStatus = async (id: string, status: any) => {
     try {
       await diaryService.updatePrompt(id, { status });
-      showSuccess("Tarefa atualizada.");
+      showSuccess(status === 'completed' ? "Tarefa concluída!" : "Tarefa reativada.");
       fetchData();
     } catch (e) {
       showError("Erro ao atualizar tarefa.");
@@ -91,6 +90,7 @@ export const DiaryModule = ({ patientId }: DiaryModuleProps) => {
   });
 
   const activePrompts = prompts.filter(p => p.status === 'active');
+  const completedPrompts = prompts.filter(p => p.status === 'completed');
 
   if (loading) return <div className="py-20 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
 
@@ -212,6 +212,30 @@ export const DiaryModule = ({ patientId }: DiaryModuleProps) => {
               ) : (
                 <div className="py-8 text-center bg-slate-50/30 rounded-2xl border border-dashed border-slate-100">
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Sem tarefas pendentes</p>
+                </div>
+              )}
+
+              {/* Histórico de Tarefas Concluídas */}
+              {completedPrompts.length > 0 && (
+                <div className="pt-4 border-t border-slate-50">
+                  <button 
+                    onClick={() => setShowPromptHistory(!showPromptHistory)}
+                    className="w-full flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <span>Histórico ({completedPrompts.length})</span>
+                    <Clock className={cn("h-3 w-3 transition-transform", showPromptHistory && "rotate-180")} />
+                  </button>
+                  
+                  {showPromptHistory && (
+                    <div className="mt-4 space-y-3 animate-in slide-in-from-top-1">
+                      {completedPrompts.map(prompt => (
+                        <div key={prompt.id} className="p-3 rounded-xl border border-slate-50 bg-slate-50/30 opacity-60 flex items-center justify-between gap-3">
+                          <p className="text-[11px] font-bold text-slate-600 line-clamp-1">{prompt.title}</p>
+                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>

@@ -7,13 +7,14 @@ import {
   Calendar, 
   Mail, 
   Phone, 
-  CalendarDays, 
   Loader2, 
   Trash2,
   AlertTriangle,
   Target,
   BookOpen,
-  Lock
+  Lock,
+  Clock,
+  Files
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,24 +30,27 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { patientService } from "@/services/patientService";
 import { sessionService } from "@/services/sessionService";
+import { useAuth } from "@/contexts/AuthContext";
 import { Patient, Session } from "@/types";
-import { LongitudinalAnalysis } from "@/components/patients/LongitudinalAnalysis";
 import { PatientTimeline } from "@/components/patients/PatientTimeline";
 import { LatestSessionFeature } from "@/components/patients/LatestSessionFeature";
 import { TreatmentPlanModule } from "@/components/treatment/TreatmentPlanModule";
 import { DiaryModule } from "@/components/diary/DiaryModule";
 import { DiaryOverviewWidget } from "@/components/diary/DiaryOverviewWidget";
 import { PatientAccessManagement } from "@/components/patients/PatientAccessManagement";
+import { AttachmentModule } from "@/components/attachments/AttachmentModule";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { showError, showSuccess } from "@/utils/toast";
 import { cn } from "@/lib/utils";
+import { useAppFeatures } from "@/hooks/useAppFeatures";
 
 const PatientDetailPage = () => {
   const { id } = useParams();
+  const { user } = useAuth();
+  const { features, isLoading: loadingFeatures } = useAppFeatures();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -63,7 +67,6 @@ const PatientDetailPage = () => {
           sessionService.list()
         ]);
         setPatient(pData);
-        // Filtra sessões deste paciente
         const patientSessions = sData.filter(s => s.patient_id === id);
         setSessions(patientSessions);
       } finally {
@@ -91,7 +94,7 @@ const PatientDetailPage = () => {
     }
   };
 
-  if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
+  if (loading || loadingFeatures) return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
   if (!patient) return <div className="p-10 text-center">Paciente não encontrado.</div>;
 
   const latestSession = sessions.length > 0 
@@ -100,7 +103,6 @@ const PatientDetailPage = () => {
 
   return (
     <div className="max-w-6xl mx-auto space-y-10 pb-20">
-      {/* Header com Navegação e Ações */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
           <Button 
@@ -164,11 +166,9 @@ const PatientDetailPage = () => {
         </div>
       </div>
 
-      {/* Destaque da Última Sessão */}
       <LatestSessionFeature session={latestSession} />
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
-        {/* Sidebar de Informações */}
         <div className="lg:col-span-1 space-y-8">
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
             <div className="h-2 w-full bg-blue-500" />
@@ -224,7 +224,6 @@ const PatientDetailPage = () => {
           </Card>
         </div>
 
-        {/* Conteúdo Principal: Overview / Timeline / Treatment Plan / Diary / Access */}
         <div className="lg:col-span-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="bg-slate-100/50 p-1.5 rounded-3xl h-auto mb-10 gap-2 border border-slate-100 flex-wrap justify-start">
@@ -234,48 +233,67 @@ const PatientDetailPage = () => {
               >
                 Visão Geral
               </TabsTrigger>
+              
+              {features.hasTherapeuticPlan && (
+                <TabsTrigger 
+                  value="treatment" 
+                  className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
+                >
+                  Plano <Target className="h-4 w-4" />
+                </TabsTrigger>
+              )}
+
+              {features.hasDiary && (
+                <TabsTrigger 
+                  value="diary" 
+                  className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
+                >
+                  Diário <BookOpen className="h-4 w-4" />
+                </TabsTrigger>
+              )}
+
               <TabsTrigger 
-                value="treatment" 
+                value="documents" 
                 className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
               >
-                Plano Terapêutico <Target className="h-4 w-4" />
-              </TabsTrigger>
-              <TabsTrigger 
-                value="diary" 
-                className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
-              >
-                Diário e Registros <BookOpen className="h-4 w-4" />
+                Documentos <Files className="h-4 w-4" />
               </TabsTrigger>
               <TabsTrigger 
                 value="analysis" 
-                className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
+                disabled
+                className="rounded-2xl px-6 py-3 font-black text-sm opacity-40 cursor-not-allowed flex gap-2 grayscale"
               >
-                Parecer Clínico <Badge className="h-5 px-1.5 bg-indigo-50 text-indigo-600 border-none text-[8px] font-black">AI BETA</Badge>
+                Parecer <Clock className="h-3 w-3" />
               </TabsTrigger>
               <TabsTrigger 
                 value="access" 
                 className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
               >
-                Acesso do Paciente <Lock className="h-4 w-4" />
+                Acesso <Lock className="h-4 w-4" />
               </TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
               <PatientTimeline sessions={sessions} />
-              {/* Resumo do Diário na Visão Geral */}
-              <DiaryOverviewWidget patientId={id!} onViewMore={() => setActiveTab("diary")} />
+              {features.hasDiary && (
+                <DiaryOverviewWidget patientId={id!} onViewMore={() => setActiveTab("diary")} />
+              )}
             </TabsContent>
 
-            <TabsContent value="treatment" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
-              <TreatmentPlanModule patientId={id!} />
-            </TabsContent>
+            {features.hasTherapeuticPlan && (
+              <TabsContent value="treatment" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
+                <TreatmentPlanModule patientId={id!} />
+              </TabsContent>
+            )}
 
-            <TabsContent value="diary" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
-              <DiaryModule patientId={id!} />
-            </TabsContent>
+            {features.hasDiary && (
+              <TabsContent value="diary" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
+                <DiaryModule patientId={id!} />
+              </TabsContent>
+            )}
 
-            <TabsContent value="analysis" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
-              <LongitudinalAnalysis patientId={id!} />
+            <TabsContent value="documents" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
+              <AttachmentModule patientId={id!} psychologistId={user?.id!} role="psychologist" />
             </TabsContent>
 
             <TabsContent value="access" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">

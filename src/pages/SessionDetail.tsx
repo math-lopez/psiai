@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { 
-  ChevronLeft, Edit, Trash2, Mic, Clock, User, FileText, Sparkles, Loader2, AlertTriangle, Music, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Lock, ClipboardList, Zap, Quote
+  ChevronLeft, Edit, Trash2, Mic, Clock, User, FileText, Sparkles, Loader2, AlertTriangle, Music, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Lock, ClipboardList, Zap, Quote, BrainCircuit, ListChecks, TriangleAlert
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -26,17 +26,30 @@ const SessionDetail = () => {
   const [processing, setProcessing] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  const [aiAnalysis, setAiAnalysis] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+
   const fetchData = async () => {
     if (!id) return;
     try {
-      const data = await sessionService.getById(id);
-      setSession(data);
+      const [sessionData, analysisData] = await Promise.all([
+        sessionService.getById(id),
+        sessionService.getSessionAIAnalysis(id)
+      ]);
       
+      setSession(sessionData);
+      setAiAnalysis(analysisData);
+      
+      if (analysisData && (analysisData.status === 'processing' || analysisData.status === 'pending')) {
+        setIsAnalyzing(true);
+      }
+
       const { data: { user } } = await supabase.auth.getUser();
       const { data: profile } = await supabase.from('profiles').select('subscription_tier').eq('id', user?.id).single();
       setTier(profile?.subscription_tier as SubscriptionTier || "free");
     } catch (e) {
-      showError("Erro ao carregar sessão.");
+      showError("Erro ao carregar dados da sessão.");
     } finally {
       setLoading(false);
     }
@@ -44,6 +57,30 @@ const SessionDetail = () => {
 
   useEffect(() => {
     fetchData();
+
+    const channel = supabase
+      .channel(`ai-analysis-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'session_ai_analysis',
+          filter: `session_id=eq.${id}`,
+        },
+        (payload) => {
+          const newAnalysis = payload.new as any;
+          if (newAnalysis.summary) {
+            setAiAnalysis(newAnalysis);
+            setIsAnalyzing(false);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [id]);
 
   const handleProcessAudio = async () => {
@@ -57,6 +94,11 @@ const SessionDetail = () => {
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handleAnalyzeSessionAI = async () => {
+    // Feature desativada no front para representar estado futuro
+    return;
   };
 
   const handleDelete = async () => {
@@ -76,7 +118,6 @@ const SessionDetail = () => {
   if (loading) return <div className="h-full flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
   if (!session) return <div className="p-10 text-center"><Button onClick={() => navigate("/sessoes")}>Voltar</Button></div>;
 
-  const isUltra = PLAN_LIMITS[tier].hasTherapeuticInsights;
   const isProcessing = ['queued', 'processing'].includes(session.processing_status);
 
   return (
@@ -119,7 +160,6 @@ const SessionDetail = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Sidebar Informativa */}
         <div className="space-y-6">
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
             <div className="h-1.5 w-full bg-slate-100" />
@@ -144,16 +184,14 @@ const SessionDetail = () => {
               <CardContent>
                 <Button className="w-full gap-2 bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-11 font-black shadow-lg shadow-indigo-100" onClick={handleProcessAudio} disabled={processing || isProcessing}>
                   {processing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-                  {session.processing_status === 'completed' ? "Reprocessar com IA" : "Processar Transcrição"}
+                  {session.processing_status === 'completed' ? "Reprocessar Transcrição" : "Processar Transcrição"}
                 </Button>
               </CardContent>
             </Card>
           )}
         </div>
 
-        {/* Conteúdo Principal */}
         <div className="lg:col-span-2 space-y-8">
-          {/* Seção Clínica Estruturada */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
               <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-blue-500"><ClipboardList className="h-4 w-4" /> Notas Clínicas</CardTitle></CardHeader>
@@ -171,53 +209,34 @@ const SessionDetail = () => {
             <CardContent><p className="text-slate-700 font-bold leading-relaxed whitespace-pre-wrap italic">{session.session_summary_manual || "Não preenchido."}</p></CardContent>
           </Card>
 
-          <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
-            <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-slate-400"><FileText className="h-4 w-4" /> Diário do Psicólogo</CardTitle></CardHeader>
-            <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.manual_notes || "Sem notas adicionais."}</p></CardContent>
+          {/* SEÇÃO DESABILITADA (BREVE) */}
+          <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-slate-50 opacity-60 grayscale pointer-events-none">
+            <div className="h-1.5 w-full bg-slate-300" />
+            <CardHeader className="pb-2 border-b border-slate-100 mb-4 flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-slate-400">
+                <BrainCircuit className="h-4 w-4" /> Análise da Sessão com IA (Em breve)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="min-h-[200px] flex flex-col items-center justify-center py-12 gap-6">
+              <div className="h-14 w-14 bg-slate-100 text-slate-300 rounded-2xl flex items-center justify-center">
+                <Sparkles className="h-7 w-7" />
+              </div>
+              <div className="text-center space-y-1">
+                <p className="text-sm font-black text-slate-400">Funcionalidade em desenvolvimento</p>
+                <p className="text-xs text-slate-400 max-w-xs mx-auto font-medium leading-relaxed">
+                  Em breve você poderá gerar relatórios estruturados com padrões de comportamento e recomendações clínicas automáticas.
+                </p>
+              </div>
+              <Button disabled className="bg-slate-200 text-slate-400 rounded-2xl h-12 font-black px-8">
+                Indisponível no momento
+              </Button>
+            </CardContent>
           </Card>
 
-          {session.processing_status === 'completed' && (
-            <div className="space-y-8 pt-6">
-              <div className="flex items-center gap-3">
-                <div className="h-px flex-1 bg-slate-100" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-300">Inteligência Artificial</span>
-                <div className="h-px flex-1 bg-slate-100" />
-              </div>
-
-              <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-white">
-                <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-lg font-bold text-indigo-900"><Sparkles className="h-5 w-5 text-indigo-500" /> Transcrição Integrada</CardTitle></CardHeader>
-                <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.transcript || "Não disponível."}</p></CardContent>
-              </Card>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className={cn("relative overflow-hidden rounded-[32px] border-none shadow-sm", !isUltra && 'opacity-70 grayscale')}>
-                  {!isUltra && (
-                    <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center">
-                      <Lock className="h-8 w-8 text-indigo-600 mb-2" />
-                      <p className="text-xs font-bold text-indigo-900 uppercase">Recurso Ultra</p>
-                      <Link to="/assinatura"><Button size="sm" variant="link" className="text-indigo-600 text-xs mt-2 underline">Fazer Upgrade</Button></Link>
-                    </div>
-                  )}
-                  <CardHeader><CardTitle className="text-sm font-black uppercase tracking-widest text-indigo-400">Pontos Relevantes</CardTitle></CardHeader>
-                  <CardContent>
-                    {isUltra && session.highlights ? (
-                      <ul className="space-y-3">
-                        {session.highlights.map((h, i) => <li key={i} className="text-xs text-slate-700 flex gap-2"><div className="h-1.5 w-1.5 rounded-full bg-indigo-400 mt-1.5 shrink-0" />{h}</li>)}
-                      </ul>
-                    ) : <p className="text-xs text-slate-400 italic">Análise bloqueada.</p>}
-                  </CardContent>
-                </Card>
-
-                <Card className={cn("relative overflow-hidden rounded-[32px] border-none shadow-sm", !isUltra && 'opacity-70 grayscale')}>
-                  {!isUltra && <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[2px] flex items-center justify-center p-4"><Lock className="h-5 w-5 text-indigo-400" /></div>}
-                  <CardHeader><CardTitle className="text-sm font-black uppercase tracking-widest text-amber-500">Próximos Passos</CardTitle></CardHeader>
-                  <CardContent>
-                    {isUltra ? <p className="text-xs text-slate-700 leading-relaxed">{session.next_steps || "Sem sugestões."}</p> : <p className="text-xs text-slate-400 italic">Análise bloqueada.</p>}
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          )}
+          <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
+            <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-indigo-900"><Sparkles className="h-5 w-5 text-indigo-500" /> Transcrição Completa</CardTitle></CardHeader>
+            <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.transcript || "Não disponível."}</p></CardContent>
+          </Card>
         </div>
       </div>
     </div>

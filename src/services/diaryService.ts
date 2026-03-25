@@ -7,7 +7,6 @@ export const diaryService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    // Buscamos o vínculo diretamente (usando o novo campo psychologist_id que criamos para evitar loops)
     const { data, error } = await supabase
       .from('patient_access')
       .select('patient_id, psychologist_id')
@@ -25,7 +24,6 @@ export const diaryService = {
     };
   },
 
-  // Mantido para compatibilidade, mas prefira getPatientContext
   getMyPatientId: async (): Promise<string | null> => {
     const context = await diaryService.getPatientContext();
     return context?.patientId || null;
@@ -47,7 +45,6 @@ export const diaryService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    // Injeta o psychologist_id se ele não estiver presente (caso do psicólogo criando log)
     const logData = {
       ...log,
       psychologist_id: log.psychologist_id || user.id
@@ -57,8 +54,8 @@ export const diaryService = {
       .from('patient_logs')
       .insert([logData])
       .select()
-      .single();
-    
+      .maybeSingle(); // Usando maybeSingle para evitar erro PGRST116
+
     if (error) throw error;
     return data;
   },
@@ -69,7 +66,7 @@ export const diaryService = {
       .update(updates)
       .eq('id', id)
       .select()
-      .single();
+      .maybeSingle();
     
     if (error) throw error;
     return data;
@@ -100,20 +97,21 @@ export const diaryService = {
       .from('patient_log_prompts')
       .insert([{ ...prompt, psychologist_id: user.id }])
       .select()
-      .single();
+      .maybeSingle();
     
     if (error) throw error;
     return data;
   },
 
   updatePrompt: async (id: string, updates: Partial<PatientLogPrompt>): Promise<PatientLogPrompt> => {
+    // Atualização de prompt pode falhar se o RLS não permitir ao paciente
     const { data, error } = await supabase
       .from('patient_log_prompts')
       .update(updates)
       .eq('id', id)
       .select()
-      .single();
-    
+      .maybeSingle(); // maybeSingle não quebra se retornar 0 linhas
+
     if (error) throw error;
     return data;
   },
