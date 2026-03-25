@@ -3,10 +3,23 @@
 import React, { useState, useEffect } from "react";
 import { TreatmentPlan, TreatmentGoal, GoalStatus } from "@/types/treatment";
 import { treatmentService } from "@/services/treatmentService";
-import { 
-  Target, Plus, Loader2, ClipboardList, ChevronRight, 
-  History, CheckCircle2, TrendingUp, LayoutDashboard, 
-  Calendar, Edit2, Eye, AlertTriangle, Sparkles, XCircle
+import {
+  Target,
+  Plus,
+  Loader2,
+  ClipboardList,
+  ChevronRight,
+  History,
+  CheckCircle2,
+  TrendingUp,
+  LayoutDashboard,
+  Calendar,
+  Edit2,
+  Eye,
+  AlertTriangle,
+  Sparkles,
+  XCircle,
+  Save,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
