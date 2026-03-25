@@ -13,7 +13,8 @@ import {
   CheckCircle2, 
   TrendingUp,
   LayoutDashboard,
-  Calendar
+  Calendar,
+  Edit2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -60,6 +61,7 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
   
   // States para modais
   const [isPlanDialogOpen, setIsPlanDialogOpen] = useState(false);
+  const [isEditingPlan, setIsEditingPlan] = useState(false);
   const [isGoalDialogOpen, setIsGoalDialogOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<TreatmentGoal | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -90,25 +92,44 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
     fetchData();
   }, [patientId]);
 
-  const handleCreatePlan = async () => {
+  const handleCreateOrUpdatePlan = async () => {
     if (!planForm.title) return;
     setSubmitting(true);
     try {
-      await treatmentService.createPlan({
-        patient_id: patientId,
-        title: planForm.title,
-        description: planForm.description,
-        status: 'active'
-      });
-      showSuccess("Plano terapêutico criado!");
+      if (isEditingPlan && activePlan) {
+        await treatmentService.updatePlan(activePlan.id, {
+          title: planForm.title,
+          description: planForm.description,
+        });
+        showSuccess("Plano atualizado com sucesso!");
+      } else {
+        await treatmentService.createPlan({
+          patient_id: patientId,
+          title: planForm.title,
+          description: planForm.description,
+          status: 'active'
+        });
+        showSuccess("Plano terapêutico criado!");
+      }
       setIsPlanDialogOpen(false);
+      setIsEditingPlan(false);
       setPlanForm({ title: '', description: '' });
       fetchData();
     } catch (e) {
-      showError("Erro ao criar plano.");
+      showError("Erro ao salvar plano.");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const openEditPlan = () => {
+    if (!activePlan) return;
+    setPlanForm({
+      title: activePlan.title,
+      description: activePlan.description || ''
+    });
+    setIsEditingPlan(true);
+    setIsPlanDialogOpen(true);
   };
 
   const handleGoalAction = async () => {
@@ -166,6 +187,7 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
 
   const handleFinishPlan = async () => {
     if (!activePlan) return;
+    if (!confirm("Deseja marcar este plano como concluído? Ele será movido para o histórico.")) return;
     try {
       await treatmentService.updatePlan(activePlan.id, { status: 'completed', end_date: new Date().toISOString() });
       showSuccess("Plano concluído com sucesso!");
@@ -180,6 +202,7 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
   const completedGoals = activePlan?.goals?.filter(g => g.status === 'completed').length || 0;
   const totalGoals = activePlan?.goals?.length || 0;
   const progressValue = totalGoals > 0 ? (completedGoals / totalGoals) * 100 : 0;
+  const historyPlans = plans.filter(p => p.status !== 'active');
 
   return (
     <div className="space-y-8 pb-10">
@@ -192,16 +215,16 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
           <p className="text-slate-500 max-w-sm mx-auto mb-8 font-medium">
             Defina objetivos e acompanhe a evolução terapêutica do paciente de forma estruturada.
           </p>
-          <Dialog open={isPlanDialogOpen} onOpenChange={setIsPlanDialogOpen}>
+          <Dialog open={isPlanDialogOpen} onOpenChange={(open) => { setIsPlanDialogOpen(open); if(!open) setIsEditingPlan(false); }}>
             <DialogTrigger asChild>
-              <Button className="bg-primary hover:bg-primary/90 rounded-2xl h-14 px-10 shadow-xl shadow-primary/20 gap-2 font-black transition-all">
+              <Button className="bg-primary hover:bg-primary/90 rounded-2xl h-14 px-10 shadow-xl shadow-primary/20 gap-2 font-black transition-all" onClick={() => { setPlanForm({ title: '', description: '' }); setIsEditingPlan(false); }}>
                 <Plus className="h-5 w-5" /> Criar Plano Terapêutico
               </Button>
             </DialogTrigger>
             <DialogContent className="rounded-[32px] border-none shadow-2xl p-8">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-black flex items-center gap-3">
-                  <Target className="text-primary h-6 w-6" /> Novo Plano
+                  <Target className="text-primary h-6 w-6" /> {isEditingPlan ? 'Editar Plano' : 'Novo Plano'}
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-6 py-6">
@@ -226,15 +249,34 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
               </div>
               <DialogFooter>
                 <Button 
-                  onClick={handleCreatePlan} 
+                  onClick={handleCreateOrUpdatePlan} 
                   disabled={submitting || !planForm.title}
                   className="w-full bg-primary hover:bg-primary/90 rounded-2xl h-12 font-black shadow-lg shadow-primary/10"
                 >
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Iniciar Plano Terapêutico"}
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : isEditingPlan ? "Salvar Alterações" : "Iniciar Plano Terapêutico"}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
+
+          {historyPlans.length > 0 && (
+            <div className="mt-12 max-w-2xl mx-auto space-y-4">
+              <h4 className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center justify-center gap-2">
+                <History className="h-4 w-4" /> Histórico de Planos Anteriores
+              </h4>
+              <div className="grid grid-cols-1 gap-3">
+                {historyPlans.map(plan => (
+                  <div key={plan.id} className="p-5 bg-slate-50/50 border border-slate-100 rounded-[28px] flex items-center justify-between group hover:border-indigo-100 transition-all">
+                    <div className="text-left">
+                      <p className="text-sm font-bold text-slate-800">{plan.title}</p>
+                      <p className="text-[10px] text-slate-400 font-medium">Concluído em {format(new Date(plan.end_date || plan.updated_at), 'dd/MM/yyyy')}</p>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition-all" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -249,9 +291,14 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
                       <Calendar className="h-3 w-3" /> Iniciado em {format(new Date(activePlan.start_date), "MMMM 'de' yyyy", { locale: ptBR })}
                     </span>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={handleFinishPlan} className="text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl font-bold text-xs">
-                    <CheckCircle2 className="h-4 w-4 mr-2" /> Finalizar Plano
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={openEditPlan} className="text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl font-bold text-xs">
+                      <Edit2 className="h-3.5 w-3.5 mr-2" /> Editar
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={handleFinishPlan} className="text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl font-bold text-xs">
+                      <CheckCircle2 className="h-4 w-4 mr-2" /> Finalizar
+                    </Button>
+                  </div>
                 </div>
                 <CardTitle className="text-3xl font-black text-slate-900 tracking-tight">{activePlan.title}</CardTitle>
                 <p className="text-slate-500 font-medium leading-relaxed mt-2">{activePlan.description}</p>
@@ -329,8 +376,8 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {plans.filter(p => p.status !== 'active').length > 0 ? (
-                  plans.filter(p => p.status !== 'active').map(plan => (
+                {historyPlans.length > 0 ? (
+                  historyPlans.map(plan => (
                     <div key={plan.id} className="p-4 rounded-2xl border border-slate-50 bg-slate-50/30 space-y-2 hover:border-indigo-100 transition-colors cursor-pointer group">
                       <div className="flex items-center justify-between">
                         <Badge className="bg-white text-slate-400 border-none text-[8px] uppercase">{plan.status === 'completed' ? 'Concluído' : 'Arquivado'}</Badge>
@@ -365,6 +412,47 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
         </div>
       )}
 
+      {/* Modal para Novo/Editar Plano */}
+      <Dialog open={isPlanDialogOpen} onOpenChange={(open) => { setIsPlanDialogOpen(open); if(!open) setIsEditingPlan(false); }}>
+        <DialogContent className="rounded-[32px] border-none shadow-2xl p-8">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black flex items-center gap-3">
+              <Target className="text-primary h-6 w-6" /> {isEditingPlan ? 'Editar Plano' : 'Novo Plano'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6 py-6">
+            <div className="space-y-2">
+              <Label className="text-xs font-black uppercase text-slate-400">Título do Plano</Label>
+              <Input 
+                placeholder="Ex: Tratamento para Ansiedade Generalizada" 
+                className="h-12 rounded-2xl border-slate-200 font-bold"
+                value={planForm.title}
+                onChange={(e) => setPlanForm({...planForm, title: e.target.value})}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs font-black uppercase text-slate-400">Breve Descrição / Foco Principal</Label>
+              <Textarea 
+                placeholder="Quais os principais desafios e o foco do tratamento?" 
+                className="rounded-2xl border-slate-200 resize-none min-h-[100px]"
+                value={planForm.description}
+                onChange={(e) => setPlanForm({...planForm, description: e.target.value})}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              onClick={handleCreateOrUpdatePlan} 
+              disabled={submitting || !planForm.title}
+              className="w-full bg-primary hover:bg-primary/90 rounded-2xl h-12 font-black shadow-lg shadow-primary/10"
+            >
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : isEditingPlan ? "Salvar Alterações" : "Iniciar Plano Terapêutico"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para Novo/Editar Objetivo */}
       <Dialog open={isGoalDialogOpen} onOpenChange={setIsGoalDialogOpen}>
         <DialogContent className="rounded-[32px] border-none shadow-2xl p-8 max-w-lg">
           <DialogHeader>
