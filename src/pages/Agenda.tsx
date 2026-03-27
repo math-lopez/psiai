@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -9,6 +10,9 @@ import {
   Calendar as CalendarIcon,
   CheckCircle2,
   XCircle,
+  Repeat,
+  ArrowRight,
+  FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WeeklyCalendar } from "@/components/agenda/WeeklyCalendar";
@@ -33,10 +37,12 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { showSuccess, showError } from "@/utils/toast";
 import { cn } from "@/lib/utils";
 
 const Agenda = () => {
+  const navigate = useNavigate();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [sessions, setSessions] = useState<Session[]>([]);
   const [patients, setPatients] = useState<Patient[]>([]);
@@ -53,7 +59,9 @@ const Agenda = () => {
     date: "",
     hour: "09:00",
     duration: 50,
-    status: "scheduled" as any
+    status: "scheduled" as any,
+    isRecurrent: false,
+    recurrenceUntil: ""
   });
 
   const fetchData = async () => {
@@ -86,7 +94,9 @@ const Agenda = () => {
       date: format(date, "yyyy-MM-dd"),
       hour: hour ? `${hour.toString().padStart(2, '0')}:00` : "09:00",
       duration: 50,
-      status: "scheduled"
+      status: "scheduled",
+      isRecurrent: false,
+      recurrenceUntil: format(addWeeks(date, 12), "yyyy-MM-dd") // Default 3 meses
     });
     setIsModalOpen(true);
   };
@@ -99,7 +109,9 @@ const Agenda = () => {
       date: format(sDate, "yyyy-MM-dd"),
       hour: format(sDate, "HH:mm"),
       duration: session.duration_minutes,
-      status: session.status
+      status: session.status,
+      isRecurrent: false,
+      recurrenceUntil: ""
     });
     setIsModalOpen(true);
   };
@@ -117,24 +129,17 @@ const Agenda = () => {
         record_type: 'manual' as const 
       };
 
-      let savedSessionId;
       if (selectedSession) {
         await sessionService.update(selectedSession.id, payload);
-        savedSessionId = selectedSession.id;
+        showSuccess("Agendamento atualizado!");
       } else {
-        const newSession = await sessionService.create(payload);
-        savedSessionId = newSession.id;
-      }
-
-      // Sincronização de Status
-      if (formData.status === 'completed') {
-        await sessionService.finishSession(savedSessionId);
-        showSuccess("Consulta marcada como realizada e prontuário atualizado!");
-      } else if (formData.status === 'cancelled') {
-        await sessionService.cancelSession(savedSessionId);
-        showSuccess("Agendamento cancelado com sucesso.");
-      } else {
-        showSuccess(selectedSession ? "Agendamento atualizado!" : "Sessão agendada com sucesso!");
+        if (formData.isRecurrent && formData.recurrenceUntil) {
+          await sessionService.createRecurrent(payload, formData.recurrenceUntil);
+          showSuccess("Sessões recorrentes agendadas!");
+        } else {
+          await sessionService.create(payload);
+          showSuccess("Sessão agendada com sucesso!");
+        }
       }
 
       setIsModalOpen(false);
@@ -170,22 +175,6 @@ const Agenda = () => {
         </div>
       </div>
 
-      <div className="flex items-center justify-between px-2">
-        <h2 className="text-lg font-black text-slate-700">
-          {format(startOfWeek(currentDate), "dd 'de' MMM", { locale: ptBR })} — {format(endOfWeek(currentDate), "dd 'de' MMM, yyyy", { locale: ptBR })}
-        </h2>
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-indigo-600" />
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Agendada</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="h-3 w-3 rounded-full bg-emerald-500" />
-            <span className="text-[10px] font-bold text-slate-400 uppercase">Realizada</span>
-          </div>
-        </div>
-      </div>
-
       <WeeklyCalendar 
         currentDate={currentDate} 
         sessions={sessions} 
@@ -193,7 +182,6 @@ const Agenda = () => {
         onEmptySlotClick={handleOpenNew}
       />
 
-      {/* Modal de Agendamento */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="rounded-[32px] border-none shadow-2xl p-8 max-w-lg">
           <DialogHeader>
@@ -225,41 +213,60 @@ const Agenda = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase text-slate-400">Data</Label>
-                <Input 
-                  type="date" 
-                  className="h-12 rounded-2xl border-slate-200 font-bold"
-                  value={formData.date}
-                  onChange={(e) => setFormData({...formData, date: e.target.value})}
-                />
+                <Input type="date" className="h-12 rounded-2xl border-slate-200 font-bold" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} />
               </div>
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase text-slate-400">Horário</Label>
-                <Input 
-                  type="time" 
-                  className="h-12 rounded-2xl border-slate-200 font-bold"
-                  value={formData.hour}
-                  onChange={(e) => setFormData({...formData, hour: e.target.value})}
-                />
+                <Input type="time" className="h-12 rounded-2xl border-slate-200 font-bold" value={formData.hour} onChange={(e) => setFormData({...formData, hour: e.target.value})} />
               </div>
             </div>
 
+            {!selectedSession && (
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Repeat className="h-4 w-4 text-indigo-500" />
+                    <Label className="text-xs font-bold text-slate-700">Repetir semanalmente</Label>
+                  </div>
+                  <Switch checked={formData.isRecurrent} onCheckedChange={(v) => setFormData({...formData, isRecurrent: v})} />
+                </div>
+                {formData.isRecurrent && (
+                  <div className="space-y-2 animate-in slide-in-from-top-2">
+                    <Label className="text-[10px] font-black uppercase text-slate-400">Até quando repetir?</Label>
+                    <Input type="date" className="h-10 rounded-xl bg-white" value={formData.recurrenceUntil} onChange={(e) => setFormData({...formData, recurrenceUntil: e.target.value})} />
+                  </div>
+                )}
+              </div>
+            )}
+
             {selectedSession && (
-              <div className="space-y-2">
-                <Label className="text-[10px] font-black uppercase text-slate-400">Status do Atendimento</Label>
+              <div className="grid grid-cols-1 gap-3">
+                <Button 
+                  className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-14 font-black shadow-lg shadow-indigo-100 gap-2 text-lg"
+                  onClick={() => navigate(`/sessoes/editar/${selectedSession.id}`)}
+                >
+                  <FileText className="h-5 w-5" /> Iniciar Atendimento
+                </Button>
                 <div className="grid grid-cols-2 gap-3">
-                  <Button 
-                    variant={formData.status === 'completed' ? 'secondary' : 'outline'}
-                    className={cn("rounded-2xl h-12 gap-2 font-bold", formData.status === 'completed' && "bg-emerald-50 text-emerald-600 border-emerald-100")}
-                    onClick={() => setFormData({...formData, status: 'completed'})}
-                  >
-                    <CheckCircle2 className="h-4 w-4" /> Realizada
-                  </Button>
                   <Button 
                     variant={formData.status === 'cancelled' ? 'secondary' : 'outline'}
                     className={cn("rounded-2xl h-12 gap-2 font-bold", formData.status === 'cancelled' && "bg-red-50 text-red-600 border-red-100")}
                     onClick={() => setFormData({...formData, status: 'cancelled'})}
                   >
-                    <XCircle className="h-4 w-4" /> Cancelada
+                    <XCircle className="h-4 w-4" /> Cancelar
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    className="rounded-2xl h-12 font-bold text-red-500 border-red-100 hover:bg-red-50"
+                    onClick={async () => {
+                       if (confirm("Excluir este agendamento permanentemente?")) {
+                          await sessionService.delete(selectedSession.id);
+                          setIsModalOpen(false);
+                          fetchData();
+                       }
+                    }}
+                  >
+                    Excluir
                   </Button>
                 </div>
               </div>
@@ -267,18 +274,8 @@ const Agenda = () => {
           </div>
 
           <DialogFooter className="gap-2">
-            <Button 
-              variant="ghost" 
-              className="rounded-2xl h-12 font-bold" 
-              onClick={() => setIsModalOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button 
-              className="flex-1 bg-primary hover:bg-primary/90 rounded-2xl h-12 font-black shadow-lg shadow-primary/10"
-              onClick={handleSave}
-              disabled={submitting}
-            >
+            <Button variant="ghost" className="rounded-2xl h-12 font-bold" onClick={() => setIsModalOpen(false)}>Cancelar</Button>
+            <Button className="flex-1 bg-primary hover:bg-primary/90 rounded-2xl h-12 font-black shadow-lg shadow-primary/10" onClick={handleSave} disabled={submitting}>
               {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : (selectedSession ? "Salvar Alterações" : "Confirmar Agendamento")}
             </Button>
           </DialogFooter>
