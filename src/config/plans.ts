@@ -14,8 +14,8 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
   free: {
     name: 'Gratuito',
     price: 0,
-    maxPatients: 10,
-    maxSessionsPerMonth: 10,
+    maxPatients: 2,
+    maxSessionsPerMonth: 2,
     maxTranscriptionsPerMonth: 0,
     hasTherapeuticInsights: false,
     description: 'Ideal para quem está começando.'
@@ -23,18 +23,18 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
   basic: {
     name: 'Básico',
     price: 19.90,
-    maxPatients: 100,
-    maxSessionsPerMonth: 1000,
-    maxTranscriptionsPerMonth: 10,
+    maxPatients: 25,
+    maxSessionsPerMonth: 100,
+    maxTranscriptionsPerMonth: 5,
     hasTherapeuticInsights: false,
     description: 'Para profissionais em crescimento.'
   },
   pro: {
     name: 'Profissional',
     price: 37.90,
-    maxPatients: 1000,
-    maxSessionsPerMonth: 10000,
-    maxTranscriptionsPerMonth: Infinity,
+    maxPatients: 40,
+    maxSessionsPerMonth: 160,
+    maxTranscriptionsPerMonth: 160,
     hasTherapeuticInsights: false,
     description: 'Gestão completa para clínicas médias.'
   },
