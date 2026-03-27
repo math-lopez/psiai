@@ -170,14 +170,19 @@ const SessionDetail = () => {
                 "flex items-center gap-2 px-3 py-1.5 rounded-full text-[10px] font-black uppercase w-fit",
                 session.processing_status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 
                 ['queued', 'processing'].includes(session.processing_status) ? 'bg-blue-100 text-blue-700' :
+                session.processing_status === 'cancelled' ? 'bg-red-50 text-red-600' :
                 session.processing_status === 'error' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
               )}>
-                {session.processing_status}
+                {session.processing_status === 'completed' ? 'Concluída' : 
+                 session.processing_status === 'processing' ? 'Processando' :
+                 session.processing_status === 'queued' ? 'Na fila' : 
+                 session.processing_status === 'cancelled' ? 'Cancelada' : 
+                 session.processing_status === 'error' ? 'Erro' : 'Rascunho'}
               </div>
             </CardContent>
           </Card>
 
-          {session.audio_file_path && (
+          {session.audio_file_path && session.processing_status !== 'cancelled' && (
             <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-indigo-50/20">
               <div className="h-1.5 w-full bg-indigo-500" />
               <CardHeader className="pb-4"><CardTitle className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-400"><Music className="h-4 w-4" /> Áudio da Sessão</CardTitle></CardHeader>

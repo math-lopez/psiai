@@ -178,6 +178,7 @@ const Sessions = () => {
                     { id: 'draft', label: 'Rascunho' },
                     { id: 'processing', label: 'Processando' },
                     { id: 'completed', label: 'Concluído' },
+                    { id: 'cancelled', label: 'Cancelado' },
                     { id: 'error', label: 'Erro' }
                   ].map((item) => (
                     <div key={item.id} className="flex items-center space-x-2">
@@ -267,6 +268,8 @@ const Sessions = () => {
                             ? 'bg-emerald-100 text-emerald-700' 
                             : ['queued', 'processing'].includes(session.processing_status)
                             ? 'bg-blue-100 text-blue-700'
+                            : session.processing_status === 'cancelled'
+                            ? 'bg-red-50 text-red-600'
                             : session.processing_status === 'error'
                             ? 'bg-red-100 text-red-700'
                             : 'bg-amber-100 text-amber-700'
@@ -274,6 +277,7 @@ const Sessions = () => {
                           {session.processing_status === 'completed' ? 'concluído' : 
                            session.processing_status === 'processing' ? 'processando' :
                            session.processing_status === 'queued' ? 'na fila' : 
+                           session.processing_status === 'cancelled' ? 'cancelada' : 
                            session.processing_status === 'error' ? 'erro' : 'rascunho'}
                         </div>
                       </TableCell>
