@@ -22,7 +22,7 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
   },
   basic: {
     name: 'Básico',
-    price: 19.90,
+    price: 12.90,
     maxPatients: 15, // Reduzido de 100 para 15
     maxSessionsPerMonth: 30,
     maxTranscriptionsPerMonth: 5, // Reduzido de 10 para 5
@@ -31,7 +31,7 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
   },
   pro: {
     name: 'Profissional',
-    price: 37.90,
+    price: 21.90,
     maxPatients: 50, // Definido um limite (antes era 1000)
     maxSessionsPerMonth: 200,
     maxTranscriptionsPerMonth: 30, // Definido um limite (antes era Infinity)
@@ -40,7 +40,7 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
   },
   ultra: {
     name: 'Ultra',
-    price: 59.90,
+    price: 45.90,
     maxPatients: Infinity,
     maxSessionsPerMonth: Infinity,
     maxTranscriptionsPerMonth: Infinity,
