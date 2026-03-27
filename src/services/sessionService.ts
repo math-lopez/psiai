@@ -76,9 +76,6 @@ export const sessionService = {
     return data as Session;
   },
 
-  /**
-   * Cria múltiplas sessões baseadas em recorrência semanal
-   */
   createRecurrent: async (baseSession: any, untilDate: string): Promise<void> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
@@ -87,10 +84,8 @@ export const sessionService = {
     let currentDate = parseISO(baseSession.session_date);
     const limitDate = parseISO(untilDate);
 
-    // Adiciona a primeira
     sessionsToInsert.push({ ...baseSession, psychologist_id: user.id, processing_status: 'draft' });
 
-    // Gera as próximas semanas
     while (true) {
       currentDate = addWeeks(currentDate, 1);
       if (isBefore(limitDate, currentDate)) break;
@@ -128,9 +123,19 @@ export const sessionService = {
   },
 
   finishSession: async (id: string): Promise<void> => {
+    // Ao finalizar, definimos o status como concluído. 
+    // Se for manual, o processing_status também vira completed (pois não há IA para rodar).
+    const { data: session } = await supabase.from('sessions').select('record_type, audio_file_path').eq('id', id).single();
+    
+    const updates: any = { status: 'completed' };
+    
+    if (!session?.audio_file_path || session?.record_type === 'manual') {
+      updates.processing_status = 'completed';
+    }
+
     const { error } = await supabase
       .from('sessions')
-      .update({ status: 'completed' })
+      .update(updates)
       .eq('id', id);
     if (error) throw error;
   },
@@ -138,7 +143,7 @@ export const sessionService = {
   cancelSession: async (id: string): Promise<void> => {
     const { error } = await supabase
       .from('sessions')
-      .update({ status: 'cancelled' })
+      .update({ status: 'cancelled', processing_status: 'cancelled' })
       .eq('id', id);
     if (error) throw error;
   },
