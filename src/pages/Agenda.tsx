@@ -151,12 +151,24 @@ const Agenda = () => {
     }
   };
 
-  const generateMeetLink = () => {
-    const fakeLink = `https://meet.google.com/${Math.random().toString(36).substring(2, 5)}-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 5)}`;
-    showSuccess("Link do Google Meet gerado com sucesso!");
+  const generateMeetLink = async () => {
+    if (!selectedSession) return;
     
-    if (selectedSession) {
-       sessionService.update(selectedSession.id, { meeting_link: fakeLink }).then(() => fetchData());
+    // Gerar um link que "parece" real seguindo o padrão do meet (3-4-3 chars)
+    const charset = "abcdefghijklmnopqrstuvwxyz";
+    const gen = (len: number) => Array.from({length: len}, () => charset[Math.floor(Math.random() * charset.length)]).join('');
+    const fakeLink = `https://meet.google.com/${gen(3)}-${gen(4)}-${gen(3)}`;
+    
+    try {
+      await sessionService.update(selectedSession.id, { meeting_link: fakeLink });
+      
+      // Atualizar o estado local IMEDIATAMENTE para mostrar na tela
+      setSelectedSession({ ...selectedSession, meeting_link: fakeLink });
+      
+      showSuccess("Link do Google Meet gerado com sucesso!");
+      fetchData(); // Atualiza a lista por baixo
+    } catch (e) {
+      showError("Erro ao salvar link da reunião.");
     }
   };
 
