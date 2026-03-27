@@ -113,6 +113,21 @@ const Agenda = () => {
     setIsModalOpen(true);
   };
 
+  const handleFinish = async () => {
+    if (!selectedSession) return;
+    setSubmitting(true);
+    try {
+      await sessionService.finishSession(selectedSession.id);
+      showSuccess("Sessão finalizada!");
+      setIsModalOpen(false);
+      fetchData();
+    } catch (e) {
+      showError("Erro ao finalizar sessão.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!formData.patient_id || !formData.date) return;
     setSubmitting(true);
@@ -248,6 +263,16 @@ const Agenda = () => {
                 >
                   <FileText className="h-5 w-5" /> Iniciar Atendimento
                 </Button>
+                
+                <Button 
+                  variant="outline"
+                  className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-100 rounded-2xl h-12 font-black gap-2"
+                  onClick={handleFinish}
+                  disabled={submitting}
+                >
+                  <CheckCircle2 className="h-4 w-4" /> Finalizar Atendimento
+                </Button>
+
                 <div className="grid grid-cols-2 gap-3">
                   <Button 
                     variant={formData.status === 'cancelled' ? 'secondary' : 'outline'}
