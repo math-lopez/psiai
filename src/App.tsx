@@ -117,7 +117,7 @@ const App = () => (
             <Route path="/portal/ativar" element={<ActivateAccount />} />
             
             {/* Rotas Clínicas (Só Psicólogos) */}
-            <Route element={<RoleProtectedRoute requiredRole="psychologist"><AppLayout /></Route>}>
+            <Route element={<RoleProtectedRoute requiredRole="psychologist"><AppLayout /></RoleProtectedRoute>}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/agenda" element={<Agenda />} />
               <Route path="/pacientes" element={<Patients />} />
