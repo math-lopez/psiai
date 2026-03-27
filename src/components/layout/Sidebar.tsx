@@ -9,13 +9,15 @@ import {
   LogOut,
   BrainCircuit,
   X,
-  ChevronRight
+  ChevronRight,
+  Calendar
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+  { icon: Calendar, label: "Agenda", path: "/agenda" },
   { icon: Users, label: "Pacientes", path: "/pacientes" },
   { icon: CalendarDays, label: "Sessões", path: "/sessoes" },
   { icon: Settings, label: "Configurações", path: "/configuracoes" },

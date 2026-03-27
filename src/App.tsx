@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Agenda from "./pages/Agenda";
 import Patients from "./pages/Patients";
 import PatientFormPage from "./pages/PatientFormPage";
 import PatientDetailPage from "./pages/PatientDetailPage";
@@ -30,10 +31,6 @@ import PatientDiaryPage from "./pages/portal/PatientDiaryPage";
 
 const queryClient = new QueryClient();
 
-/**
- * RoleProtectedRoute 2.0:
- * Bloqueio total até que o banco de dados confirme quem é o usuário.
- */
 const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode, requiredRole: 'psychologist' | 'patient' }) => {
   const { session, loading: authLoading, signOut } = useAuth();
   const [userRole, setUserRole] = useState<'psychologist' | 'patient' | 'unknown' | null>(null);
@@ -47,9 +44,6 @@ const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactN
       }
 
       try {
-        console.log(`[AuthGuard] Verificando papel para ${session.user.email}...`);
-        
-        // 1. Tenta encontrar na tabela de pacientes
         const { data: patientData } = await supabase
           .from('patient_access')
           .select('id')
@@ -57,14 +51,11 @@ const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactN
           .maybeSingle();
 
         if (patientData) {
-          console.log("[AuthGuard] Papel confirmado: PACIENTE");
           setUserRole('patient');
           setChecking(false);
           return;
         }
 
-        // 2. Se não for paciente, verifica se é psicólogo no perfil
-        // No seu sistema, psicólogos têm CRP no perfil.
         const { data: profileData } = await supabase
           .from('profiles')
           .select('crp')
@@ -72,14 +63,11 @@ const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactN
           .maybeSingle();
 
         if (profileData && profileData.crp) {
-          console.log("[AuthGuard] Papel confirmado: PSICÓLOGO");
           setUserRole('psychologist');
         } else {
-          console.log("[AuthGuard] Usuário não identificado em nenhuma categoria.");
           setUserRole('unknown');
         }
       } catch (err) {
-        console.error("[AuthGuard] Erro crítico na identificação:", err);
         setUserRole('unknown');
       } finally {
         setChecking(false);
@@ -89,7 +77,6 @@ const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactN
     if (!authLoading) identifyUser();
   }, [session, authLoading]);
 
-  // Enquanto verifica, não renderiza NADA das rotas protegidas
   if (authLoading || checking) {
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-white">
@@ -99,10 +86,8 @@ const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactN
     );
   }
 
-  // Se não tem sessão, tchau.
   if (!session) return <Navigate to="/login" replace />;
 
-  // Se o papel for incompatível com a rota, redireciona para o portal correto
   if (userRole === 'patient' && requiredRole === 'psychologist') {
     return <Navigate to="/portal" replace />;
   }
@@ -111,7 +96,6 @@ const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactN
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Se o usuário não foi identificado (ex: conta mal formada), desloga para segurança
   if (userRole === 'unknown') {
     signOut();
     return <Navigate to="/login" replace />;
@@ -133,8 +117,9 @@ const App = () => (
             <Route path="/portal/ativar" element={<ActivateAccount />} />
             
             {/* Rotas Clínicas (Só Psicólogos) */}
-            <Route element={<RoleProtectedRoute requiredRole="psychologist"><AppLayout /></RoleProtectedRoute>}>
+            <Route element={<RoleProtectedRoute requiredRole="psychologist"><AppLayout /></Route>}>
               <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/agenda" element={<Agenda />} />
               <Route path="/pacientes" element={<Patients />} />
               <Route path="/pacientes/novo" element={<PatientFormPage />} />
               <Route path="/pacientes/editar/:id" element={<PatientFormPage />} />
