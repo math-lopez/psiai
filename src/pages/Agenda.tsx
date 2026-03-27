@@ -7,13 +7,8 @@ import {
   Plus, 
   Loader2, 
   Calendar as CalendarIcon,
-  Video,
-  ExternalLink,
-  Trash2,
   CheckCircle2,
   XCircle,
-  User,
-  Clock
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WeeklyCalendar } from "@/components/agenda/WeeklyCalendar";
@@ -151,27 +146,6 @@ const Agenda = () => {
     }
   };
 
-  const generateMeetLink = async () => {
-    if (!selectedSession) return;
-    
-    // Gerar um link que "parece" real seguindo o padrão do meet (3-4-3 chars)
-    const charset = "abcdefghijklmnopqrstuvwxyz";
-    const gen = (len: number) => Array.from({length: len}, () => charset[Math.floor(Math.random() * charset.length)]).join('');
-    const fakeLink = `https://meet.google.com/${gen(3)}-${gen(4)}-${gen(3)}`;
-    
-    try {
-      await sessionService.update(selectedSession.id, { meeting_link: fakeLink });
-      
-      // Atualizar o estado local IMEDIATAMENTE para mostrar na tela
-      setSelectedSession({ ...selectedSession, meeting_link: fakeLink });
-      
-      showSuccess("Link do Google Meet gerado com sucesso!");
-      fetchData(); // Atualiza a lista por baixo
-    } catch (e) {
-      showError("Erro ao salvar link da reunião.");
-    }
-  };
-
   if (loading) return <div className="h-[60vh] flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
 
   return (
@@ -179,7 +153,7 @@ const Agenda = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Agenda Clínica</h1>
-          <p className="text-slate-500 mt-1 font-medium">Gestão de horários e teleconsultas.</p>
+          <p className="text-slate-500 mt-1 font-medium">Gestão de horários de atendimento.</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center bg-white border border-slate-100 rounded-2xl p-1 shadow-sm">
@@ -288,34 +262,6 @@ const Agenda = () => {
                     <XCircle className="h-4 w-4" /> Cancelada
                   </Button>
                 </div>
-              </div>
-            )}
-
-            {selectedSession && (
-              <div className="p-6 bg-slate-50 rounded-[28px] border border-slate-100 space-y-4">
-                <div className="flex items-center justify-between">
-                   <Label className="text-[10px] font-black uppercase text-slate-400">Teleconsulta</Label>
-                   <Button 
-                    variant="ghost" 
-                    className="text-[10px] font-black uppercase text-indigo-600 hover:bg-indigo-50 rounded-lg h-7"
-                    onClick={generateMeetLink}
-                   >
-                     {selectedSession.meeting_link ? "Gerar novo" : "Gerar link via Google"}
-                   </Button>
-                </div>
-                {selectedSession.meeting_link ? (
-                  <div className="flex items-center justify-between gap-3 bg-white p-3 rounded-xl border border-indigo-100 shadow-sm">
-                    <div className="flex items-center gap-2 truncate">
-                      <Video className="h-4 w-4 text-indigo-600" />
-                      <span className="text-xs font-mono text-indigo-600 truncate">{selectedSession.meeting_link}</span>
-                    </div>
-                    <a href={selectedSession.meeting_link} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-indigo-600">
-                      <ExternalLink className="h-4 w-4" />
-                    </a>
-                  </div>
-                ) : (
-                  <p className="text-[10px] text-slate-400 italic text-center">Nenhum link de reunião gerado.</p>
-                )}
               </div>
             )}
           </div>

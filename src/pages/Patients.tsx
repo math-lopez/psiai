@@ -104,14 +104,14 @@ const Patients = () => {
           <h1 className="text-2xl font-bold text-slate-900">Meus Pacientes</h1>
           <p className="text-slate-500">Gerencie sua lista de pacientes e históricos.</p>
         </div>
-        <Link to="/pacientes/novo">
+        <Link to="/pacientes/novo" data-tour="add-patient-btn">
           <Button className="bg-indigo-600 hover:bg-indigo-700 gap-2">
             <Plus className="h-4 w-4" /> Cadastrar Paciente
           </Button>
         </Link>
       </div>
 
-      <div className="flex items-center gap-4 bg-white p-4 rounded-lg border">
+      <div className="flex items-center gap-4 bg-white p-4 rounded-lg border" data-tour="search-patients">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input 
@@ -143,7 +143,7 @@ const Patients = () => {
               </TableHeader>
               <TableBody>
                 {paginatedPatients.length > 0 ? (
-                  paginatedPatients.map((patient) => (
+                  paginatedSessions.map((patient) => (
                     <TableRow key={patient.id} className="cursor-pointer hover:bg-slate-50 transition-colors">
                       <TableCell className="font-bold text-slate-900">
                         <Link to={`/pacientes/${patient.id}`} className="hover:text-indigo-600">

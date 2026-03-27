@@ -18,9 +18,9 @@ import { useAuth } from "@/contexts/AuthContext";
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Calendar, label: "Agenda", path: "/agenda" },
-  { icon: Users, label: "Pacientes", path: "/pacientes" },
-  { icon: CalendarDays, label: "Sessões", path: "/sessoes" },
-  { icon: Settings, label: "Configurações", path: "/configuracoes" },
+  { icon: Users, label: "Pacientes", path: "/pacientes", tourId: "menu-patients" },
+  { icon: CalendarDays, label: "Sessões", path: "/sessoes", tourId: "menu-sessions" },
+  { icon: Settings, label: "Configurações", path: "/configuracoes", tourId: "menu-settings" },
 ];
 
 interface SidebarProps {
@@ -33,10 +33,13 @@ export const Sidebar = ({ isMobile, onpjClose }: SidebarProps) => {
   const { signOut } = useAuth();
 
   return (
-    <div className={cn(
-      "flex h-screen flex-col bg-white border-r border-slate-100 transition-all duration-300",
-      isMobile ? "w-full" : "w-72"
-    )}>
+    <div 
+      data-tour="sidebar"
+      className={cn(
+        "flex h-screen flex-col bg-white border-r border-slate-100 transition-all duration-300",
+        isMobile ? "w-full" : "w-72"
+      )}
+    >
       <div className="flex h-20 items-center justify-between px-8">
         <Link to="/" className="flex items-center gap-3 group">
           <div className="bg-primary/10 p-2 rounded-xl group-hover:bg-primary/20 transition-colors">
@@ -58,6 +61,7 @@ export const Sidebar = ({ isMobile, onpjClose }: SidebarProps) => {
             <Link
               key={item.path}
               to={item.path}
+              data-tour={item.tourId}
               className={cn(
                 "group flex items-center justify-between px-4 py-3.5 rounded-2xl text-sm font-semibold transition-all duration-200",
                 isActive
