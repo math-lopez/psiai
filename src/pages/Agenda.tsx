@@ -11,7 +11,6 @@ import {
   CheckCircle2,
   XCircle,
   Repeat,
-  ArrowRight,
   FileText
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,7 +18,7 @@ import { WeeklyCalendar } from "@/components/agenda/WeeklyCalendar";
 import { sessionService } from "@/services/sessionService";
 import { patientService } from "@/services/patientService";
 import { Session, Patient } from "@/types";
-import { format, addWeeks, subWeeks, startOfWeek, endOfWeek } from "date-fns";
+import { format, addWeeks, subWeeks } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
   Dialog, 
@@ -48,12 +47,10 @@ const Agenda = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Modais
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Form
   const [formData, setFormData] = useState({
     patient_id: "",
     date: "",
@@ -96,7 +93,7 @@ const Agenda = () => {
       duration: 50,
       status: "scheduled",
       isRecurrent: false,
-      recurrenceUntil: format(addWeeks(date, 12), "yyyy-MM-dd") // Default 3 meses
+      recurrenceUntil: format(addWeeks(date, 12), "yyyy-MM-dd")
     });
     setIsModalOpen(true);
   };
@@ -158,7 +155,11 @@ const Agenda = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Agenda Clínica</h1>
-          <p className="text-slate-500 mt-1 font-medium">Gestão de horários de atendimento.</p>
+          {/* Indicador de Mês e Ano */}
+          <p className="text-indigo-600 mt-1 font-black uppercase tracking-widest text-sm flex items-center gap-2">
+            <CalendarIcon className="h-4 w-4" />
+            {format(currentDate, "MMMM 'de' yyyy", { locale: ptBR })}
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center bg-white border border-slate-100 rounded-2xl p-1 shadow-sm">
