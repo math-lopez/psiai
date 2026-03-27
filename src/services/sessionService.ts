@@ -160,16 +160,20 @@ export const sessionService = {
   finishSession: async (id: string): Promise<void> => {
     const { data: session } = await supabase.from('sessions').select('*').eq('id', id).single();
     
-    const nextStatus = (session?.audio_file_path && session?.processing_status === 'draft') ? 'queued' : 'completed';
+    // Se tiver áudio e ainda for rascunho, vai para a fila. Se não, marca como concluído.
+    const nextProcessingStatus = (session?.audio_file_path && session?.processing_status === 'draft') ? 'queued' : 'completed';
 
     const { error } = await supabase
       .from('sessions')
-      .update({ processing_status: nextStatus })
+      .update({ 
+        processing_status: nextProcessingStatus,
+        status: 'completed' // Sincroniza com a Agenda (Realizada)
+      })
       .eq('id', id);
     
     if (error) throw error;
 
-    if (nextStatus === 'queued') {
+    if (nextProcessingStatus === 'queued') {
       sessionService.processAudio(id);
     }
   },

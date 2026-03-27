@@ -119,16 +119,26 @@ const Agenda = () => {
         session_date: sessionDate.toISOString(),
         duration_minutes: formData.duration,
         status: formData.status,
-        record_type: 'manual' as const // Default para agendamentos
+        record_type: 'manual' as const 
       };
 
+      let savedSessionId;
       if (selectedSession) {
         await sessionService.update(selectedSession.id, payload);
-        showSuccess("Agendamento atualizado!");
+        savedSessionId = selectedSession.id;
       } else {
-        await sessionService.create(payload);
-        showSuccess("Sessão agendada com sucesso!");
+        const newSession = await sessionService.create(payload);
+        savedSessionId = newSession.id;
       }
+
+      // Se marcou como 'Realizada', dispara o fluxo de finalização clínica
+      if (formData.status === 'completed') {
+        await sessionService.finishSession(savedSessionId);
+        showSuccess("Consulta marcada como realizada e prontuário atualizado!");
+      } else {
+        showSuccess(selectedSession ? "Agendamento atualizado!" : "Sessão agendada com sucesso!");
+      }
+
       setIsModalOpen(false);
       fetchData();
     } catch (e: any) {
@@ -139,12 +149,9 @@ const Agenda = () => {
   };
 
   const generateMeetLink = () => {
-    // Simulação de geração de link Google Meet
-    // Em um cenário real, isso chamaria uma Edge Function com OAuth do Google
     const fakeLink = `https://meet.google.com/${Math.random().toString(36).substring(2, 5)}-${Math.random().toString(36).substring(2, 6)}-${Math.random().toString(36).substring(2, 5)}`;
     showSuccess("Link do Google Meet gerado com sucesso!");
     
-    // Atualiza o estado da sessão se estiver editando
     if (selectedSession) {
        sessionService.update(selectedSession.id, { meeting_link: fakeLink }).then(() => fetchData());
     }
