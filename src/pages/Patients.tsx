@@ -143,7 +143,7 @@ const Patients = () => {
               </TableHeader>
               <TableBody>
                 {paginatedPatients.length > 0 ? (
-                  paginatedSessions.map((patient) => (
+                  paginatedPatients.map((patient) => (
                     <TableRow key={patient.id} className="cursor-pointer hover:bg-slate-50 transition-colors">
                       <TableCell className="font-bold text-slate-900">
                         <Link to={`/pacientes/${patient.id}`} className="hover:text-indigo-600">
