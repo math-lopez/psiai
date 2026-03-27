@@ -10,7 +10,7 @@ export interface Profile {
 }
 
 export type SessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'draft';
-export type ProcessingStatus = 'draft' | 'queued' | 'processing' | 'completed' | 'error';
+export type ProcessingStatus = 'draft' | 'queued' | 'processing' | 'completed' | 'error' | 'cancelled';
 export type SessionRecordType = 'audio' | 'manual' | 'ambos';
 
 export interface Session {

@@ -47,7 +47,6 @@ export const sessionService = {
     return data as Session;
   },
 
-  // Busca a análise profunda de IA da sessão
   getSessionAIAnalysis: async (sessionId: string) => {
     const { data, error } = await supabase
       .from('session_ai_analysis')
@@ -59,7 +58,6 @@ export const sessionService = {
     return data;
   },
 
-  // Solicita a geração da análise profunda via Edge Function
   analyzeSessionAI: async (sessionId: string) => {
     const { data, error } = await supabase.functions.invoke('analyze-session-v2', {
       body: { sessionId }
@@ -73,7 +71,6 @@ export const sessionService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    // 1. Verificar plano e limites de sessões no mês
     const { data: profile } = await supabase
       .from('profiles')
       .select('subscription_tier')
@@ -99,7 +96,6 @@ export const sessionService = {
       }
     }
 
-    // 2. Criar a sessão
     const { data, error } = await supabase
       .from('sessions')
       .insert([{ ...session, psychologist_id: user.id, processing_status: 'draft' }])
@@ -159,15 +155,13 @@ export const sessionService = {
 
   finishSession: async (id: string): Promise<void> => {
     const { data: session } = await supabase.from('sessions').select('*').eq('id', id).single();
-    
-    // Se tiver áudio e ainda for rascunho, vai para a fila. Se não, marca como concluído.
     const nextProcessingStatus = (session?.audio_file_path && session?.processing_status === 'draft') ? 'queued' : 'completed';
 
     const { error } = await supabase
       .from('sessions')
       .update({ 
         processing_status: nextProcessingStatus,
-        status: 'completed' // Sincroniza com a Agenda (Realizada)
+        status: 'completed'
       })
       .eq('id', id);
     
@@ -176,6 +170,18 @@ export const sessionService = {
     if (nextProcessingStatus === 'queued') {
       sessionService.processAudio(id);
     }
+  },
+
+  cancelSession: async (id: string): Promise<void> => {
+    const { error } = await supabase
+      .from('sessions')
+      .update({ 
+        status: 'cancelled',
+        processing_status: 'cancelled'
+      })
+      .eq('id', id);
+    
+    if (error) throw error;
   },
 
   processAudio: async (sessionId: string): Promise<void> => {

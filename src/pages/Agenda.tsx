@@ -131,10 +131,13 @@ const Agenda = () => {
         savedSessionId = newSession.id;
       }
 
-      // Se marcou como 'Realizada', dispara o fluxo de finalização clínica
+      // Sincronização de Status
       if (formData.status === 'completed') {
         await sessionService.finishSession(savedSessionId);
         showSuccess("Consulta marcada como realizada e prontuário atualizado!");
+      } else if (formData.status === 'cancelled') {
+        await sessionService.cancelSession(savedSessionId);
+        showSuccess("Agendamento cancelado com sucesso.");
       } else {
         showSuccess(selectedSession ? "Agendamento atualizado!" : "Sessão agendada com sucesso!");
       }
