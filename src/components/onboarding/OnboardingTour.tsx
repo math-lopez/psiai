@@ -98,20 +98,30 @@ export const OnboardingTour = () => {
 
   const currentStep = TOUR_STEPS[stepIndex];
 
-  // Verifica se deve mostrar o tour
   useEffect(() => {
     const checkTourStatus = async () => {
+      // Fallback: Verifica no localStorage primeiro para ser instantâneo e evitar erro de coluna ausente
+      const localCompleted = localStorage.getItem("psiai_onboarding_completed");
+      if (localCompleted === "true") return;
+
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('onboarding_completed, crp')
-        .eq('id', user.id)
-        .maybeSingle();
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('onboarding_completed, crp')
+          .eq('id', user.id)
+          .maybeSingle();
 
-      // Só mostra se for psicólogo (tem crp) e não completou o tour
-      if (profile && profile.crp && !profile.onboarding_completed) {
+        // Se o campo não existir no banco, profile.onboarding_completed virá undefined/null
+        // Só ativa se for psicólogo e não completou
+        if (profile && profile.crp && !profile.onboarding_completed) {
+          setActive(true);
+        }
+      } catch (err) {
+        // Se der erro de coluna ausente no banco, ativamos o tour se não estiver no localStorage
+        console.warn("Coluna onboarding_completed não encontrada. Usando localStorage.");
         setActive(true);
       }
     };
@@ -134,7 +144,7 @@ export const OnboardingTour = () => {
   useEffect(() => {
     if (!active) return;
     
-    const timer = setTimeout(updateRect, 500); // Aguarda navegação/renderização
+    const timer = setTimeout(updateRect, 500); 
     window.addEventListener('resize', updateRect);
     window.addEventListener('scroll', updateRect);
     
@@ -159,7 +169,6 @@ export const OnboardingTour = () => {
         if (patients && patients.length > 0) {
           navigate(`/pacientes/${patients[0].id}`);
         } else {
-          // Se não houver paciente, pula os passos de paciente
           setStepIndex(12); 
           return;
         }
@@ -177,9 +186,16 @@ export const OnboardingTour = () => {
 
   const finishTour = async () => {
     setActive(false);
+    localStorage.setItem("psiai_onboarding_completed", "true");
+    
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', user.id);
+      // Tenta atualizar no banco, mas ignora silenciosamente se a coluna não existir
+      try {
+        await supabase.from('profiles').update({ onboarding_completed: true }).eq('id', user.id);
+      } catch (e) {
+        console.info("Não foi possível persistir no banco (coluna ausente), mas salvamos localmente.");
+      }
     }
   };
 
@@ -187,10 +203,8 @@ export const OnboardingTour = () => {
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] pointer-events-none">
-      {/* Background Dimmed Overlay */}
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px] transition-all duration-500 pointer-events-auto" />
 
-      {/* Spotlight Mask */}
       {rect && (
         <div 
           className="absolute border-[4px] border-indigo-400 rounded-2xl shadow-[0_0_0_9999px_rgba(15,23,42,0.6)] transition-all duration-300 pointer-events-none"
@@ -203,7 +217,6 @@ export const OnboardingTour = () => {
         />
       )}
 
-      {/* Card Informativo */}
       <div 
         className={cn(
           "absolute pointer-events-auto bg-white rounded-[32px] shadow-2xl p-8 max-w-sm w-full transition-all duration-500 transform",
@@ -252,9 +265,9 @@ export const OnboardingTour = () => {
             
             <div className="flex items-center gap-3">
               {currentStep.id < 15 && (
-                <Button variant="ghost" size="sm" onClick={handleSkip} className="text-[10px] font-black uppercase text-slate-400 hover:text-slate-600">
+                <button onClick={handleSkip} className="text-[10px] font-black uppercase text-slate-400 hover:text-slate-600">
                   Pular Tour
-                </Button>
+                </button>
               )}
               <Button 
                 onClick={handleNext} 
