@@ -82,7 +82,6 @@ const SessionFormPage = () => {
     loadData();
   }, [id, location.state]);
 
-  // Lógica de Autosave para campos clínicos
   useEffect(() => {
     if (!id || loading) return;
 
@@ -129,6 +128,12 @@ const SessionFormPage = () => {
 
       if (shouldFinish) {
         await sessionService.finishSession(savedSession.id);
+        
+        // Se houver áudio (novo ou já existente), dispara o processamento da IA
+        if (audioFile || existingAudioName) {
+          await sessionService.processAudio(savedSession.id);
+        }
+        
         showSuccess(audioFile || existingAudioName ? "Sessão enviada para processamento!" : "Sessão finalizada com sucesso!");
       } else {
         showSuccess("Rascunho salvo com sucesso!");
@@ -175,7 +180,6 @@ const SessionFormPage = () => {
       </div>
 
       <form className="space-y-8">
-        {/* Seção 1: Informações Básicas e Áudio */}
         <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
           <div className="h-1.5 w-full bg-slate-100" />
           <CardContent className="p-8 space-y-8">
@@ -271,7 +275,6 @@ const SessionFormPage = () => {
           </CardContent>
         </Card>
 
-        {/* Seção 2: Registro Clínico Estruturado (A Grande Novidade da Fase 2) */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
             <div className="h-1.5 w-full bg-blue-500" />
@@ -325,7 +328,6 @@ const SessionFormPage = () => {
           </CardContent>
         </Card>
 
-        {/* Footer de Ações */}
         <div className="flex flex-col md:flex-row justify-end gap-3 pt-6">
           <Button type="button" variant="ghost" onClick={() => navigate(-1)} disabled={submitting} className="rounded-2xl h-12 font-bold px-8">
             Voltar

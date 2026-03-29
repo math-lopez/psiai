@@ -166,7 +166,9 @@ const PatientDetailPage = () => {
         </div>
       </div>
 
-      <LatestSessionFeature session={latestSession} />
+      <div data-tour="latest-session-card">
+        <LatestSessionFeature session={latestSession} />
+      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-10">
         <div className="lg:col-span-1 space-y-8">
@@ -226,9 +228,10 @@ const PatientDetailPage = () => {
 
         <div className="lg:col-span-3">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="bg-slate-100/50 p-1.5 rounded-3xl h-auto mb-10 gap-2 border border-slate-100 flex-wrap justify-start">
+            <TabsList data-tour="patient-tabs-list" className="bg-slate-100/50 p-1.5 rounded-3xl h-auto mb-10 gap-2 border border-slate-100 flex-wrap justify-start">
               <TabsTrigger 
                 value="overview" 
+                data-tour="tab-overview"
                 className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-primary transition-all"
               >
                 Visão Geral
@@ -237,6 +240,7 @@ const PatientDetailPage = () => {
               {features.hasTherapeuticPlan && (
                 <TabsTrigger 
                   value="treatment" 
+                  data-tour="tab-treatment"
                   className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
                 >
                   Plano <Target className="h-4 w-4" />
@@ -246,6 +250,7 @@ const PatientDetailPage = () => {
               {features.hasDiary && (
                 <TabsTrigger 
                   value="diary" 
+                  data-tour="tab-diary"
                   className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
                 >
                   Diário <BookOpen className="h-4 w-4" />
@@ -254,12 +259,14 @@ const PatientDetailPage = () => {
 
               <TabsTrigger 
                 value="documents" 
+                data-tour="tab-documents"
                 className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
               >
                 Documentos <Files className="h-4 w-4" />
               </TabsTrigger>
               <TabsTrigger 
                 value="analysis" 
+                data-tour="tab-analysis"
                 disabled
                 className="rounded-2xl px-6 py-3 font-black text-sm opacity-40 cursor-not-allowed flex gap-2 grayscale"
               >
@@ -267,6 +274,7 @@ const PatientDetailPage = () => {
               </TabsTrigger>
               <TabsTrigger 
                 value="access" 
+                data-tour="tab-access"
                 className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
               >
                 Acesso <Lock className="h-4 w-4" />

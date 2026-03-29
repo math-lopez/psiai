@@ -6,7 +6,7 @@ export interface PlanLimits {
   maxPatients: number;
   maxSessionsPerMonth: number;
   maxTranscriptionsPerMonth: number;
-  hasTherapeuticInsights: boolean; // Novo campo
+  hasTherapeuticInsights: boolean;
   description: string;
 }
 
@@ -14,37 +14,37 @@ export const PLAN_LIMITS: Record<SubscriptionTier, PlanLimits> = {
   free: {
     name: 'Gratuito',
     price: 0,
-    maxPatients: 2,
-    maxSessionsPerMonth: 2,
+    maxPatients: 3, // Reduzido de 10 para 3
+    maxSessionsPerMonth: 5,
     maxTranscriptionsPerMonth: 0,
     hasTherapeuticInsights: false,
-    description: 'Ideal para quem está começando.'
+    description: 'Ideal para experimentação e início de carreira.'
   },
   basic: {
     name: 'Básico',
-    price: 19.90,
-    maxPatients: 25,
-    maxSessionsPerMonth: 100,
-    maxTranscriptionsPerMonth: 5,
+    price: 12.90,
+    maxPatients: 15, // Reduzido de 100 para 15
+    maxSessionsPerMonth: 30,
+    maxTranscriptionsPerMonth: 5, // Reduzido de 10 para 5
     hasTherapeuticInsights: false,
-    description: 'Para profissionais em crescimento.'
+    description: 'Para profissionais que estão começando a crescer.'
   },
   pro: {
     name: 'Profissional',
-    price: 37.90,
-    maxPatients: 40,
-    maxSessionsPerMonth: 160,
-    maxTranscriptionsPerMonth: 160,
+    price: 21.90,
+    maxPatients: 50, // Definido um limite (antes era 1000)
+    maxSessionsPerMonth: 200,
+    maxTranscriptionsPerMonth: 30, // Definido um limite (antes era Infinity)
     hasTherapeuticInsights: false,
-    description: 'Gestão completa para clínicas médias.'
+    description: 'Gestão completa para clínicas em ritmo acelerado.'
   },
   ultra: {
     name: 'Ultra',
-    price: 59.90,
+    price: 45.90,
     maxPatients: Infinity,
     maxSessionsPerMonth: Infinity,
     maxTranscriptionsPerMonth: Infinity,
-    hasTherapeuticInsights: true, // Apenas Ultra tem insights
-    description: 'Liberdade total e inteligência máxima.'
+    hasTherapeuticInsights: true,
+    description: 'Liberdade total e inteligência artificial avançada.'
   }
 };
