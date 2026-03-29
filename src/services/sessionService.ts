@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Session, DashboardStats } from "@/types";
 import { storageService } from "./storageService";
 import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
-import { startOfMonth, endOfMonth } from "date-fns";
+import { startOfMonth, endOfMonth, addWeeks, isBefore, parseISO } from "date-fns";
 
 export const sessionService = {
   getStats: async (): Promise<DashboardStats> => {
@@ -47,59 +47,10 @@ export const sessionService = {
     return data as Session;
   },
 
-  // Busca a análise profunda de IA da sessão
-  getSessionAIAnalysis: async (sessionId: string) => {
-    const { data, error } = await supabase
-      .from('session_ai_analysis')
-      .select('*')
-      .eq('session_id', sessionId)
-      .maybeSingle();
-    
-    if (error) throw error;
-    return data;
-  },
-
-  // Solicita a geração da análise profunda via Edge Function
-  analyzeSessionAI: async (sessionId: string) => {
-    const { data, error } = await supabase.functions.invoke('analyze-session-v2', {
-      body: { sessionId }
-    });
-    
-    if (error) throw error;
-    return data;
-  },
-
   create: async (session: any, audioFile?: File): Promise<Session> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    // 1. Verificar plano e limites de sessões no mês
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('subscription_tier')
-      .eq('id', user.id)
-      .single();
-
-    const tier = (profile?.subscription_tier as SubscriptionTier) || 'free';
-    const limit = PLAN_LIMITS[tier].maxSessionsPerMonth;
-
-    if (limit !== Infinity) {
-      const start = startOfMonth(new Date()).toISOString();
-      const end = endOfMonth(new Date()).toISOString();
-
-      const { count } = await supabase
-        .from('sessions')
-        .select('*', { count: 'exact', head: true })
-        .eq('psychologist_id', user.id)
-        .gte('session_date', start)
-        .lte('session_date', end);
-
-      if (count !== null && count >= limit) {
-        throw new Error(`Limite de sessões atingido! Seu plano ${PLAN_LIMITS[tier].name} permite apenas ${limit} sessões por mês. Faça um upgrade para continuar.`);
-      }
-    }
-
-    // 2. Criar a sessão
     const { data, error } = await supabase
       .from('sessions')
       .insert([{ ...session, psychologist_id: user.id, processing_status: 'draft' }])
@@ -125,21 +76,39 @@ export const sessionService = {
     return data as Session;
   },
 
-  update: async (id: string, session: any, audioFile?: File): Promise<Session> => {
+  createRecurrent: async (baseSession: any, untilDate: string): Promise<void> => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
-    let updateData = { ...session };
+    const sessionsToInsert = [];
+    let currentDate = parseISO(baseSession.session_date);
+    const limitDate = parseISO(untilDate);
 
-    if (audioFile) {
-      const upload = await storageService.uploadSessionAudio(user.id, session.patient_id, id, audioFile);
-      updateData.audio_file_name = upload.name;
-      updateData.audio_file_path = upload.path;
+    sessionsToInsert.push({ ...baseSession, psychologist_id: user.id, processing_status: 'draft' });
+
+    while (true) {
+      currentDate = addWeeks(currentDate, 1);
+      if (isBefore(limitDate, currentDate)) break;
+      
+      sessionsToInsert.push({
+        ...baseSession,
+        session_date: currentDate.toISOString(),
+        psychologist_id: user.id,
+        processing_status: 'draft'
+      });
     }
 
+    const { error } = await supabase
+      .from('sessions')
+      .insert(sessionsToInsert);
+    
+    if (error) throw error;
+  },
+
+  update: async (id: string, session: any, audioFile?: File): Promise<Session> => {
     const { data, error } = await supabase
       .from('sessions')
-      .update(updateData)
+      .update(session)
       .eq('id', id)
       .select()
       .single();
@@ -149,36 +118,42 @@ export const sessionService = {
   },
 
   delete: async (id: string): Promise<void> => {
-    const { error } = await supabase
-      .from('sessions')
-      .delete()
-      .eq('id', id);
-    
+    const { error } = await supabase.from('sessions').delete().eq('id', id);
     if (error) throw error;
   },
 
   finishSession: async (id: string): Promise<void> => {
-    const { data: session } = await supabase.from('sessions').select('*').eq('id', id).single();
+    // Ao finalizar, definimos o status como concluído. 
+    // Se for manual, o processing_status também vira completed (pois não há IA para rodar).
+    const { data: session } = await supabase.from('sessions').select('record_type, audio_file_path').eq('id', id).single();
     
-    const nextStatus = (session?.audio_file_path && session?.processing_status === 'draft') ? 'queued' : 'completed';
+    const updates: any = { status: 'completed' };
+    
+    if (!session?.audio_file_path || session?.record_type === 'manual') {
+      updates.processing_status = 'completed';
+    }
 
     const { error } = await supabase
       .from('sessions')
-      .update({ processing_status: nextStatus })
+      .update(updates)
       .eq('id', id);
-    
     if (error) throw error;
+  },
 
-    if (nextStatus === 'queued') {
-      sessionService.processAudio(id);
-    }
+  cancelSession: async (id: string): Promise<void> => {
+    const { error } = await supabase
+      .from('sessions')
+      .update({ status: 'cancelled', processing_status: 'cancelled' })
+      .eq('id', id);
+    if (error) throw error;
   },
 
   processAudio: async (sessionId: string): Promise<void> => {
-    const { error } = await supabase.functions.invoke('process-session-audio', {
-      body: { sessionId }
-    });
-    
-    if (error) throw error;
+    await supabase.functions.invoke('process-session-audio', { body: { sessionId } });
+  },
+
+  getSessionAIAnalysis: async (sessionId: string) => {
+    const { data } = await supabase.from('session_ai_analysis').select('*').eq('session_id', sessionId).maybeSingle();
+    return data;
   }
 };

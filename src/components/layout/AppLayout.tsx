@@ -4,6 +4,7 @@ import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
 import { Outlet, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { OnboardingTour } from "../onboarding/OnboardingTour";
 
 export const AppLayout = () => {
   const location = useLocation();
@@ -16,6 +17,9 @@ export const AppLayout = () => {
 
   return (
     <div className="flex min-h-screen bg-[#F8FAFC]">
+      {/* Tour Interativo */}
+      <OnboardingTour />
+
       {/* Sidebar Desktop */}
       <div className="hidden lg:block">
         <Sidebar />
@@ -31,7 +35,7 @@ export const AppLayout = () => {
         </main>
       </div>
 
-      {/* Sidebar Mobile via Sheet/Drawer logic embutida para simplicidade */}
+      {/* Sidebar Mobile via logic embutida */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div 
