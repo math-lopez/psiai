@@ -1,6 +1,10 @@
+"use client";
+
 import { supabase } from "@/integrations/supabase/client";
 import { Session, DashboardStats } from "@/types";
 import { storageService } from "./storageService";
+import { PLAN_LIMITS, SubscriptionTier } from "@/config/plans";
+import { startOfMonth, endOfMonth } from "date-fns";
 
 export const sessionService = {
   getStats: async (): Promise<DashboardStats> => {
@@ -57,8 +61,6 @@ export const sessionService = {
 
   // Solicita a geração da análise profunda via Edge Function
   analyzeSessionAI: async (sessionId: string) => {
-    // Nota: Esta função deve chamar uma Edge Function que processa o texto da sessão
-    // Usaremos a mesma lógica de invocar funções do Supabase
     const { data, error } = await supabase.functions.invoke('analyze-session-v2', {
       body: { sessionId }
     });
@@ -71,6 +73,33 @@ export const sessionService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Não autenticado");
 
+    // 1. Verificar plano e limites de sessões no mês
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('subscription_tier')
+      .eq('id', user.id)
+      .single();
+
+    const tier = (profile?.subscription_tier as SubscriptionTier) || 'free';
+    const limit = PLAN_LIMITS[tier].maxSessionsPerMonth;
+
+    if (limit !== Infinity) {
+      const start = startOfMonth(new Date()).toISOString();
+      const end = endOfMonth(new Date()).toISOString();
+
+      const { count } = await supabase
+        .from('sessions')
+        .select('*', { count: 'exact', head: true })
+        .eq('psychologist_id', user.id)
+        .gte('session_date', start)
+        .lte('session_date', end);
+
+      if (count !== null && count >= limit) {
+        throw new Error(`Limite de sessões atingido! Seu plano ${PLAN_LIMITS[tier].name} permite apenas ${limit} sessões por mês. Faça um upgrade para continuar.`);
+      }
+    }
+
+    // 2. Criar a sessão
     const { data, error } = await supabase
       .from('sessions')
       .insert([{ ...session, psychologist_id: user.id, processing_status: 'draft' }])
