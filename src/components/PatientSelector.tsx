@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Input } from '@shadcn/ui/input';
+import { Input } from "@/components/ui/input";
 
 interface Patient {
   id: string;
@@ -24,14 +24,18 @@ const PatientSelector: React.FC<PatientSelectorProps> = ({ patients, onSelect })
     <div>
       <Input
         type="text"
-        placeholder="Search for a patient..."
+        placeholder="Buscar por um paciente..."
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
         className="mb-4"
       />
-      <ul>
+      <ul className="space-y-2">
         {filteredPatients.map(patient => (
-          <li key={patient.id} onClick={() => onSelect(patient)}>
+          <li 
+            key={patient.id} 
+            onClick={() => onSelect(patient)}
+            className="p-3 bg-white border rounded-xl cursor-pointer hover:bg-slate-50 transition-colors font-medium"
+          >
             {patient.name}
           </li>
         ))}
