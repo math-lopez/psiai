@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Input } from '@shadcn/ui/input';
+import { Input } from '@shadcn/ui';
 
 interface Appointment {
   id: string;
