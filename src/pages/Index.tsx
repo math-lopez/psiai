@@ -20,6 +20,7 @@ const Index = () => {
       // SE NÃO ESTÁ LOGADO
       if (!session) {
         if (token) {
+          // Se tem token, força ir para a ativação
           navigate(`/portal/ativar?token=${token}`, { replace: true });
           return;
         }
@@ -35,13 +36,13 @@ const Index = () => {
           .eq('id', session.user.id)
           .maybeSingle();
 
-        // Se é Psicólogo, vai pro Dashboard
+        // Se é Psicólogo, ignora qualquer token e vai pro Dashboard
         if (profile && profile.crp) {
           navigate("/dashboard", { replace: true });
           return;
         }
 
-        // Se é Paciente e veio com token, garante o vínculo
+        // Se é Paciente, processa vínculo se houver token
         if (token) {
           await supabase
             .from('patient_access')
@@ -50,7 +51,8 @@ const Index = () => {
               status: 'active',
               updated_at: new Date().toISOString()
             })
-            .eq('invite_token', token);
+            .eq('invite_token', token)
+            .eq('status', 'invited');
         }
         
         // Verifica se tem acesso ativo para ir pro portal
@@ -66,13 +68,7 @@ const Index = () => {
           return;
         }
 
-        // Caso sem papel e sem token, força preencher CRP se for psicólogo
-        // ou dá erro se for alguém perdido
-        if (profile && !profile.crp) {
-          navigate("/configuracoes"); // Força preencher dados
-          return;
-        }
-
+        // Caso sem acesso
         await supabase.auth.signOut();
         navigate("/login?error=no-access", { replace: true });
         
