@@ -7,21 +7,14 @@ export const diaryService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    // Prioriza o prontuário que o paciente selecionou no Dashboard (salvo no localStorage)
-    const savedId = localStorage.getItem('psiai_selected_patient_id');
-
-    const query = supabase
+    // Busca o vínculo ativo e mais recente (Usa !inner para garantir que o prontuário esteja 'ativo')
+    const { data: accessList, error } = await supabase
       .from('patient_access')
       .select('patient_id, psychologist_id, patients!inner(status)')
       .eq('user_id', user.id)
       .eq('patients.status', 'ativo')
       .order('updated_at', { ascending: false });
     
-    if (savedId) {
-      query.eq('patient_id', savedId);
-    }
-
-    const { data: accessList, error } = await query;
     const data = accessList?.[0];
 
     if (error || !data) {
