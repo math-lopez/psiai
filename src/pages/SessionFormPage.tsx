@@ -280,15 +280,15 @@ const SessionFormPage = () => {
             <div className="h-1.5 w-full bg-blue-500" />
             <CardHeader className="pb-2">
               <CardTitle className="text-lg font-bold flex items-center gap-2 text-slate-800">
-                <ClipboardList className="h-5 w-5 text-blue-500" /> Notas Clínicas
+                <ClipboardList className="h-5 w-5 text-blue-500" /> Notas do Atendimento
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <Textarea 
-                placeholder="Observações técnicas, fenomenologia, humor, transferência..." 
+                placeholder="Escreva aqui suas percepções da sessão..." 
                 className="min-h-[300px] rounded-3xl border-slate-100 focus:border-blue-300 resize-none text-sm leading-relaxed"
-                value={formData.clinical_notes}
-                onChange={(e) => setFormData({...formData, clinical_notes: e.target.value})}
+                value={formData.manual_notes}
+                onChange={(e) => setFormData({...formData, manual_notes: e.target.value})}
               />
             </CardContent>
           </Card>
