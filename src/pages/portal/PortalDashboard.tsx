@@ -30,7 +30,6 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link, useNavigate } from "react-router-dom";
-import { cn } from "@/lib/utils";
 
 const PortalDashboard = () => {
   const { user } = useAuth();
@@ -46,14 +45,13 @@ const PortalDashboard = () => {
     const fetchVenculos = async () => {
       if (!user) return;
       try {
-        // 1. Buscar todos os vínculos ativos do paciente
-        // Removido o nome específico da FK para evitar erro de banco de dados
+        // 1. Buscar todos os vínculos ativos do paciente e o nome do psicólogo (via profiles)
         const { data: accessList, error } = await supabase
           .from('patient_access')
           .select(`
             *,
             patients!inner(*),
-            psychologist:profiles(*)
+            psychologist:profiles!patient_access_psychologist_id_fkey(full_name, crp)
           `)
           .eq('user_id', user.id)
           .eq('patients.status', 'ativo')
@@ -63,6 +61,7 @@ const PortalDashboard = () => {
 
         setAllAccess(accessList || []);
         
+        // Recupera o psicólogo selecionado anteriormente ou pega o primeiro
         const savedId = localStorage.getItem('psiai_selected_patient_id');
         const initial = accessList?.find(a => a.patient_id === savedId) || accessList?.[0];
         
@@ -82,7 +81,7 @@ const PortalDashboard = () => {
     setSelectedAccess(access);
     localStorage.setItem('psiai_selected_patient_id', access.patient_id);
     
-    // 2. Buscar Prompts Ativos
+    // 2. Buscar Prompts Ativos do psicólogo selecionado
     const { data: p } = await supabase
       .from('patient_log_prompts')
       .select('*')
@@ -90,7 +89,7 @@ const PortalDashboard = () => {
       .eq('status', 'active');
     setPrompts(p || []);
 
-    // 3. Buscar Registros Compartilhados
+    // 3. Buscar Registros Compartilhados pelo psicólogo selecionado
     const { data: l } = await supabase
       .from('patient_logs')
       .select('*')
@@ -103,15 +102,12 @@ const PortalDashboard = () => {
 
   if (loading) return <div className="py-20 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
 
-  // Pega o nome do paciente do vínculo selecionado
-  const patientFirstName = selectedAccess?.patients?.full_name?.split(' ')[0] || "";
-
   return (
     <div className="space-y-10">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-            Olá{patientFirstName ? `, ${patientFirstName}` : ''}!
+            Olá, {selectedAccess?.patients?.full_name?.split(' ')[0]}!
           </h1>
           <p className="text-slate-500 font-medium italic">Seu espaço seguro para acompanhamento terapêutico.</p>
         </div>
@@ -123,7 +119,7 @@ const PortalDashboard = () => {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="h-10 rounded-xl bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 font-bold gap-2">
                     <UserCircle className="h-4 w-4" />
-                    {selectedAccess?.psychologist?.full_name || 'Profissional'}
+                    {selectedAccess?.psychologist?.full_name}
                     <ChevronDown className="h-4 w-4 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -156,7 +152,7 @@ const PortalDashboard = () => {
             <Card className="md:col-span-2 border-none shadow-sm rounded-[32px] bg-white overflow-hidden">
                <CardHeader className="pb-4">
                   <CardTitle className="text-xs font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                    <Files className="h-4 w-4" /> Documentos com {selectedAccess.psychologist?.full_name || 'seu psicólogo'}
+                    <Files className="h-4 w-4" /> Documentos com {selectedAccess.psychologist?.full_name}
                   </CardTitle>
                </CardHeader>
                <CardContent>
@@ -245,12 +241,13 @@ const PortalDashboard = () => {
       ) : (
         <Card className="p-20 text-center rounded-[40px] border-none shadow-sm bg-white">
           <Cloud className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-          <p className="text-slate-500 font-medium">Sua conta está ativa, mas não encontramos prontuários vinculados a este e-mail.</p>
-          <p className="text-sm text-slate-400 mt-4">Certifique-se de que seu psicólogo enviou o convite para o e-mail: <strong>{user.email}</strong></p>
+          <p className="text-slate-500 font-medium">Sua conta está ativa, mas não encontramos prontuários ativos no momento.</p>
         </Card>
       )}
     </div>
   );
 };
+
+import { cn } from "@/lib/utils";
 
 export default PortalDashboard;
