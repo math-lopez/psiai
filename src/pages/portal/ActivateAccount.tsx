@@ -19,6 +19,7 @@ const ActivateAccount = () => {
   const [validating, setValidating] = useState(false);
   const [inviteData, setInviteData] = useState<any>(null);
   const [patientEmail, setPatientEmail] = useState("");
+  const [isEmailPreFilled, setIsEmailPreFilled] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [errorType, setErrorType] = useState<string | null>(null);
@@ -32,10 +33,6 @@ const ActivateAccount = () => {
       }
 
       try {
-        console.log("Validando token:", token);
-        
-        // Busca o convite. Se retornar vazio, é provável que o RLS esteja bloqueando 
-        // ou o token esteja realmente errado/expirado.
         const { data: access, error: accessError } = await supabase
           .from('patient_access')
           .select('id, patient_id, status')
@@ -43,21 +40,14 @@ const ActivateAccount = () => {
           .eq('status', 'invited')
           .maybeSingle();
 
-        if (accessError) {
-          console.error("Erro Supabase:", accessError);
-          setErrorType("database_error");
-          setLoading(false);
-          return;
-        }
-
-        if (!access) {
-          console.warn("Nenhum convite encontrado para o token fornecido.");
+        if (accessError || !access) {
           setErrorType("invalid_token");
           setLoading(false);
           return;
         }
 
-        // Tenta buscar o e-mail (pode falhar por RLS se o usuário não for o dono)
+        // Tenta buscar o e-mail. Se o RLS (Segurança do Banco) estiver bem configurado, 
+        // ele pode retornar vazio para usuários anônimos.
         const { data: patient } = await supabase
           .from('patients')
           .select('email')
@@ -65,11 +55,12 @@ const ActivateAccount = () => {
           .maybeSingle();
 
         setInviteData(access);
+        
         if (patient?.email) {
           setPatientEmail(patient.email);
+          setIsEmailPreFilled(true);
         }
       } catch (err) {
-        console.error("Erro crítico na validação:", err);
         setErrorType("system_error");
       } finally {
         setLoading(false);
@@ -82,8 +73,8 @@ const ActivateAccount = () => {
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!patientEmail) {
-      showError("Por favor, informe seu e-mail cadastrado.");
+    if (!patientEmail || !patientEmail.includes("@")) {
+      showError("Por favor, informe um e-mail válido.");
       return;
     }
 
@@ -99,7 +90,7 @@ const ActivateAccount = () => {
 
     setValidating(true);
     try {
-      // 1. Criar o usuário no Auth
+      // 1. Criar o usuário no Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: patientEmail,
         password: password,
@@ -110,26 +101,26 @@ const ActivateAccount = () => {
 
       if (authError) {
         if (authError.message.includes("already registered")) {
-          throw new Error("Este e-mail já possui uma conta ativa. Tente fazer login.");
+          throw new Error("Este e-mail já possui uma conta. Tente fazer login.");
         }
         throw authError;
       }
 
       if (authData.user) {
-        // 2. Vincular o novo user_id ao registro de acesso
+        // 2. Vincular o novo user_id ao registro de acesso do paciente
         const { error: updateError } = await supabase
           .from('patient_access')
           .update({
             user_id: authData.user.id,
             status: 'active',
-            invite_token: null,
+            invite_token: null, // Invalida o token após uso
             updated_at: new Date().toISOString()
           })
           .eq('id', inviteData.id);
 
         if (updateError) throw updateError;
 
-        showSuccess("Conta ativada! Você já pode acessar seu portal.");
+        showSuccess("Conta ativada com sucesso!");
         navigate("/login");
       } else {
         showSuccess("Verifique seu e-mail para confirmar a ativação.");
@@ -145,7 +136,7 @@ const ActivateAccount = () => {
   if (loading) return (
     <div className="h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
       <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Validando seu acesso...</p>
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Aguarde um momento...</p>
     </div>
   );
 
@@ -158,9 +149,7 @@ const ActivateAccount = () => {
           </div>
           <CardTitle className="text-2xl font-black mb-2">Convite Inválido</CardTitle>
           <CardDescription className="text-slate-500 font-medium mb-8 leading-relaxed">
-            {errorType === "invalid_token" 
-              ? "Este link de convite expirou, já foi utilizado ou é inválido." 
-              : "Não foi possível validar seu convite no momento. Verifique sua conexão ou fale com seu psicólogo."}
+            Este link de convite expirou, já foi utilizado ou é inválido. Peça um novo convite ao seu psicólogo.
           </CardDescription>
           <Button onClick={() => navigate("/login")} className="w-full bg-slate-900 hover:bg-slate-800 rounded-2xl h-14 font-black">
             Voltar para Login
@@ -180,27 +169,27 @@ const ActivateAccount = () => {
           </div>
           <CardTitle className="text-2xl font-black text-slate-900 tracking-tight">Ativar Meu Acesso</CardTitle>
           <CardDescription className="font-medium px-4">
-            Crie sua senha para acessar o portal terapêutico.
+            Crie sua senha para acessar seu prontuário digital.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8">
           <form onSubmit={handleActivate} className="space-y-5">
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2">
-                <Mail className="h-3 w-3" /> Seu E-mail cadastrado
+                <Mail className="h-3 w-3" /> Confirme seu E-mail
               </Label>
               <Input 
                 type="email"
-                placeholder="Ex: joao@email.com"
+                placeholder="Digite seu e-mail"
                 required
                 className="rounded-2xl h-12 border-slate-200 font-bold"
                 value={patientEmail}
                 onChange={(e) => setPatientEmail(e.target.value)}
-                disabled={!!patientEmail && patientEmail.includes("@")}
+                readOnly={isEmailPreFilled} // Só trava se o sistema já souber qual é
               />
-              {!patientEmail && (
-                <p className="text-[9px] text-amber-600 font-bold leading-tight">
-                  * Por segurança, digite o e-mail que você informou ao seu psicólogo.
+              {!isEmailPreFilled && (
+                <p className="text-[9px] text-indigo-600 font-bold leading-tight">
+                  * Digite o e-mail que você informou ao seu terapeuta para vincular sua conta.
                 </p>
               )}
             </div>
@@ -248,7 +237,7 @@ const ActivateAccount = () => {
         </CardContent>
         <div className="bg-slate-50 p-6 text-center border-t border-slate-100">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-2">
-            <ShieldCheck className="h-3 w-3 text-emerald-500" /> Prontuário protegido por criptografia
+            <ShieldCheck className="h-3 w-3 text-emerald-500" /> Acesso protegido e criptografado
           </p>
         </div>
       </Card>
