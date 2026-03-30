@@ -31,7 +31,9 @@ const ActivateAccount = () => {
       }
 
       try {
-        // 1. Busca o convite pelo token
+        console.log("[Activate] Validando token:", token);
+        
+        // Busca simples: apenas o registro de acesso pelo token
         const { data: access, error } = await supabase
           .from('patient_access')
           .select('id, patient_id, status, user_id')
@@ -39,30 +41,29 @@ const ActivateAccount = () => {
           .maybeSingle();
 
         if (error || !access) {
+          console.error("[Activate] Token não encontrado no banco.");
           setLoading(false);
           return;
         }
 
-        // Se já tem usuário vinculado, redireciona para login
-        if (access.user_id) {
+        // Se o vínculo já está ativo e tem um usuário, a conta já existe
+        if (access.status === 'active' || access.user_id) {
+          console.log("[Activate] Vínculo já está ativo.");
           setAlreadyHasAccount(true);
         }
 
-        setInviteData(access);
-
-        // 2. Tenta buscar o e-mail (pode falhar por RLS se não estiver logado)
+        // Busca o e-mail do paciente para facilitar o cadastro
         const { data: patient } = await supabase
           .from('patients')
-          .select('email')
+          .select('email, full_name')
           .eq('id', access.patient_id)
           .maybeSingle();
 
-        if (patient?.email) {
-          setPatientEmail(patient.email);
-        }
+        setInviteData(access);
+        if (patient) setPatientEmail(patient.email);
         
       } catch (err) {
-        console.error("[Activate] Erro na validação:", err);
+        console.error("[Activate] Erro crítico na validação:", err);
       } finally {
         setLoading(false);
       }
@@ -74,11 +75,6 @@ const ActivateAccount = () => {
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!patientEmail) {
-      showError("Por favor, informe seu e-mail.");
-      return;
-    }
-
     if (password.length < 6) {
       showError("A senha deve ter pelo menos 6 caracteres.");
       return;
@@ -91,7 +87,7 @@ const ActivateAccount = () => {
 
     setValidating(true);
     try {
-      // 1. Tenta criar o usuário
+      // 1. Tenta criar o usuário no Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: patientEmail,
         password: password,
@@ -109,17 +105,19 @@ const ActivateAccount = () => {
         throw authError;
       }
 
-      // 2. Vincula ao prontuário
+      // 2. Vincula o novo usuário ao prontuário
       if (authData?.user) {
-        await supabase
+        const { error: updateError } = await supabase
           .from('patient_access')
           .update({
             user_id: authData.user.id,
             status: 'active',
-            invite_token: null,
+            invite_token: null, // Só limpa aqui após o sucesso
             updated_at: new Date().toISOString()
           })
           .eq('id', inviteData.id);
+        
+        if (updateError) throw updateError;
       }
 
       showSuccess("Conta ativada! Verifique seu e-mail para confirmar.");
@@ -134,10 +132,11 @@ const ActivateAccount = () => {
   if (loading) return (
     <div className="h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
       <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Aguarde...</p>
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Validando acesso...</p>
     </div>
   );
 
+  // Se o token não existe ou foi invalidado
   if (!inviteData && !alreadyHasAccount) {
     return (
       <div className="h-screen flex items-center justify-center p-4 bg-slate-50">
@@ -147,7 +146,7 @@ const ActivateAccount = () => {
           </div>
           <CardTitle className="text-2xl font-black mb-2">Convite não encontrado</CardTitle>
           <CardDescription className="text-slate-500 font-medium mb-8">
-            O link pode ter expirado ou já foi utilizado.
+            O link pode ter expirado ou já foi utilizado para criar sua conta.
           </CardDescription>
           <Button onClick={() => navigate("/login")} className="w-full bg-slate-900 rounded-2xl h-14 font-black">
             Ir para o Login
@@ -157,6 +156,7 @@ const ActivateAccount = () => {
     );
   }
 
+  // Se detectamos que o paciente já tem conta
   if (alreadyHasAccount) {
     return (
       <div className="h-screen flex items-center justify-center p-4 bg-indigo-600">
@@ -164,17 +164,17 @@ const ActivateAccount = () => {
           <div className="h-2 w-full bg-amber-400" />
           <CardHeader className="text-center pt-10">
             <CheckCircle2 className="h-12 w-12 text-amber-500 mx-auto mb-4" />
-            <CardTitle className="text-2xl font-black">Você já possui acesso!</CardTitle>
+            <CardTitle className="text-2xl font-black">Sua conta já está pronta!</CardTitle>
             <CardDescription className="font-medium px-4">
-              O e-mail <strong>{patientEmail}</strong> já está cadastrado.
+              O e-mail <strong>{patientEmail}</strong> já está cadastrado. 
             </CardDescription>
           </CardHeader>
           <CardContent className="p-8">
             <Button 
-              onClick={() => navigate(`/login?email=${patientEmail}${token ? `&token=${token}` : ''}`)} 
+              onClick={() => navigate(`/login?email=${patientEmail}&token=${token}`)} 
               className="w-full bg-indigo-600 hover:bg-indigo-700 h-14 rounded-2xl font-black text-lg flex gap-2"
             >
-              Entrar na Minha Conta <ArrowRight className="h-5 w-5" />
+              Fazer Login e Acessar <ArrowRight className="h-5 w-5" />
             </Button>
           </CardContent>
         </Card>
@@ -182,6 +182,7 @@ const ActivateAccount = () => {
     );
   }
 
+  // Fluxo normal de cadastro
   return (
     <div className="h-screen flex items-center justify-center p-4 bg-indigo-600">
       <Card className="max-w-md w-full rounded-[40px] shadow-2xl border-none overflow-hidden bg-white">
@@ -189,7 +190,7 @@ const ActivateAccount = () => {
         <CardHeader className="text-center pt-10">
           <BrainCircuit className="h-12 w-12 text-indigo-600 mx-auto mb-4" />
           <CardTitle className="text-2xl font-black tracking-tight">Ativar Meu Acesso</CardTitle>
-          <CardDescription className="font-medium px-4">
+          <CardDescription className="font-medium">
             Defina uma senha para acessar seu prontuário online.
           </CardDescription>
         </CardHeader>
@@ -197,22 +198,7 @@ const ActivateAccount = () => {
           <form onSubmit={handleActivate} className="space-y-5">
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-slate-400">Seu E-mail</Label>
-              <Input 
-                type="email"
-                placeholder="Informe seu e-mail cadastrado"
-                value={patientEmail} 
-                onChange={(e) => setPatientEmail(e.target.value)}
-                readOnly={!!patientEmail && patientEmail.length > 0} 
-                className={cn(
-                  "rounded-2xl h-12 font-bold",
-                  patientEmail ? "bg-slate-50 border-slate-100" : "bg-white border-slate-200"
-                )}
-              />
-              {!patientEmail && (
-                <p className="text-[9px] text-amber-600 font-bold uppercase mt-1 px-1">
-                  * Digite o mesmo e-mail onde recebeu o convite.
-                </p>
-              )}
+              <Input value={patientEmail} readOnly className="rounded-2xl h-12 bg-slate-50 font-bold" />
             </div>
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-slate-400">Crie uma Senha</Label>
