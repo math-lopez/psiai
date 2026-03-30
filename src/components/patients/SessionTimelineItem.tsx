@@ -9,16 +9,15 @@ import {
   ChevronDown, 
   ChevronUp, 
   FileText, 
-  Sparkles, 
   Clock, 
   AlertCircle, 
   CheckCircle2, 
   Loader2,
-  Footprints,
   Quote,
   ClipboardList,
   ArrowRight,
-  XCircle
+  XCircle,
+  Zap
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -92,14 +91,14 @@ export const SessionTimelineItem = ({ session }: SessionTimelineItemProps) => {
 
         {!isCancelled && (
           <div className="space-y-5">
-            {/* Seção de Resumo Manual */}
-            {session.session_summary_manual && (
+            {/* Seção de Resumo Manual / Síntese */}
+            {(session.manual_notes || session.session_summary_manual) && (
               <div className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-50">
                 <div className="flex items-center gap-2 text-[9px] font-black uppercase text-emerald-600 tracking-wider mb-2">
                   <Quote className="h-3 w-3" /> Síntese da Sessão
                 </div>
                 <p className="text-xs font-bold text-slate-700 italic leading-relaxed">
-                  "{session.session_summary_manual.slice(0, 250)}{session.session_summary_manual.length > 250 ? '...' : ''}"
+                  "{ (session.manual_notes || session.session_summary_manual || "").slice(0, 250) }{ (session.manual_notes || session.session_summary_manual || "").length > 250 ? '...' : '' }"
                 </p>
               </div>
             )}
@@ -114,7 +113,7 @@ export const SessionTimelineItem = ({ session }: SessionTimelineItemProps) => {
             </div>
 
             {isExpanded && (
-              <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-8 animate-in fade-in slide-in-from-top-2 duration-300 border-t border-slate-50">
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-[10px] font-black uppercase text-blue-500 tracking-wider">
                     <ClipboardList className="h-3 w-3" /> Notas Clínicas
@@ -126,36 +125,11 @@ export const SessionTimelineItem = ({ session }: SessionTimelineItemProps) => {
 
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-[10px] font-black uppercase text-indigo-500 tracking-wider">
-                    <Quote className="h-3 w-3" /> Intervenções
+                    <Zap className="h-3 w-3" /> Intervenções
                   </div>
                   <p className="text-xs text-slate-700 leading-relaxed">
                     {session.interventions || "Não preenchido."}
                   </p>
-                </div>
-
-                <div className="md:col-span-2 pt-4 border-t border-slate-50 grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-emerald-500 tracking-wider">
-                      <Sparkles className="h-3 w-3" /> IA: Destaques
-                    </div>
-                    {session.highlights && session.highlights.length > 0 ? (
-                      <ul className="space-y-2">
-                        {session.highlights.map((h, i) => (
-                          <li key={i} className="text-xs text-slate-700 flex gap-2">
-                            <span className="h-1 w-1 rounded-full bg-emerald-400 mt-1.5 shrink-0" />
-                            {h}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : <p className="text-xs text-slate-400 italic">Sem destaques.</p>}
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-amber-500 tracking-wider">
-                      <Footprints className="h-3 w-3" /> IA: Próximos Passos
-                    </div>
-                    <p className="text-xs text-slate-700">{session.next_steps || "Sem sugestões."}</p>
-                  </div>
                 </div>
               </div>
             )}
