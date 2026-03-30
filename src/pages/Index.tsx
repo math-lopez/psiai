@@ -15,10 +15,12 @@ const Index = () => {
     const checkRoleAndRedirect = async () => {
       if (authLoading) return;
 
+      const token = searchParams.get("token");
+
+      // SE NÃO ESTÁ LOGADO
       if (!session) {
-        // Se houver token mas não houver sessão, vai para a tela de ativação
-        const token = searchParams.get("token");
         if (token) {
+          // Se tem token, força ir para a ativação
           navigate(`/portal/ativar?token=${token}`, { replace: true });
           return;
         }
@@ -27,66 +29,51 @@ const Index = () => {
       }
 
       try {
-        // 1. BUSCA PERFIL DE PSICÓLOGO PRIMEIRO
-        // Se for psicólogo, ignoramos tokens de convite (evita o erro de consumir o próprio convite ao testar)
+        // SE ESTÁ LOGADO, VERIFICA PAPEL
         const { data: profile } = await supabase
           .from('profiles')
           .select('crp')
           .eq('id', session.user.id)
           .maybeSingle();
 
+        // Se é Psicólogo, ignora qualquer token e vai pro Dashboard
         if (profile && profile.crp) {
           navigate("/dashboard", { replace: true });
           return;
         }
 
-        // 2. VERIFICAÇÃO DE VÍNCULO PENDENTE (Para usuários que não são psicólogos)
-        const inviteToken = searchParams.get("token") || session.user.user_metadata?.pending_invite_token;
-        
-        if (inviteToken) {
-          console.log("[Index] Processando vínculo pendente...");
-          const { error: linkError } = await supabase
+        // Se é Paciente, processa vínculo se houver token
+        if (token) {
+          await supabase
             .from('patient_access')
             .update({
               user_id: session.user.id,
               status: 'active',
-              invite_token: null, 
               updated_at: new Date().toISOString()
             })
-            .eq('invite_token', inviteToken)
-            .eq('status', 'invited'); // Garante que só ativa se estiver pendente
-
-          if (!linkError) {
-             await supabase.auth.updateUser({ data: { pending_invite_token: null } });
-          }
+            .eq('invite_token', token)
+            .eq('status', 'invited');
         }
         
-        // 3. BUSCA VÍNCULOS DO PACIENTE
+        // Verifica se tem acesso ativo para ir pro portal
         const { data: accessList } = await supabase
           .from('patient_access')
-          .select('id, patient_id, patients(status)')
+          .select('id, patients(status)')
           .eq('user_id', session.user.id);
 
-        const activeAccess = accessList?.find(a => (a.patients as any)?.status === 'ativo');
+        const hasActive = accessList?.some(a => (a.patients as any)?.status === 'ativo');
 
-        if (activeAccess) {
+        if (hasActive) {
           navigate("/portal", { replace: true });
           return;
         }
 
-        // Se tem vínculos mas todos inativos
-        if (accessList && accessList.length > 0) {
-            await supabase.auth.signOut();
-            navigate("/login?error=inactive", { replace: true });
-            return;
-        }
-
-        // Caso não tenha perfil nem vínculo
+        // Caso sem acesso
         await supabase.auth.signOut();
         navigate("/login?error=no-access", { replace: true });
         
       } catch (err) {
-        console.error("[Index] Erro crítico:", err);
+        console.error("[Index] Erro:", err);
         navigate("/login", { replace: true });
       }
     };
