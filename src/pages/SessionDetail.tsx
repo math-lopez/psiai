@@ -38,6 +38,8 @@ const SessionDetail = () => {
         sessionService.getSessionAIAnalysis(id)
       ]);
       
+      console.log("DEBUG - Dados da Sessão vindos do Banco:", sessionData);
+      
       setSession(sessionData);
       setAiAnalysis(analysisData);
       
@@ -200,7 +202,11 @@ const SessionDetail = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
               <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-blue-500"><ClipboardList className="h-4 w-4" /> Notas Clínicas</CardTitle></CardHeader>
-              <CardContent><p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">{session.clinical_notes || "Não preenchido."}</p></CardContent>
+              <CardContent>
+                <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-wrap">
+                  {session.clinical_notes || session.manual_notes || "Não preenchido."}
+                </p>
+              </CardContent>
             </Card>
 
             <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
@@ -211,7 +217,11 @@ const SessionDetail = () => {
 
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
             <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-emerald-500"><Quote className="h-4 w-4" /> Síntese da Sessão</CardTitle></CardHeader>
-            <CardContent><p className="text-slate-700 font-bold leading-relaxed whitespace-pre-wrap italic">{session.session_summary_manual || "Não preenchido."}</p></CardContent>
+            <CardContent>
+              <p className="text-slate-700 font-bold leading-relaxed whitespace-pre-wrap italic">
+                {session.session_summary_manual || session.session_summary || "Não preenchido."}
+              </p>
+            </CardContent>
           </Card>
 
           {/* SEÇÃO DESABILITADA (BREVE) */}
