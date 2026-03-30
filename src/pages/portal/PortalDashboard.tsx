@@ -14,91 +14,140 @@ import {
   CheckCircle2,
   Files,
   Upload,
-  Cloud
+  Cloud,
+  ChevronDown,
+  UserCircle
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { AttachmentModule } from "@/components/attachments/AttachmentModule";
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link, useNavigate } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 const PortalDashboard = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [allAccess, setAllAccess] = useState<any[]>([]);
   const [selectedAccess, setSelectedAccess] = useState<any>(null);
   
   const [prompts, setPrompts] = useState<any[]>([]);
   const [sharedLogs, setSharedLogs] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchVenculos = async () => {
       if (!user) return;
       try {
-        const savedId = localStorage.getItem('psiai_selected_patient_id');
-        
-        // Busca o vínculo específico que está selecionado
-        const { data: access, error } = await supabase
+        // 1. Buscar todos os vínculos ativos do paciente
+        // Removido o nome específico da FK para evitar erro de banco de dados
+        const { data: accessList, error } = await supabase
           .from('patient_access')
           .select(`
             *,
-            patients!inner(full_name, status),
+            patients!inner(*),
             psychologist:profiles(*)
           `)
           .eq('user_id', user.id)
-          .eq('patient_id', savedId)
-          .maybeSingle();
+          .eq('patients.status', 'ativo')
+          .order('updated_at', { ascending: false });
 
-        if (error || !access) {
-          // Fallback: busca qualquer vínculo se o salvo não existir
-          const { data: anyAccess } = await supabase
-            .from('patient_access')
-            .select(`*, patients!inner(*), psychologist:profiles(*)`)
-            .eq('user_id', user.id)
-            .limit(1)
-            .maybeSingle();
-          
-          if (anyAccess) {
-            setSelectedAccess(anyAccess);
-            localStorage.setItem('psiai_selected_patient_id', anyAccess.patient_id);
-          }
-        } else {
-          setSelectedAccess(access);
-        }
+        if (error) throw error;
 
-        if (access || selectedAccess) {
-          const patientId = access?.patient_id || selectedAccess?.patient_id;
-          
-          // Buscar Prompts e Logs do profissional selecionado
-          const [pRes, lRes] = await Promise.all([
-            supabase.from('patient_log_prompts').select('*').eq('patient_id', patientId).eq('status', 'active'),
-            supabase.from('patient_logs').select('*').eq('patient_id', patientId).eq('visibility', 'shared_with_patient').order('created_at', { ascending: false }).limit(3)
-          ]);
-
-          setPrompts(pRes.data || []);
-          setSharedLogs(lRes.data || []);
+        setAllAccess(accessList || []);
+        
+        const savedId = localStorage.getItem('psiai_selected_patient_id');
+        const initial = accessList?.find(a => a.patient_id === savedId) || accessList?.[0];
+        
+        if (initial) {
+          handleSelectProfessional(initial);
         }
       } catch (err) {
-        console.error("[Portal] Erro:", err);
+        console.error("[Portal] Erro ao carregar vínculos:", err);
       } finally {
         setLoading(false);
       }
     };
-    fetchData();
+    fetchVenculos();
   }, [user]);
+
+  const handleSelectProfessional = async (access: any) => {
+    setSelectedAccess(access);
+    localStorage.setItem('psiai_selected_patient_id', access.patient_id);
+    
+    // 2. Buscar Prompts Ativos
+    const { data: p } = await supabase
+      .from('patient_log_prompts')
+      .select('*')
+      .eq('patient_id', access.patient_id)
+      .eq('status', 'active');
+    setPrompts(p || []);
+
+    // 3. Buscar Registros Compartilhados
+    const { data: l } = await supabase
+      .from('patient_logs')
+      .select('*')
+      .eq('patient_id', access.patient_id)
+      .eq('visibility', 'shared_with_patient')
+      .order('created_at', { ascending: false })
+      .limit(3);
+    setSharedLogs(l || []);
+  };
 
   if (loading) return <div className="py-20 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
 
+  // Pega o nome do paciente do vínculo selecionado
   const patientFirstName = selectedAccess?.patients?.full_name?.split(' ')[0] || "";
 
   return (
     <div className="space-y-10">
-      <div className="space-y-1">
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-          Olá{patientFirstName ? `, ${patientFirstName}` : ''}!
-        </h1>
-        <p className="text-slate-500 font-medium italic">Seu espaço seguro para acompanhamento terapêutico.</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+            Olá{patientFirstName ? `, ${patientFirstName}` : ''}!
+          </h1>
+          <p className="text-slate-500 font-medium italic">Seu espaço seguro para acompanhamento terapêutico.</p>
+        </div>
+
+        {allAccess.length > 1 && (
+          <div className="bg-white p-2 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+             <span className="text-[9px] font-black uppercase text-slate-400 pl-2">Psicólogo Atual:</span>
+             <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="h-10 rounded-xl bg-slate-50 hover:bg-indigo-50 hover:text-indigo-600 font-bold gap-2">
+                    <UserCircle className="h-4 w-4" />
+                    {selectedAccess?.psychologist?.full_name || 'Profissional'}
+                    <ChevronDown className="h-4 w-4 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 rounded-2xl border-slate-100 p-2">
+                  <div className="px-3 py-2 text-[10px] font-black uppercase text-slate-400">Escolha o Profissional</div>
+                  {allAccess.map((access) => (
+                    <DropdownMenuItem 
+                      key={access.patient_id}
+                      onClick={() => handleSelectProfessional(access)}
+                      className={cn(
+                        "rounded-xl py-3 cursor-pointer",
+                        selectedAccess?.patient_id === access.patient_id ? "bg-indigo-50 text-indigo-700 font-bold" : "font-medium"
+                      )}
+                    >
+                      <div className="flex flex-col">
+                        <span>{access.psychologist?.full_name}</span>
+                        <span className="text-[10px] opacity-60">CRP: {access.psychologist?.crp}</span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+             </DropdownMenu>
+          </div>
+        )}
       </div>
 
       {selectedAccess ? (
@@ -126,7 +175,7 @@ const PortalDashboard = () => {
                   <ClipboardCheck className="h-4 w-4" /> Atividades Pendentes
                 </h3>
                 <div className="grid grid-cols-1 gap-4">
-                  {prompts.length > 0 ? prompts.map((p) => (
+                  {prompts.length > 0 ? prompts.slice(0, 2).map((p) => (
                     <Card key={p.id} className="border-none shadow-sm rounded-[24px] bg-amber-50/50 border border-amber-100">
                       <CardContent className="p-5 space-y-3">
                         <p className="text-sm font-bold text-slate-900 leading-tight">{p.title}</p>
