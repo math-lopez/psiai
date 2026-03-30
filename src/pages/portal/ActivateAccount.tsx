@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams, useNavigate, Link } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Loader2, ShieldCheck, BrainCircuit, AlertCircle, Mail, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Loader2, ShieldCheck, BrainCircuit, AlertCircle, Mail } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
 
 const ActivateAccount = () => {
@@ -22,7 +22,6 @@ const ActivateAccount = () => {
   const [isEmailPreFilled, setIsEmailPreFilled] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [alreadyHasAccount, setAlreadyHasAccount] = useState(false);
 
   useEffect(() => {
     const validateToken = async () => {
@@ -32,10 +31,9 @@ const ActivateAccount = () => {
       }
 
       try {
-        // 1. Valida se o token existe e está pendente
         const { data: access, error: accessError } = await supabase
           .from('patient_access')
-          .select('id, patient_id, status, psychologist:profiles(full_name)')
+          .select('id, patient_id, status')
           .eq('invite_token', token)
           .eq('status', 'invited')
           .maybeSingle();
@@ -56,20 +54,6 @@ const ActivateAccount = () => {
         if (patient?.email) {
           setPatientEmail(patient.email);
           setIsEmailPreFilled(true);
-
-          // 2. Verifica se este e-mail já existe no sistema (Auth)
-          // Como não podemos listar usuários, tentamos uma pequena gambiarra: 
-          // Se houver um vínculo 'active' com esse e-mail em qualquer outro prontuário, a conta existe.
-          const { data: existingLink } = await supabase
-            .from('patient_access')
-            .select('user_id')
-            .not('user_id', 'is', null)
-            .eq('status', 'active')
-            .limit(1)
-            .maybeSingle();
-
-          // Nota: Em produção, o ideal é uma Edge Function para checar existência de e-mail.
-          // Aqui, vamos tentar o Sign Up e tratar o erro de "e-mail já existe".
         }
       } catch (err) {
         console.error("Erro na validação:", err);
@@ -96,27 +80,26 @@ const ActivateAccount = () => {
 
     setValidating(true);
     try {
+      // 1. Criar o usuário no Auth guardando o TOKEN no metadado
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: patientEmail,
         password: password,
         options: {
           data: { 
             role: 'patient',
-            pending_invite_token: token 
+            pending_invite_token: token // Guardamos aqui como backup de segurança
           }
         }
       });
 
       if (authError) {
-        // DETECÇÃO DE CONTA EXISTENTE
-        if (authError.message.toLowerCase().includes("already registered") || authError.status === 422) {
-          setAlreadyHasAccount(true);
-          setValidating(false);
-          return;
+        if (authError.message.includes("already registered")) {
+          throw new Error("Este e-mail já possui uma conta ativa.");
         }
         throw authError;
       }
 
+      // 2. Tenta o vínculo imediato (pode falhar se o e-mail não for confirmado na hora, mas o Index.tsx resolverá depois)
       if (authData?.user) {
         await supabase
           .from('patient_access')
@@ -133,6 +116,7 @@ const ActivateAccount = () => {
       
     } catch (err: any) {
       showError(err.message || "Erro ao ativar conta.");
+    } finally {
       setValidating(false);
     }
   };
@@ -140,7 +124,7 @@ const ActivateAccount = () => {
   if (loading) return (
     <div className="h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
       <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Verificando convite...</p>
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Aguarde...</p>
     </div>
   );
 
@@ -163,38 +147,6 @@ const ActivateAccount = () => {
     );
   }
 
-  if (alreadyHasAccount) {
-    return (
-      <div className="h-screen flex items-center justify-center p-4 bg-indigo-600">
-        <Card className="max-w-md w-full rounded-[40px] shadow-2xl border-none overflow-hidden bg-white">
-          <div className="h-2 w-full bg-amber-400" />
-          <CardHeader className="text-center pt-10">
-            <div className="flex justify-center mb-4">
-              <CheckCircle2 className="h-12 w-12 text-amber-500" />
-            </div>
-            <CardTitle className="text-2xl font-black text-slate-900 tracking-tight">Você já possui conta!</CardTitle>
-            <CardDescription className="font-medium px-4">
-              Identificamos que o e-mail <strong>{patientEmail}</strong> já está cadastrado no PsiAI.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-8 space-y-6">
-            <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
-              <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                Para visualizar o prontuário compartilhado por <strong>{(inviteData.psychologist as any)?.full_name}</strong>, basta fazer login com sua conta existente.
-              </p>
-            </div>
-            <Button 
-              onClick={() => navigate(`/login?email=${patientEmail}&token=${token}`)} 
-              className="w-full bg-indigo-600 hover:bg-indigo-700 h-14 rounded-2xl font-black shadow-lg shadow-indigo-100 text-lg flex gap-2"
-            >
-              Ir para o Login <ArrowRight className="h-5 w-5" />
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="h-screen flex items-center justify-center p-4 bg-indigo-600">
       <Card className="max-w-md w-full rounded-[40px] shadow-2xl border-none overflow-hidden bg-white">
@@ -205,26 +157,28 @@ const ActivateAccount = () => {
           </div>
           <CardTitle className="text-2xl font-black text-slate-900 tracking-tight">Ativar Meu Acesso</CardTitle>
           <CardDescription className="font-medium px-4">
-            Olá! Você foi convidado por <strong>{(inviteData.psychologist as any)?.full_name}</strong> para acompanhar seu tratamento online.
+            Crie sua senha para acessar seu prontuário digital.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8">
           <form onSubmit={handleActivate} className="space-y-5">
             <div className="space-y-2">
               <Label className="text-[10px] font-black uppercase text-slate-400 flex items-center gap-2">
-                <Mail className="h-3 w-3" /> Seu E-mail de Acesso
+                <Mail className="h-3 w-3" /> Confirme seu E-mail
               </Label>
               <Input 
                 type="email"
+                placeholder="Digite seu e-mail"
                 required
-                className="rounded-2xl h-12 border-slate-200 font-bold bg-slate-50"
+                className="rounded-2xl h-12 border-slate-200 font-bold"
                 value={patientEmail}
-                readOnly
+                onChange={(e) => setPatientEmail(e.target.value)}
+                readOnly={isEmailPreFilled}
               />
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="pass" className="text-[10px] font-black uppercase text-slate-400">Crie uma Senha</Label>
+              <Label htmlFor="pass" className="text-[10px] font-black uppercase text-slate-400">Escolha uma Senha</Label>
               <Input id="pass" type="password" required placeholder="Mínimo 6 caracteres" className="rounded-2xl h-12 border-slate-200 font-bold" value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
 
@@ -238,6 +192,11 @@ const ActivateAccount = () => {
             </Button>
           </form>
         </CardContent>
+        <div className="bg-slate-50 p-6 text-center border-t border-slate-100">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-2">
+            <ShieldCheck className="h-3 w-3 text-emerald-500" /> Acesso protegido e criptografado
+          </p>
+        </div>
       </Card>
     </div>
   );
