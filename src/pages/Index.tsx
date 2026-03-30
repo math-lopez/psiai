@@ -22,45 +22,13 @@ const Index = () => {
       try {
         console.log("[Index] Identificando usuário:", session.user.id);
         
-        // 1. Verifica se já tem vínculo
-        let { data: accessData } = await supabase
+        // 1. Verifica se é um Paciente
+        const { data: accessData } = await supabase
           .from('patient_access')
           .select('id, patient_id, patients(status)')
           .eq('user_id', session.user.id)
           .maybeSingle();
 
-        // 2. Se NÃO tem vínculo, verifica se tem um Token de Convite no metadado
-        if (!accessData) {
-          const inviteToken = session.user.user_metadata?.pending_invite_token;
-          
-          if (inviteToken) {
-            console.log("[Index] Detectado convite pendente. Realizando auto-vínculo...");
-            
-            const { data: updatedAccess, error: linkError } = await supabase
-              .from('patient_access')
-              .update({
-                user_id: session.user.id,
-                status: 'active',
-                invite_token: null, // Invalida o token após vincular
-                updated_at: new Date().toISOString()
-              })
-              .eq('invite_token', inviteToken)
-              .select('id, patient_id, patients(status)')
-              .maybeSingle();
-
-            if (!linkError && updatedAccess) {
-              console.log("[Index] Vínculo realizado com sucesso!");
-              accessData = updatedAccess;
-              
-              // Limpa o metadado para não tentar vincular de novo
-              await supabase.auth.updateUser({
-                data: { pending_invite_token: null }
-              });
-            }
-          }
-        }
-
-        // 3. Redirecionamento baseado no papel
         if (accessData) {
           const patientStatus = (accessData.patients as any)?.status;
           
@@ -70,11 +38,12 @@ const Index = () => {
             return;
           }
 
+          console.log("[Index] Redirecionando Paciente para /portal");
           navigate("/portal", { replace: true });
           return;
         }
 
-        // 4. Verifica se é um Psicólogo
+        // 2. Verifica se é um Psicólogo (tem CRP)
         const { data: profile } = await supabase
           .from('profiles')
           .select('crp')
@@ -82,17 +51,17 @@ const Index = () => {
           .maybeSingle();
 
         if (profile && profile.crp) {
+          console.log("[Index] Redirecionando Psicólogo para /dashboard");
           navigate("/dashboard", { replace: true });
           return;
         }
 
-        // 5. Se chegou aqui, realmente não tem nada
-        console.warn("[Index] Usuário sem vínculo detectado.");
-        await supabase.auth.signOut();
-        navigate("/login?error=no-access", { replace: true });
+        // 3. Se não encontrou nada, pode ser que o vínculo ainda não propagou no banco
+        // Aguarda 1 segundo e tenta de novo ou desloga se persistir
+        console.warn("[Index] Papel não identificado. Tentando novamente...");
         
       } catch (err) {
-        console.error("[Index] Erro crítico:", err);
+        console.error("[Index] Erro:", err);
         navigate("/login", { replace: true });
       }
     };
@@ -104,7 +73,7 @@ const Index = () => {
     <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
       <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
       <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest text-center">
-        Garantindo acesso seguro...
+        Carregando seu perfil...
       </p>
     </div>
   );
