@@ -44,7 +44,7 @@ const Login = () => {
       if (error) throw error;
 
       if (data.user) {
-        // 1. Verifica se é Psicólogo (tem CRP)
+        // 1. Verifica se é Psicólogo (tem CRP no perfil)
         const { data: profile } = await supabase
           .from('profiles')
           .select('crp')
@@ -57,32 +57,41 @@ const Login = () => {
           return;
         }
 
-        // 2. Verifica se é um Paciente
-        const { data: accessData } = await supabase
-          .from('patient_access')
-          .select('id, patients(status)')
-          .eq('user_id', data.user.id)
+        // 2. AUTO-VÍNCULO: Tenta achar um prontuário pelo e-mail do usuário
+        // Se o user_id estiver nulo no patient_access, a gente vincula agora
+        const { data: patientData } = await supabase
+          .from('patients')
+          .select('id, email, patient_access(id, user_id, status)')
+          .eq('email', data.user.email)
           .maybeSingle();
 
-        if (accessData) {
-          const patientStatus = (accessData.patients as any)?.status;
-          if (patientStatus === 'inativo') {
-            await supabase.auth.signOut();
-            showError("Seu prontuário está inativo. Procure seu psicólogo.");
+        if (patientData) {
+          const access = Array.isArray(patientData.patient_access) 
+            ? patientData.patient_access[0] 
+            : patientData.patient_access;
+
+          if (access) {
+            // Se o prontuário existe mas não tem o ID do usuário ainda, vincula!
+            if (!access.user_id) {
+              await supabase
+                .from('patient_access')
+                .update({ user_id: data.user.id, status: 'active', invite_token: null })
+                .eq('id', access.id);
+            }
+
+            if (patientData.status === 'inativo') {
+              await supabase.auth.signOut();
+              showError("Seu prontuário está inativo. Procure seu psicólogo.");
+              return;
+            }
+
+            showSuccess("Bem-vindo ao seu Portal!");
+            navigate("/portal");
             return;
           }
-          showSuccess("Bem-vindo ao seu Portal!");
-          navigate("/portal");
-          return;
         }
 
-        // 3. Se chegou aqui e tem token na URL, deixa o Index processar o vínculo
-        if (searchParams.get("token")) {
-          navigate(`/?token=${searchParams.get("token")}`);
-          return;
-        }
-
-        // 4. Caso contrário, erro de falta de papel
+        // 3. Fallback se nada funcionar
         console.warn("[Login] Usuário sem papel detectado.");
         await supabase.auth.signOut();
         showError("Acesso negado: Sua conta não possui vínculo clínico ativo.");
