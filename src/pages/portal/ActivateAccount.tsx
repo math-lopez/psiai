@@ -9,7 +9,6 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Loader2, BrainCircuit, AlertCircle, Mail, ArrowRight, CheckCircle2 } from "lucide-react";
 import { showError, showSuccess } from "@/utils/toast";
-import { cn } from "@/lib/utils";
 
 const ActivateAccount = () => {
   const [searchParams] = useSearchParams();
