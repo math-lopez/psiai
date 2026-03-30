@@ -7,7 +7,7 @@ export const diaryService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    // Busca o vínculo ativo e mais recente (Usa !inner para garantir que o prontuário esteja 'ativo')
+    // Busca o vínculo ativo e mais recente (suporta troca de psicólogo)
     const { data: accessList, error } = await supabase
       .from('patient_access')
       .select('patient_id, psychologist_id, patients!inner(status)')

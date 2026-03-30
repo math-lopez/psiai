@@ -36,17 +36,15 @@ const PortalDashboard = () => {
     const fetchData = async () => {
       if (!user) return;
       try {
-        // 1. Buscar vínculo do paciente (Usa !inner para garantir que só traga se o paciente existir e estiver ATIVO)
-        const { data: accessList, error: accessError } = await supabase
+        // 1. Buscar vínculo do paciente (Ordenado pelo mais recente e que esteja ativo no prontuário)
+        const { data: accessList } = await supabase
           .from('patient_access')
-          .select('*, patients!inner(*)')
+          .select('*, patients(*)')
           .eq('user_id', user.id)
-          .eq('patients.status', 'ativo')
+          .eq('patients.status', 'ativo') // Apenas quem está ativo no momento
           .order('updated_at', { ascending: false });
 
-        if (accessError) throw accessError;
-
-        // Pega o vínculo mais recente que esteja ativo
+        // Pega o primeiro da lista (o mais recente)
         const access = accessList?.[0];
 
         if (access) {
@@ -70,11 +68,7 @@ const PortalDashboard = () => {
             .order('created_at', { ascending: false })
             .limit(3);
           setSharedLogs(l || []);
-        } else {
-          console.warn("[Portal] Nenhum vínculo ativo encontrado para este usuário.");
         }
-      } catch (err) {
-        console.error("[Portal] Erro ao carregar dashboard:", err);
       } finally {
         setLoading(false);
       }
@@ -87,9 +81,7 @@ const PortalDashboard = () => {
   return (
     <div className="space-y-10">
       <div className="space-y-2">
-        <h1 className="text-3xl font-black text-slate-900 tracking-tight">
-          Olá, {patientInfo ? patientInfo.full_name?.split(' ')[0] : 'Paciente'}!
-        </h1>
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Olá, {patientInfo?.full_name?.split(' ')[0]}!</h1>
         <p className="text-slate-500 font-medium italic">Seu espaço seguro para registros e acompanhamento terapêutico.</p>
       </div>
 
@@ -185,10 +177,9 @@ const PortalDashboard = () => {
           </section>
         </>
       ) : (
-        <Card className="p-20 text-center rounded-[40px] border-none shadow-sm bg-white">
+        <Card className="p-20 text-center rounded-[40px] border-none shadow-sm">
           <Cloud className="h-12 w-12 text-slate-200 mx-auto mb-4" />
-          <p className="text-slate-500 font-medium">Sua conta está ativa, mas você ainda não possui um vínculo clínico configurado para este profissional.</p>
-          <p className="text-xs text-slate-400 mt-2">Consulte seu psicólogo para verificar o status do seu prontuário.</p>
+          <p className="text-slate-500 font-medium">Você não possui um vínculo clínico ativo no momento.</p>
         </Card>
       )}
     </div>
