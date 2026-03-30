@@ -44,7 +44,6 @@ const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactN
       }
 
       try {
-        // 1. Tenta por vínculo direto de ID
         const { data: patientData } = await supabase
           .from('patient_access')
           .select('id')
@@ -57,20 +56,6 @@ const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactN
           return;
         }
 
-        // 2. Se falhou, tenta achar prontuário pelo e-mail (para casos de recém-confirmados)
-        const { data: patientByEmail } = await supabase
-          .from('patients')
-          .select('id, patient_access(id)')
-          .eq('email', session.user.email)
-          .maybeSingle();
-
-        if (patientByEmail && patientByEmail.patient_access) {
-          setUserRole('patient');
-          setChecking(false);
-          return;
-        }
-
-        // 3. Tenta por Perfil (Psicólogo)
         const { data: profileData } = await supabase
           .from('profiles')
           .select('crp')
@@ -96,7 +81,7 @@ const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactN
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-white">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-600 mb-4"></div>
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Validando credenciais...</p>
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Garantindo acesso seguro...</p>
       </div>
     );
   }
@@ -112,8 +97,8 @@ const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactN
   }
 
   if (userRole === 'unknown') {
-    // Se o Index ainda não conseguiu vincular, manda pra lá para tentar uma última vez
-    return <Navigate to="/" replace />;
+    signOut();
+    return <Navigate to="/login" replace />;
   }
 
   return <>{children}</>;
@@ -148,7 +133,7 @@ const App = () => (
             </Route>
 
             {/* Rotas Terapêuticas (Só Pacientes) */}
-            <Route element={<RoleProtectedRoute requiredRole="patient"><PatientPortalLayout /></Route>}>
+            <Route element={<RoleProtectedRoute requiredRole="patient"><PatientPortalLayout /></RoleProtectedRoute>}>
               <Route path="/portal" element={<PortalDashboard />} />
               <Route path="/portal/diario" element={<PatientDiaryPage />} />
             </Route>
