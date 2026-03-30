@@ -7,12 +7,16 @@ export const diaryService = {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
-    const { data, error } = await supabase
+    // Busca o vínculo ativo e mais recente (suporta troca de psicólogo)
+    const { data: accessList, error } = await supabase
       .from('patient_access')
-      .select('patient_id, psychologist_id')
+      .select('patient_id, psychologist_id, patients!inner(status)')
       .eq('user_id', user.id)
-      .maybeSingle();
+      .eq('patients.status', 'ativo')
+      .order('updated_at', { ascending: false });
     
+    const data = accessList?.[0];
+
     if (error || !data) {
       console.error("Erro ao buscar contexto do paciente:", error);
       return null;
@@ -54,7 +58,7 @@ export const diaryService = {
       .from('patient_logs')
       .insert([logData])
       .select()
-      .maybeSingle(); // Usando maybeSingle para evitar erro PGRST116
+      .maybeSingle();
 
     if (error) throw error;
     return data;
@@ -104,13 +108,12 @@ export const diaryService = {
   },
 
   updatePrompt: async (id: string, updates: Partial<PatientLogPrompt>): Promise<PatientLogPrompt> => {
-    // Atualização de prompt pode falhar se o RLS não permitir ao paciente
     const { data, error } = await supabase
       .from('patient_log_prompts')
       .update(updates)
       .eq('id', id)
       .select()
-      .maybeSingle(); // maybeSingle não quebra se retornar 0 linhas
+      .maybeSingle();
 
     if (error) throw error;
     return data;

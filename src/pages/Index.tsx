@@ -22,26 +22,26 @@ const Index = () => {
       try {
         console.log("[Index] Identificando usuário:", session.user.id);
         
-        // 1. Verifica se já tem vínculo
-        let { data: accessData } = await supabase
+        // 1. Busca todos os vínculos, priorizando o mais recente e que esteja 'ativo'
+        const { data: accessList } = await supabase
           .from('patient_access')
           .select('id, patient_id, patients(status)')
           .eq('user_id', session.user.id)
-          .maybeSingle();
+          .order('updated_at', { ascending: false });
+
+        let accessData = accessList?.find(a => (a.patients as any)?.status === 'ativo') || accessList?.[0];
 
         // 2. Se NÃO tem vínculo, verifica se tem um Token de Convite no metadado
         if (!accessData) {
           const inviteToken = session.user.user_metadata?.pending_invite_token;
           
           if (inviteToken) {
-            console.log("[Index] Detectado convite pendente. Realizando auto-vínculo...");
-            
             const { data: updatedAccess, error: linkError } = await supabase
               .from('patient_access')
               .update({
                 user_id: session.user.id,
                 status: 'active',
-                invite_token: null, // Invalida o token após vincular
+                invite_token: null,
                 updated_at: new Date().toISOString()
               })
               .eq('invite_token', inviteToken)
@@ -49,32 +49,25 @@ const Index = () => {
               .maybeSingle();
 
             if (!linkError && updatedAccess) {
-              console.log("[Index] Vínculo realizado com sucesso!");
               accessData = updatedAccess;
-              
-              // Limpa o metadado para não tentar vincular de novo
-              await supabase.auth.updateUser({
-                data: { pending_invite_token: null }
-              });
+              await supabase.auth.updateUser({ data: { pending_invite_token: null } });
             }
           }
         }
 
-        // 3. Redirecionamento baseado no papel
+        // 3. Redirecionamento
         if (accessData) {
           const patientStatus = (accessData.patients as any)?.status;
-          
-          if (patientStatus === 'inativo') {
+          if (patientStatus === 'inativo' && accessList && accessList.length === 1) {
             await supabase.auth.signOut();
             navigate("/login?error=inactive", { replace: true });
             return;
           }
-
           navigate("/portal", { replace: true });
           return;
         }
 
-        // 4. Verifica se é um Psicólogo
+        // 4. Psicólogo
         const { data: profile } = await supabase
           .from('profiles')
           .select('crp')
@@ -86,8 +79,6 @@ const Index = () => {
           return;
         }
 
-        // 5. Se chegou aqui, realmente não tem nada
-        console.warn("[Index] Usuário sem vínculo detectado.");
         await supabase.auth.signOut();
         navigate("/login?error=no-access", { replace: true });
         
