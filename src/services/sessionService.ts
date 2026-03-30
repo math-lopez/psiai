@@ -36,6 +36,17 @@ export const sessionService = {
     return data as Session[];
   },
 
+  getByPatientId: async (patientId: string): Promise<Session[]> => {
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('*, patient:patients(full_name)')
+      .eq('patient_id', patientId)
+      .order('session_date', { ascending: false });
+    
+    if (error) throw error;
+    return data as Session[];
+  },
+
   getById: async (id: string): Promise<Session | null> => {
     const { data, error } = await supabase
       .from('sessions')

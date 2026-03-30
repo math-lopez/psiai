@@ -64,11 +64,14 @@ const PatientDetailPage = () => {
       try {
         const [pData, sData] = await Promise.all([
           patientService.getById(id),
-          sessionService.list()
+          sessionService.getByPatientId(id)
         ]);
+        console.log(`DEBUG - Sessões encontradas para o paciente ${id}:`, sData);
         setPatient(pData);
-        const patientSessions = sData.filter(s => s.patient_id === id);
-        setSessions(patientSessions);
+        setSessions(sData);
+      } catch (error) {
+        console.error("Erro ao buscar dados do paciente:", error);
+        showError("Erro ao carregar histórico do paciente.");
       } finally {
         setLoading(false);
       }
