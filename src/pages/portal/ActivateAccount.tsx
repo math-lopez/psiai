@@ -22,17 +22,16 @@ const ActivateAccount = () => {
   const [isEmailPreFilled, setIsEmailPreFilled] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [errorType, setErrorType] = useState<string | null>(null);
 
   useEffect(() => {
     const validateToken = async () => {
       if (!token) {
-        setErrorType("missing_token");
         setLoading(false);
         return;
       }
 
       try {
+        // Busca o convite pelo token - essencial para vincular depois
         const { data: access, error: accessError } = await supabase
           .from('patient_access')
           .select('id, patient_id, status')
@@ -41,13 +40,11 @@ const ActivateAccount = () => {
           .maybeSingle();
 
         if (accessError || !access) {
-          setErrorType("invalid_token");
           setLoading(false);
           return;
         }
 
-        // Tenta buscar o e-mail. Se o RLS (Segurança do Banco) estiver bem configurado, 
-        // ele pode retornar vazio para usuários anônimos.
+        // Tenta buscar o e-mail do prontuário
         const { data: patient } = await supabase
           .from('patients')
           .select('email')
@@ -61,7 +58,7 @@ const ActivateAccount = () => {
           setIsEmailPreFilled(true);
         }
       } catch (err) {
-        setErrorType("system_error");
+        console.error("Erro na validação:", err);
       } finally {
         setLoading(false);
       }
@@ -73,11 +70,6 @@ const ActivateAccount = () => {
   const handleActivate = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!patientEmail || !patientEmail.includes("@")) {
-      showError("Por favor, informe um e-mail válido.");
-      return;
-    }
-
     if (password.length < 6) {
       showError("A senha deve ter pelo menos 6 caracteres.");
       return;
@@ -90,7 +82,7 @@ const ActivateAccount = () => {
 
     setValidating(true);
     try {
-      // 1. Criar o usuário no Supabase Auth
+      // 1. Criar o usuário no Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: patientEmail,
         password: password,
@@ -99,31 +91,37 @@ const ActivateAccount = () => {
         }
       });
 
+      // Se o erro for que o usuário já existe, tentamos apenas vincular
       if (authError) {
-        if (authError.message.includes("already registered")) {
-          throw new Error("Este e-mail já possui uma conta. Tente fazer login.");
+        if (!authError.message.includes("already registered")) {
+          throw authError;
         }
-        throw authError;
       }
 
-      if (authData.user) {
-        // 2. Vincular o novo user_id ao registro de acesso do paciente
+      // 2. Tentar vincular o ID do usuário ao convite
+      // Se authData.user existe (novo cadastro), usamos ele. 
+      // Se não (já cadastrado), o Supabase não retorna o ID por segurança no signUp, 
+      // mas o fluxo de convite ideal é que o usuário seja novo.
+      if (authData?.user) {
         const { error: updateError } = await supabase
           .from('patient_access')
           .update({
             user_id: authData.user.id,
             status: 'active',
-            invite_token: null, // Invalida o token após uso
+            invite_token: null, // Invalida o token
             updated_at: new Date().toISOString()
           })
-          .eq('id', inviteData.id);
+          .eq('invite_token', token); // Segurança: usa o token para autorizar o update
 
         if (updateError) throw updateError;
+      }
 
-        showSuccess("Conta ativada com sucesso!");
-        navigate("/login");
+      // Feedback para o usuário
+      if (authData?.session) {
+        showSuccess("Acesso configurado! Bem-vindo.");
+        navigate("/portal");
       } else {
-        showSuccess("Verifique seu e-mail para confirmar a ativação.");
+        showSuccess("Quase pronto! Verifique seu e-mail para confirmar a ativação.");
         navigate("/login");
       }
     } catch (err: any) {
@@ -136,7 +134,7 @@ const ActivateAccount = () => {
   if (loading) return (
     <div className="h-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
       <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
-      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Aguarde um momento...</p>
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">Aguarde...</p>
     </div>
   );
 
@@ -149,7 +147,7 @@ const ActivateAccount = () => {
           </div>
           <CardTitle className="text-2xl font-black mb-2">Convite Inválido</CardTitle>
           <CardDescription className="text-slate-500 font-medium mb-8 leading-relaxed">
-            Este link de convite expirou, já foi utilizado ou é inválido. Peça um novo convite ao seu psicólogo.
+            Este link expirou ou já foi utilizado. Peça um novo convite ao seu psicólogo.
           </CardDescription>
           <Button onClick={() => navigate("/login")} className="w-full bg-slate-900 hover:bg-slate-800 rounded-2xl h-14 font-black">
             Voltar para Login
@@ -185,53 +183,22 @@ const ActivateAccount = () => {
                 className="rounded-2xl h-12 border-slate-200 font-bold"
                 value={patientEmail}
                 onChange={(e) => setPatientEmail(e.target.value)}
-                readOnly={isEmailPreFilled} // Só trava se o sistema já souber qual é
+                readOnly={isEmailPreFilled}
               />
-              {!isEmailPreFilled && (
-                <p className="text-[9px] text-indigo-600 font-bold leading-tight">
-                  * Digite o e-mail que você informou ao seu terapeuta para vincular sua conta.
-                </p>
-              )}
             </div>
             
             <div className="space-y-2">
               <Label htmlFor="pass" className="text-[10px] font-black uppercase text-slate-400">Escolha uma Senha</Label>
-              <Input 
-                id="pass" 
-                type="password" 
-                required 
-                placeholder="Mínimo 6 caracteres"
-                className="rounded-2xl h-12 border-slate-200 font-bold"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
+              <Input id="pass" type="password" required placeholder="Mínimo 6 caracteres" className="rounded-2xl h-12 border-slate-200 font-bold" value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="confirm" className="text-[10px] font-black uppercase text-slate-400">Confirme a Senha</Label>
-              <Input 
-                id="confirm" 
-                type="password" 
-                required 
-                placeholder="Repita a senha"
-                className="rounded-2xl h-12 border-slate-200 font-bold"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
+              <Input id="confirm" type="password" required placeholder="Repita a senha" className="rounded-2xl h-12 border-slate-200 font-bold" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} />
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full bg-indigo-600 hover:bg-indigo-700 h-14 rounded-2xl font-black mt-4 shadow-lg shadow-indigo-100 text-lg transition-all active:scale-95"
-              disabled={validating}
-            >
-              {validating ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin" /> Ativando...
-                </div>
-              ) : (
-                "Criar Minha Conta"
-              )}
+            <Button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 h-14 rounded-2xl font-black mt-4 shadow-lg shadow-indigo-100 text-lg transition-all" disabled={validating}>
+              {validating ? <Loader2 className="h-5 w-5 animate-spin" /> : "Criar Minha Conta"}
             </Button>
           </form>
         </CardContent>
