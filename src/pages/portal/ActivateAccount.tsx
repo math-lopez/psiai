@@ -20,7 +20,6 @@ const ActivateAccount = () => {
   const [validating, setValidating] = useState(false);
   const [inviteData, setInviteData] = useState<any>(null);
   const [patientEmail, setPatientEmail] = useState("");
-  const [isEmailLocked, setIsEmailLocked] = useState(false); // NOVO: Controle de bloqueio
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [alreadyHasAccount, setAlreadyHasAccount] = useState(false);
@@ -45,13 +44,14 @@ const ActivateAccount = () => {
           return;
         }
 
+        // Se já tem usuário vinculado, redireciona para login
         if (access.user_id) {
           setAlreadyHasAccount(true);
         }
 
         setInviteData(access);
 
-        // 2. Tenta buscar o e-mail
+        // 2. Tenta buscar o e-mail (pode falhar por RLS se não estiver logado)
         const { data: patient } = await supabase
           .from('patients')
           .select('email')
@@ -60,7 +60,6 @@ const ActivateAccount = () => {
 
         if (patient?.email) {
           setPatientEmail(patient.email);
-          setIsEmailLocked(true); // SÓ BLOQUEIA se veio do banco
         }
         
       } catch (err) {
@@ -93,6 +92,7 @@ const ActivateAccount = () => {
 
     setValidating(true);
     try {
+      // 1. Tenta criar o usuário
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: patientEmail,
         password: password,
@@ -110,6 +110,7 @@ const ActivateAccount = () => {
         throw authError;
       }
 
+      // 2. Vincula ao prontuário
       if (authData?.user) {
         await supabase
           .from('patient_access')
@@ -202,13 +203,13 @@ const ActivateAccount = () => {
                 placeholder="Informe seu e-mail cadastrado"
                 value={patientEmail} 
                 onChange={(e) => setPatientEmail(e.target.value)}
-                readOnly={isEmailLocked} // AGORA USA O ESTADO CORRETO
+                readOnly={!!patientEmail && patientEmail.length > 0} 
                 className={cn(
                   "rounded-2xl h-12 font-bold",
-                  isEmailLocked ? "bg-slate-50 border-slate-100" : "bg-white border-slate-200"
+                  patientEmail ? "bg-slate-50 border-slate-100" : "bg-white border-slate-200"
                 )}
               />
-              {!isEmailLocked && (
+              {!patientEmail && (
                 <p className="text-[9px] text-amber-600 font-bold uppercase mt-1 px-1">
                   * Digite o mesmo e-mail onde recebeu o convite.
                 </p>
