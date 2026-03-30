@@ -19,7 +19,6 @@ const ActivateAccount = () => {
   const [validating, setValidating] = useState(false);
   const [inviteData, setInviteData] = useState<any>(null);
   const [patientEmail, setPatientEmail] = useState("");
-  const [isEmailPreFilled, setIsEmailPreFilled] = useState(false);
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [alreadyHasAccount, setAlreadyHasAccount] = useState(false);
@@ -32,45 +31,31 @@ const ActivateAccount = () => {
       }
 
       try {
-        // 1. Valida se o token existe e está pendente
+        // Busca o acesso e os dados básicos do paciente/psicólogo
         const { data: access, error: accessError } = await supabase
           .from('patient_access')
-          .select('id, patient_id, status, psychologist:profiles(full_name)')
+          .select('*, patients(email, full_name), psychologist:profiles(full_name)')
           .eq('invite_token', token)
-          .eq('status', 'invited')
           .maybeSingle();
 
         if (accessError || !access) {
+          console.error("Token não encontrado ou erro:", accessError);
           setLoading(false);
           return;
         }
 
-        const { data: patient } = await supabase
-          .from('patients')
-          .select('email')
-          .eq('id', access.patient_id)
-          .maybeSingle();
+        // Se já estiver ativo, avisa que já possui conta
+        if (access.status === 'active') {
+          setAlreadyHasAccount(true);
+          setPatientEmail(access.patients?.email || "");
+          setInviteData(access);
+          setLoading(false);
+          return;
+        }
 
         setInviteData(access);
+        setPatientEmail(access.patients?.email || "");
         
-        if (patient?.email) {
-          setPatientEmail(patient.email);
-          setIsEmailPreFilled(true);
-
-          // 2. Verifica se este e-mail já existe no sistema (Auth)
-          // Como não podemos listar usuários, tentamos uma pequena gambiarra: 
-          // Se houver um vínculo 'active' com esse e-mail em qualquer outro prontuário, a conta existe.
-          const { data: existingLink } = await supabase
-            .from('patient_access')
-            .select('user_id')
-            .not('user_id', 'is', null)
-            .eq('status', 'active')
-            .limit(1)
-            .maybeSingle();
-
-          // Nota: Em produção, o ideal é uma Edge Function para checar existência de e-mail.
-          // Aqui, vamos tentar o Sign Up e tratar o erro de "e-mail já existe".
-        }
       } catch (err) {
         console.error("Erro na validação:", err);
       } finally {
@@ -108,7 +93,6 @@ const ActivateAccount = () => {
       });
 
       if (authError) {
-        // DETECÇÃO DE CONTA EXISTENTE
         if (authError.message.toLowerCase().includes("already registered") || authError.status === 422) {
           setAlreadyHasAccount(true);
           setValidating(false);
@@ -123,6 +107,7 @@ const ActivateAccount = () => {
           .update({
             user_id: authData.user.id,
             status: 'active',
+            invite_token: null,
             updated_at: new Date().toISOString()
           })
           .eq('invite_token', token);
@@ -144,7 +129,7 @@ const ActivateAccount = () => {
     </div>
   );
 
-  if (!inviteData) {
+  if (!inviteData && !alreadyHasAccount) {
     return (
       <div className="h-screen flex items-center justify-center p-4 bg-slate-50">
         <Card className="max-w-md w-full text-center p-8 rounded-[40px] border-none shadow-2xl">
@@ -153,7 +138,7 @@ const ActivateAccount = () => {
           </div>
           <CardTitle className="text-2xl font-black mb-2">Convite Inválido</CardTitle>
           <CardDescription className="text-slate-500 font-medium mb-8 leading-relaxed">
-            Este link expirou ou já foi utilizado. Peça um novo convite ao seu psicólogo.
+            Este link expirou, já foi utilizado ou é inválido. Peça um novo convite ao seu psicólogo.
           </CardDescription>
           <Button onClick={() => navigate("/login")} className="w-full bg-slate-900 hover:bg-slate-800 rounded-2xl h-14 font-black">
             Voltar para Login
@@ -172,22 +157,22 @@ const ActivateAccount = () => {
             <div className="flex justify-center mb-4">
               <CheckCircle2 className="h-12 w-12 text-amber-500" />
             </div>
-            <CardTitle className="text-2xl font-black text-slate-900 tracking-tight">Você já possui conta!</CardTitle>
+            <CardTitle className="text-2xl font-black text-slate-900 tracking-tight">Vínculo Identificado</CardTitle>
             <CardDescription className="font-medium px-4">
-              Identificamos que o e-mail <strong>{patientEmail}</strong> já está cadastrado no PsiAI.
+              O e-mail <strong>{patientEmail}</strong> já possui uma conta ativa no sistema.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-8 space-y-6">
             <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100">
               <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                Para visualizar o prontuário compartilhado por <strong>{(inviteData.psychologist as any)?.full_name}</strong>, basta fazer login com sua conta existente.
+                Para acessar este prontuário, basta fazer login com sua conta existente. O sistema vinculará o novo profissional automaticamente.
               </p>
             </div>
             <Button 
-              onClick={() => navigate(`/login?email=${patientEmail}&token=${token}`)} 
+              onClick={() => navigate(`/login?email=${patientEmail}${token ? `&token=${token}` : ''}`)} 
               className="w-full bg-indigo-600 hover:bg-indigo-700 h-14 rounded-2xl font-black shadow-lg shadow-indigo-100 text-lg flex gap-2"
             >
-              Ir para o Login <ArrowRight className="h-5 w-5" />
+              Fazer Login Agora <ArrowRight className="h-5 w-5" />
             </Button>
           </CardContent>
         </Card>
@@ -205,7 +190,7 @@ const ActivateAccount = () => {
           </div>
           <CardTitle className="text-2xl font-black text-slate-900 tracking-tight">Ativar Meu Acesso</CardTitle>
           <CardDescription className="font-medium px-4">
-            Olá! Você foi convidado por <strong>{(inviteData.psychologist as any)?.full_name}</strong> para acompanhar seu tratamento online.
+            Olá! Você foi convidado por <strong>{inviteData.psychologist?.full_name || 'seu psicólogo'}</strong> para acompanhar seu tratamento online.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-8">
