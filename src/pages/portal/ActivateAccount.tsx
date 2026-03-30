@@ -80,12 +80,15 @@ const ActivateAccount = () => {
 
     setValidating(true);
     try {
-      // 1. Criar o usuário no Auth
+      // 1. Criar o usuário no Auth guardando o TOKEN no metadado
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: patientEmail,
         password: password,
         options: {
-          data: { role: 'patient' }
+          data: { 
+            role: 'patient',
+            pending_invite_token: token // Guardamos aqui como backup de segurança
+          }
         }
       });
 
@@ -96,25 +99,19 @@ const ActivateAccount = () => {
         throw authError;
       }
 
-      // 2. Vincular o novo user_id IMEDIATAMENTE usando o token
+      // 2. Tenta o vínculo imediato (pode falhar se o e-mail não for confirmado na hora, mas o Index.tsx resolverá depois)
       if (authData?.user) {
-        const { error: updateError } = await supabase
+        await supabase
           .from('patient_access')
           .update({
             user_id: authData.user.id,
             status: 'active',
-            invite_token: null,
             updated_at: new Date().toISOString()
           })
           .eq('invite_token', token);
-
-        if (updateError) {
-          console.error("Erro no vínculo:", updateError);
-          // Se falhar o vínculo, o usuário terá problemas no login posterior
-        }
       }
 
-      showSuccess("Senha cadastrada! Verifique seu e-mail para confirmar a ativação.");
+      showSuccess("Senha cadastrada! Confirme seu e-mail para entrar.");
       navigate("/login");
       
     } catch (err: any) {
