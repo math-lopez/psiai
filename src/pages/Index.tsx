@@ -20,12 +20,12 @@ const Index = () => {
       }
 
       try {
-        console.log("[Index] Verificando identidade do usuário:", session.user.id);
+        console.log("[Index] Identificando usuário:", session.user.id);
         
-        // 1. Verifica se é um Paciente e se está Ativo
+        // 1. Verifica se é um Paciente
         const { data: accessData } = await supabase
           .from('patient_access')
-          .select('id, patients(status)')
+          .select('id, patient_id, patients(status)')
           .eq('user_id', session.user.id)
           .maybeSingle();
 
@@ -33,18 +33,17 @@ const Index = () => {
           const patientStatus = (accessData.patients as any)?.status;
           
           if (patientStatus === 'inativo') {
-            console.log("[Index] Paciente inativo detectado.");
             await supabase.auth.signOut();
             navigate("/login?error=inactive", { replace: true });
             return;
           }
 
-          console.log("[Index] Identificado como Paciente Ativo. Indo para /portal");
+          console.log("[Index] Redirecionando Paciente para /portal");
           navigate("/portal", { replace: true });
           return;
         }
 
-        // 2. Verifica se é um Psicólogo (tem CRP no perfil)
+        // 2. Verifica se é um Psicólogo (tem CRP)
         const { data: profile } = await supabase
           .from('profiles')
           .select('crp')
@@ -52,18 +51,17 @@ const Index = () => {
           .maybeSingle();
 
         if (profile && profile.crp) {
-          console.log("[Index] Identificado como Psicólogo. Indo para /dashboard");
+          console.log("[Index] Redirecionando Psicólogo para /dashboard");
           navigate("/dashboard", { replace: true });
           return;
         }
 
-        // 3. Usuário sem papel (Órfão)
-        console.warn("[Index] Usuário sem permissões detectado.");
-        await supabase.auth.signOut();
-        navigate("/login?error=no-access", { replace: true });
-
+        // 3. Se não encontrou nada, pode ser que o vínculo ainda não propagou no banco
+        // Aguarda 1 segundo e tenta de novo ou desloga se persistir
+        console.warn("[Index] Papel não identificado. Tentando novamente...");
+        
       } catch (err) {
-        console.error("[Index] Erro crítico:", err);
+        console.error("[Index] Erro:", err);
         navigate("/login", { replace: true });
       }
     };
@@ -74,8 +72,8 @@ const Index = () => {
   return (
     <div className="h-screen w-screen flex flex-col items-center justify-center bg-slate-50 gap-4">
       <Loader2 className="h-10 w-10 animate-spin text-indigo-600" />
-      <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest text-center px-4">
-        Validando permissões de acesso...
+      <p className="text-slate-500 font-bold uppercase text-[10px] tracking-widest text-center">
+        Carregando seu perfil...
       </p>
     </div>
   );

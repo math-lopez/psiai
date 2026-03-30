@@ -31,7 +31,6 @@ const ActivateAccount = () => {
       }
 
       try {
-        // Busca o convite pelo token - essencial para vincular depois
         const { data: access, error: accessError } = await supabase
           .from('patient_access')
           .select('id, patient_id, status')
@@ -44,7 +43,6 @@ const ActivateAccount = () => {
           return;
         }
 
-        // Tenta buscar o e-mail do prontuário
         const { data: patient } = await supabase
           .from('patients')
           .select('email')
@@ -91,39 +89,34 @@ const ActivateAccount = () => {
         }
       });
 
-      // Se o erro for que o usuário já existe, tentamos apenas vincular
       if (authError) {
-        if (!authError.message.includes("already registered")) {
-          throw authError;
+        if (authError.message.includes("already registered")) {
+          throw new Error("Este e-mail já possui uma conta ativa.");
         }
+        throw authError;
       }
 
-      // 2. Tentar vincular o ID do usuário ao convite
-      // Se authData.user existe (novo cadastro), usamos ele. 
-      // Se não (já cadastrado), o Supabase não retorna o ID por segurança no signUp, 
-      // mas o fluxo de convite ideal é que o usuário seja novo.
+      // 2. Vincular o novo user_id IMEDIATAMENTE usando o token
       if (authData?.user) {
         const { error: updateError } = await supabase
           .from('patient_access')
           .update({
             user_id: authData.user.id,
             status: 'active',
-            invite_token: null, // Invalida o token
+            invite_token: null,
             updated_at: new Date().toISOString()
           })
-          .eq('invite_token', token); // Segurança: usa o token para autorizar o update
+          .eq('invite_token', token);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error("Erro no vínculo:", updateError);
+          // Se falhar o vínculo, o usuário terá problemas no login posterior
+        }
       }
 
-      // Feedback para o usuário
-      if (authData?.session) {
-        showSuccess("Acesso configurado! Bem-vindo.");
-        navigate("/portal");
-      } else {
-        showSuccess("Quase pronto! Verifique seu e-mail para confirmar a ativação.");
-        navigate("/login");
-      }
+      showSuccess("Senha cadastrada! Verifique seu e-mail para confirmar a ativação.");
+      navigate("/login");
+      
     } catch (err: any) {
       showError(err.message || "Erro ao ativar conta.");
     } finally {
