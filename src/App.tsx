@@ -1,4 +1,3 @@
-import React, { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,6 +7,7 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { PatientPortalLayout } from "./components/layout/PatientPortalLayout";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Analytics } from "@vercel/analytics/react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 import Index from "./pages/Index";
@@ -31,13 +31,8 @@ import PatientDiaryPage from "./pages/portal/PatientDiaryPage";
 
 const queryClient = new QueryClient();
 
-interface RoleProtectedRouteProps {
-  children: React.ReactNode;
-  requiredRole: 'psychologist' | 'patient';
-}
-
-const RoleProtectedRoute = ({ children, requiredRole }: RoleProtectedRouteProps) => {
-  const { session, loading: authLoading } = useAuth();
+const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode, requiredRole: 'psychologist' | 'patient' }) => {
+  const { session, loading: authLoading, signOut } = useAuth();
   const [userRole, setUserRole] = useState<'psychologist' | 'patient' | 'unknown' | null>(null);
   const [checking, setChecking] = useState(true);
 
@@ -62,14 +57,14 @@ const RoleProtectedRoute = ({ children, requiredRole }: RoleProtectedRouteProps)
           return;
         }
 
-        // 2. Se falhou, tenta achar prontuário pelo e-mail
+        // 2. Se falhou, tenta achar prontuário pelo e-mail (para casos de recém-confirmados)
         const { data: patientByEmail } = await supabase
           .from('patients')
           .select('id, patient_access(id)')
           .eq('email', session.user.email)
           .maybeSingle();
 
-        if (patientByEmail && (patientByEmail as any).patient_access) {
+        if (patientByEmail && patientByEmail.patient_access) {
           setUserRole('patient');
           setChecking(false);
           return;
@@ -117,55 +112,54 @@ const RoleProtectedRoute = ({ children, requiredRole }: RoleProtectedRouteProps)
   }
 
   if (userRole === 'unknown') {
+    // Se o Index ainda não conseguiu vincular, manda pra lá para tentar uma última vez
     return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
 };
 
-const App = () => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner position="top-right" closeButton />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/portal/ativar" element={<ActivateAccount />} />
-              
-              {/* Rotas Clínicas (Só Psicólogos) */}
-              <Route element={<RoleProtectedRoute requiredRole="psychologist"><AppLayout /></RoleProtectedRoute>}>
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/agenda" element={<Agenda />} />
-                <Route path="/pacientes" element={<Patients />} />
-                <Route path="/pacientes/novo" element={<PatientFormPage />} />
-                <Route path="/pacientes/editar/:id" element={<PatientFormPage />} />
-                <Route path="/pacientes/:id" element={<PatientDetailPage />} />
-                <Route path="/sessoes" element={<Sessions />} />
-                <Route path="/sessoes/nova" element={<SessionFormPage />} />
-                <Route path="/sessoes/editar/:id" element={<SessionFormPage />} />
-                <Route path="/sessoes/:id" element={<SessionDetail />} />
-                <Route path="/configuracoes" element={<Settings />} />
-                <Route path="/assinatura" element={<Subscription />} />
-              </Route>
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner position="top-right" closeButton />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/portal/ativar" element={<ActivateAccount />} />
+            
+            {/* Rotas Clínicas (Só Psicólogos) */}
+            <Route element={<RoleProtectedRoute requiredRole="psychologist"><AppLayout /></RoleProtectedRoute>}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/agenda" element={<Agenda />} />
+              <Route path="/pacientes" element={<Patients />} />
+              <Route path="/pacientes/novo" element={<PatientFormPage />} />
+              <Route path="/pacientes/editar/:id" element={<PatientFormPage />} />
+              <Route path="/pacientes/:id" element={<PatientDetailPage />} />
+              <Route path="/sessoes" element={<Sessions />} />
+              <Route path="/sessoes/nova" element={<SessionFormPage />} />
+              <Route path="/sessoes/editar/:id" element={<SessionFormPage />} />
+              <Route path="/sessoes/:id" element={<SessionDetail />} />
+              <Route path="/configuracoes" element={<Settings />} />
+              <Route path="/assinatura" element={<Subscription />} />
+            </Route>
 
-              {/* Rotas Terapêuticas (Só Pacientes) */}
-              <Route element={<RoleProtectedRoute requiredRole="patient"><PatientPortalLayout /></RoleProtectedRoute>}>
-                <Route path="/portal" element={<PortalDashboard />} />
-                <Route path="/portal/diario" element={<PatientDiaryPage />} />
-              </Route>
+            {/* Rotas Terapêuticas (Só Pacientes) */}
+            <Route element={<RoleProtectedRoute requiredRole="patient"><PatientPortalLayout /></Route>}>
+              <Route path="/portal" element={<PortalDashboard />} />
+              <Route path="/portal/diario" element={<PatientDiaryPage />} />
+            </Route>
 
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-          <Analytics />
-        </TooltipProvider>
-      </AuthProvider>
-    </QueryClientProvider>
-  );
-};
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+        <Analytics />
+      </TooltipProvider>
+    </AuthProvider>
+  </QueryClientProvider>
+);
 
 export default App;
