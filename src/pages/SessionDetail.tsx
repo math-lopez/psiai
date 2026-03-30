@@ -221,28 +221,7 @@ const SessionDetail = () => {
           </Card>
 
           {/* SEÇÃO DESABILITADA (BREVE) */}
-          // <Card className="border-none shadow-sm rounded-[32px] overflow-hidden bg-slate-50 opacity-60 grayscale pointer-events-none">
-          //   <div className="h-1.5 w-full bg-slate-300" />
-          //   <CardHeader className="pb-2 border-b border-slate-100 mb-4 flex flex-row items-center justify-between">
-          //     <CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-slate-400">
-          //       <BrainCircuit className="h-4 w-4" /> Análise da Sessão com IA (Em breve)
-          //     </CardTitle>
-          //   </CardHeader>
-          //   <CardContent className="min-h-[200px] flex flex-col items-center justify-center py-12 gap-6">
-          //     <div className="h-14 w-14 bg-slate-100 text-slate-300 rounded-2xl flex items-center justify-center">
-          //       <Sparkles className="h-7 w-7" />
-          //     </div>
-          //     <div className="text-center space-y-1">
-          //       <p className="text-sm font-black text-slate-400">Funcionalidade em desenvolvimento</p>
-          //       <p className="text-xs text-slate-400 max-w-xs mx-auto font-medium leading-relaxed">
-          //         Em breve você poderá gerar relatórios estruturados com padrões de comportamento e recomendações clínicas automáticas.
-          //       </p>
-          //     </div>
-          //     <Button disabled className="bg-slate-200 text-slate-400 rounded-2xl h-12 font-black px-8">
-          //       Indisponível no momento
-          //     </Button>
-          //   </CardContent>
-          // </Card>
+          
 
           <Card className="border-none shadow-sm rounded-[32px] overflow-hidden">
             <CardHeader className="pb-2 border-b border-slate-50 mb-4"><CardTitle className="flex items-center gap-2 text-sm font-black uppercase tracking-widest text-indigo-900"><Sparkles className="h-5 w-5 text-indigo-500" /> Transcrição Completa</CardTitle></CardHeader>
