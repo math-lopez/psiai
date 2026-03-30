@@ -41,26 +41,18 @@ const Index = () => {
           return;
         }
 
-        // Tenta auto-vínculo pelo e-mail se for um paciente que acabou de confirmar conta
-        const { data: patientData } = await supabase
-          .from('patients')
-          .select('id, patient_access(id, user_id)')
-          .eq('email', session.user.email)
-          .maybeSingle();
-        
-        if (patientData) {
-          const access = Array.isArray(patientData.patient_access) 
-            ? patientData.patient_access[0] 
-            : patientData.patient_access;
-          
-          if (access && !access.user_id) {
-             await supabase
-              .from('patient_access')
-              .update({ user_id: session.user.id, status: 'active', invite_token: null })
-              .eq('id', access.id);
-          }
+        // Se é Paciente e veio com token, garante o vínculo
+        if (token) {
+          await supabase
+            .from('patient_access')
+            .update({
+              user_id: session.user.id,
+              status: 'active',
+              updated_at: new Date().toISOString()
+            })
+            .eq('invite_token', token);
         }
-
+        
         // Verifica se tem acesso ativo para ir pro portal
         const { data: accessList } = await supabase
           .from('patient_access')
@@ -74,9 +66,10 @@ const Index = () => {
           return;
         }
 
-        // Caso sem papel (psicólogo sem CRP preenchido)
+        // Caso sem papel e sem token, força preencher CRP se for psicólogo
+        // ou dá erro se for alguém perdido
         if (profile && !profile.crp) {
-          navigate("/configuracoes");
+          navigate("/configuracoes"); // Força preencher dados
           return;
         }
 
