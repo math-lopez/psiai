@@ -32,21 +32,24 @@ export const accessService = {
 
   /**
    * NOVO FLUXO: Ativação direta pelo psicólogo via Edge Function
+   * Retorna a senha gerada (seja aleatória ou fixa)
    */
-  activateDirectly: async (patientId: string, email: string, password: string): Promise<void> => {
+  activateDirectly: async (patientId: string, email: string, password?: string, patientName?: string): Promise<string> => {
     const { data, error } = await supabase.functions.invoke('create-patient-user', {
-      body: { patientId, email, password, action: 'create' }
+      body: { patientId, email, password, patientName, action: 'create' }
     });
     
     if (error || (data && !data.success)) {
       throw new Error(data?.error || "Erro ao ativar conta do paciente.");
     }
+
+    return data.password; // Retornamos a senha para mostrar no frontend
   },
 
   /**
    * RESET DE SENHA: Pelo psicólogo via Edge Function
    */
-  resetPasswordDirectly: async (patientId: string, email: string, password: string): Promise<void> => {
+  resetPasswordDirectly: async (patientId: string, email: string, password?: string): Promise<string> => {
     const { data, error } = await supabase.functions.invoke('create-patient-user', {
       body: { patientId, email, password, action: 'reset_password' }
     });
@@ -54,6 +57,8 @@ export const accessService = {
     if (error || (data && !data.success)) {
       throw new Error(data?.error || "Erro ao redefinir senha do paciente.");
     }
+
+    return data.password;
   },
 
   revokeAccess: async (patientId: string): Promise<void> => {

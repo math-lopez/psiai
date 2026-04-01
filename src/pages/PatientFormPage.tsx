@@ -74,13 +74,18 @@ const PatientFormPage = () => {
       } else {
         const newPatient = await patientService.create(formData);
         
-        // NOVO: Se marcado, cria o acesso automático com senha padrão
+        // NOVO: Se marcado, cria o acesso automático com senha ALEATÓRIA
         if (createAccess && newPatient.id && newPatient.email) {
           try {
-            const defaultPassword = "Psi" + Math.random().toString(36).substring(2, 8); // Senha aleatória ou fixa
-            await accessService.activateDirectly(newPatient.id, newPatient.email, "Mudar123");
-            showSuccess(`Acesso ao portal liberado! Senha inicial: Mudar123`);
-          } catch (accessErr) {
+            // Chamando a ativação sem passar senha fixa, para que a Edge Function gere uma
+            const generatedPassword = await accessService.activateDirectly(
+              newPatient.id, 
+              newPatient.email, 
+              undefined, 
+              newPatient.full_name
+            );
+            showSuccess(`Portal liberado! Senha inicial: ${generatedPassword}`);
+          } catch (accessErr: any) {
             console.error("Erro ao criar acesso automático:", accessErr);
             showError("Paciente criado, mas erro ao liberar acesso automático.");
           }
@@ -225,8 +230,8 @@ const PatientFormPage = () => {
                   <Label htmlFor="create_access" className="text-sm font-bold text-indigo-900 cursor-pointer">
                     Liberar acesso ao Portal do Paciente agora
                   </Label>
-                  <p className="text-[10px] text-indigo-400 font-medium">
-                    O paciente receberá uma conta ativa com a senha padrão: <strong>Mudar123</strong>
+                  <p className="text-[10px] text-indigo-400 font-medium leading-relaxed">
+                    O paciente receberá uma conta ativa. Uma senha segura será gerada e o e-mail de acesso enviado.
                   </p>
                 </div>
               </div>

@@ -18,9 +18,12 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     )
 
-    const { email, password, patientId, action } = await req.json()
+    const { email, password, patientId, action, patientName } = await req.json()
 
-    console.log(`[create-patient-user] Ação: ${action || 'create'} para paciente ${patientId} com email ${email}`);
+    // Geração de senha aleatória se não for fornecida (fluxo automático)
+    const finalPassword = password || Math.random().toString(36).substring(2, 10) + "!"
+
+    console.log(`[create-patient-user] Ação: ${action || 'create'} | Paciente: ${patientName || patientId} | Email: ${email} | Senha Gerada: ${finalPassword}`);
 
     if (action === 'reset_password') {
       // 1. Localizar o usuário pelo email
@@ -33,11 +36,14 @@ serve(async (req) => {
       // 2. Atualizar a senha do usuário
       const { error: resetError } = await supabaseClient.auth.admin.updateUserById(
         user.id,
-        { password: password }
+        { password: finalPassword }
       )
       if (resetError) throw resetError
 
-      return new Response(JSON.stringify({ success: true, message: "Senha redefinida com sucesso." }), {
+      // Log da nova senha no console do servidor para o psicólogo conferir se necessário
+      console.log(`[create-patient-user] Senha REDEFINIDA para: ${finalPassword}`);
+
+      return new Response(JSON.stringify({ success: true, message: "Senha redefinida.", password: finalPassword }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       })
@@ -47,9 +53,12 @@ serve(async (req) => {
     // 1. Criar o usuário no Auth (já confirmado)
     const { data: authUser, error: authError } = await supabaseClient.auth.admin.createUser({
       email: email,
-      password: password,
+      password: finalPassword,
       email_confirm: true,
-      user_metadata: { role: 'patient' }
+      user_metadata: { 
+        role: 'patient',
+        full_name: patientName 
+      }
     })
 
     if (authError) {
@@ -89,7 +98,11 @@ serve(async (req) => {
 
     if (accessError) throw accessError
 
-    return new Response(JSON.stringify({ success: true, userId: authUser.user.id }), {
+    return new Response(JSON.stringify({ 
+      success: true, 
+      userId: authUser.user.id, 
+      password: finalPassword 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
