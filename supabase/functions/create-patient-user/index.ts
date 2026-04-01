@@ -48,10 +48,34 @@ serve(async (req) => {
     const { data: authUser, error: authError } = await supabaseClient.auth.admin.createUser({
       email: email,
       password: password,
-      email_confirm: true // PULA A CONFIRMAÇÃO DE EMAIL
+      email_confirm: true,
+      user_metadata: { role: 'patient' }
     })
 
-    if (authError) throw authError
+    if (authError) {
+      // Se o usuário já existir, apenas vinculamos ao paciente (pode ser um paciente que já teve acesso antes)
+      if (authError.message.includes("already has been registered")) {
+        const { data: { users } } = await supabaseClient.auth.admin.listUsers()
+        const existingUser = users.find(u => u.email === email)
+        if (existingUser) {
+          const { error: accessError } = await supabaseClient
+            .from('patient_access')
+            .upsert({
+              patient_id: patientId,
+              user_id: existingUser.id,
+              status: 'active',
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'patient_id' })
+          
+          if (accessError) throw accessError
+          return new Response(JSON.stringify({ success: true, message: "Vínculo atualizado para usuário existente." }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+          })
+        }
+      }
+      throw authError
+    }
 
     // 2. Criar ou Atualizar o registro em patient_access
     const { error: accessError } = await supabaseClient

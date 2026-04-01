@@ -13,8 +13,10 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { showSuccess, showError } from "@/utils/toast";
 import { patientService } from "@/services/patientService";
+import { accessService } from "@/services/accessService";
 import { maskCPF, maskPhone } from "@/lib/utils";
 
 const PatientFormPage = () => {
@@ -34,6 +36,8 @@ const PatientFormPage = () => {
     notes: "",
     status: "ativo" as "ativo" | "inativo"
   });
+
+  const [createAccess, setCreateAccess] = useState(true); // NOVO: Acesso automático
 
   useEffect(() => {
     if (id) {
@@ -68,7 +72,20 @@ const PatientFormPage = () => {
         await patientService.update(id, formData);
         showSuccess("Paciente atualizado com sucesso!");
       } else {
-        await patientService.create(formData);
+        const newPatient = await patientService.create(formData);
+        
+        // NOVO: Se marcado, cria o acesso automático com senha padrão
+        if (createAccess && newPatient.id && newPatient.email) {
+          try {
+            const defaultPassword = "Psi" + Math.random().toString(36).substring(2, 8); // Senha aleatória ou fixa
+            await accessService.activateDirectly(newPatient.id, newPatient.email, "Mudar123");
+            showSuccess(`Acesso ao portal liberado! Senha inicial: Mudar123`);
+          } catch (accessErr) {
+            console.error("Erro ao criar acesso automático:", accessErr);
+            showError("Paciente criado, mas erro ao liberar acesso automático.");
+          }
+        }
+        
         showSuccess("Paciente cadastrado com sucesso!");
       }
       navigate("/pacientes");
@@ -196,6 +213,24 @@ const PatientFormPage = () => {
                 </SelectContent>
               </Select>
             </div>
+
+            {!id && (
+              <div className="flex items-center space-x-2 pt-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                <Checkbox 
+                  id="create_access" 
+                  checked={createAccess} 
+                  onCheckedChange={(checked) => setCreateAccess(!!checked)}
+                />
+                <div className="grid gap-1.5 leading-none">
+                  <Label htmlFor="create_access" className="text-sm font-bold text-indigo-900 cursor-pointer">
+                    Liberar acesso ao Portal do Paciente agora
+                  </Label>
+                  <p className="text-[10px] text-indigo-400 font-medium">
+                    O paciente receberá uma conta ativa com a senha padrão: <strong>Mudar123</strong>
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 
