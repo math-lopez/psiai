@@ -26,8 +26,9 @@ serve(async (req) => {
 
     // Geração de senha aleatória se não for fornecida (fluxo automático)
     const finalPassword = password || Math.random().toString(36).substring(2, 10) + "!"
+    const nameToUse = patientName || "Paciente" // Garante um nome amigável
 
-    console.log(`[create-patient-user] Ação: ${action || 'create'} | Paciente: ${patientName || patientId} | Email: ${email} | Senha Gerada: ${finalPassword}`);
+    console.log(`[create-patient-user] Ação: ${action || 'create'} | Paciente: ${nameToUse} | Email: ${email} | Senha Gerada: ${finalPassword}`);
 
     // Função auxiliar para enviar e-mail via Resend
     const sendWelcomeEmail = async (toEmail: string, name: string, pass: string) => {
@@ -44,8 +45,8 @@ serve(async (req) => {
             'Authorization': `Bearer ${resendApiKey}`,
           },
           body: JSON.stringify({
-            from: 'PsyccAI <suporte@psyccai.com.br>', // ATUALIZADO: Usando seu domínio verificado
-            to: [toEmail],
+            from: 'PsyccAI <suporte@psyccai.com.br>',
+            to: [toEmail], // <--- Envia para o e-mail dinâmico recebido do formulário
             subject: 'Seu acesso ao Portal Terapêutico está pronto!',
             html: `
               <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px;">
@@ -91,7 +92,7 @@ serve(async (req) => {
       if (resetError) throw resetError
 
       // Envia e-mail de nova senha se o Resend estiver ativo
-      await sendWelcomeEmail(email, patientName || "Paciente", finalPassword);
+      await sendWelcomeEmail(email, nameToUse, finalPassword);
 
       console.log(`[create-patient-user] Senha REDEFINIDA para: ${finalPassword}`);
 
@@ -109,7 +110,7 @@ serve(async (req) => {
       email_confirm: true,
       user_metadata: { 
         role: 'patient',
-        full_name: patientName 
+        full_name: nameToUse 
       }
     })
 
@@ -151,7 +152,7 @@ serve(async (req) => {
     if (accessError) throw accessError
 
     // 3. ENVIAR E-MAIL DE BOAS-VINDAS COM A SENHA
-    await sendWelcomeEmail(email, patientName || "Paciente", finalPassword);
+    await sendWelcomeEmail(email, nameToUse, finalPassword);
 
     return new Response(JSON.stringify({ 
       success: true, 
