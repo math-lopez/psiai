@@ -44,7 +44,7 @@ serve(async (req) => {
             'Authorization': `Bearer ${resendApiKey}`,
           },
           body: JSON.stringify({
-            from: 'PsiAI <onboarding@resend.dev>', // Em produção, use seu domínio verificado
+            from: 'PsyccAI <suporte@psyccai.com.br>', // ATUALIZADO: Usando seu domínio verificado
             to: [toEmail],
             subject: 'Seu acesso ao Portal Terapêutico está pronto!',
             html: `
