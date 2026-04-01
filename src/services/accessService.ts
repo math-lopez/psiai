@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { PatientAccess, AccessStatus } from "@/types/access";
+import { PatientAccess } from "@/types/access";
 
 export const accessService = {
   getAccessByPatientId: async (patientId: string): Promise<PatientAccess | null> => {
@@ -14,43 +14,43 @@ export const accessService = {
   },
 
   createInvite: async (patientId: string): Promise<PatientAccess> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Não autenticado");
-
-    const inviteToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    
+    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     const { data, error } = await supabase
       .from('patient_access')
       .upsert({
         patient_id: patientId,
-        psychologist_id: user.id, // Agora gravamos o psicólogo aqui para segurança e performance
+        invite_token: token,
         status: 'invited',
-        invite_token: inviteToken,
-        invited_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        invited_at: new Date().toISOString()
       }, { onConflict: 'patient_id' })
       .select()
       .single();
     
     if (error) throw error;
-    return data;
+    return data as PatientAccess;
   },
 
-  updateStatus: async (patientId: string, status: AccessStatus): Promise<void> => {
-    const { error } = await supabase
-      .from('patient_access')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('patient_id', patientId);
+  /**
+   * NOVO FLUXO: Ativação direta pelo psicólogo via Edge Function
+   */
+  activateDirectly: async (patientId: string, email: string, password: string): Promise<void> => {
+    const { data, error } = await supabase.functions.invoke('create-patient-user', {
+      body: { patientId, email, password }
+    });
     
-    if (error) throw error;
+    if (error || (data && !data.success)) {
+      throw new Error(data?.error || "Erro ao ativar conta do paciente.");
+    }
   },
 
   revokeAccess: async (patientId: string): Promise<void> => {
     const { error } = await supabase
       .from('patient_access')
-      .update({ 
-        status: 'suspended', 
-        updated_at: new Date().toISOString() 
+      .update({
+        status: 'inactive',
+        user_id: null,
+        invite_token: null,
+        updated_at: new Date().toISOString()
       })
       .eq('patient_id', patientId);
     

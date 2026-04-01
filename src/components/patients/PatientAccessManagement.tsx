@@ -13,11 +13,14 @@ import {
   AlertCircle,
   Copy,
   CheckCircle2,
-  Lock
+  Lock,
+  Mail
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { showSuccess, showError } from "@/utils/toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -33,6 +36,8 @@ export const PatientAccessManagement = ({ patientId, patientEmail }: PatientAcce
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [initialPassword, setInitialPassword] = useState("");
+  const [showDirectActivation, setShowDirectActivation] = useState(false);
 
   const fetchAccess = async () => {
     try {
@@ -57,6 +62,26 @@ export const PatientAccessManagement = ({ patientId, patientEmail }: PatientAcce
       fetchAccess();
     } catch (e) {
       showError("Erro ao gerar convite.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDirectActivate = async () => {
+    if (!initialPassword || initialPassword.length < 6) {
+      showError("A senha inicial deve ter no mínimo 6 caracteres.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await accessService.activateDirectly(patientId, patientEmail, initialPassword);
+      showSuccess(`Acesso liberado para ${patientEmail}!`);
+      setShowDirectActivation(false);
+      setInitialPassword("");
+      fetchAccess();
+    } catch (e: any) {
+      showError(e.message || "Erro ao ativar conta.");
     } finally {
       setSubmitting(false);
     }
@@ -121,22 +146,75 @@ export const PatientAccessManagement = ({ patientId, patientEmail }: PatientAcce
 
         <CardContent className="p-8 space-y-8">
           {currentStatus === 'inactive' || currentStatus === 'suspended' ? (
-            <div className="bg-slate-50 rounded-3xl p-8 text-center border border-dashed border-slate-200">
-              <div className="h-16 w-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm text-slate-300">
-                <UserPlus className="h-8 w-8" />
-              </div>
-              <h4 className="font-bold text-slate-900 mb-2">Liberar o Portal do Paciente</h4>
-              <p className="text-sm text-slate-500 max-w-sm mx-auto mb-6">
-                Um convite será gerado para o e-mail <strong>{patientEmail}</strong>. O paciente precisará definir uma senha para acessar.
-              </p>
-              <Button 
-                onClick={handleInvite} 
-                disabled={submitting}
-                className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-12 px-8 font-black shadow-lg shadow-indigo-100 gap-2"
-              >
-                {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />}
-                Gerar Link de Convite
-              </Button>
+            <div className="bg-slate-50 rounded-3xl p-8 border border-dashed border-slate-200">
+              {!showDirectActivation ? (
+                <div className="text-center">
+                  <div className="h-16 w-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm text-slate-300">
+                    <UserPlus className="h-8 w-8" />
+                  </div>
+                  <h4 className="font-bold text-slate-900 mb-2">Liberar o Portal do Paciente</h4>
+                  <p className="text-sm text-slate-500 max-w-sm mx-auto mb-6">
+                    Você pode gerar um link de convite ou definir uma senha inicial para o paciente <strong>{patientEmail}</strong> agora mesmo.
+                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <Button 
+                      onClick={() => setShowDirectActivation(true)} 
+                      className="bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-12 px-8 font-black shadow-lg shadow-indigo-100 gap-2"
+                    >
+                      <Lock className="h-4 w-4" />
+                      Definir Senha e Ativar
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={handleInvite} 
+                      disabled={submitting}
+                      className="rounded-2xl h-12 px-8 font-black border-slate-200 gap-2"
+                    >
+                      {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                      Apenas Gerar Link
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="max-w-sm mx-auto space-y-4">
+                  <div className="text-center mb-6">
+                    <h4 className="font-bold text-slate-900 mb-1">Configurar Acesso Direto</h4>
+                    <p className="text-xs text-slate-500">O paciente poderá logar imediatamente com o e-mail {patientEmail}.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="init-pass" className="text-[10px] font-black uppercase text-slate-400">Senha Inicial para o Paciente</Label>
+                    <Input 
+                      id="init-pass"
+                      type="password"
+                      placeholder="Mínimo 6 caracteres"
+                      value={initialPassword}
+                      onChange={(e) => setInitialPassword(e.target.value)}
+                      className="rounded-xl h-12"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handleDirectActivate} 
+                      disabled={submitting}
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 rounded-2xl h-12 font-black shadow-lg shadow-indigo-100"
+                    >
+                      {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirmar e Ativar"}
+                    </Button>
+                    <Button 
+                      variant="ghost"
+                      onClick={() => setShowDirectActivation(false)}
+                      disabled={submitting}
+                      className="rounded-2xl h-12 px-6 font-bold text-slate-500"
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-center text-slate-400 mt-4 leading-relaxed">
+                    Ao ativar, o portal estará disponível para o paciente em seu domínio. 
+                    Recomendamos que o paciente altere sua senha no primeiro acesso.
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="space-y-6">
