@@ -12,8 +12,8 @@ export const sessionService = {
     if (!user) throw new Error("Não autenticado");
 
     const [patientsRes, sessionsRes] = await Promise.all([
-      supabase.from('patients').select('id', { count: 'exact', head: true }),
-      supabase.from('sessions').select('id, processing_status', { count: 'exact' })
+      supabase.from('patients').select('id', { count: 'exact', head: true }).eq('psychologist_id', user.id),
+      supabase.from('sessions').select('id, processing_status', { count: 'exact' }).eq('psychologist_id', user.id)
     ]);
 
     const sessions = sessionsRes.data || [];
@@ -27,9 +27,13 @@ export const sessionService = {
   },
 
   list: async (): Promise<Session[]> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Não autenticado");
+
     const { data, error } = await supabase
       .from('sessions')
       .select('*, patient:patients(full_name)')
+      .eq('psychologist_id', user.id)
       .order('session_date', { ascending: false });
     
     if (error) throw error;
