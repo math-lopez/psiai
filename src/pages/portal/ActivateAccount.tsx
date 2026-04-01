@@ -15,6 +15,8 @@ const ActivateAccount = () => {
   const navigate = useNavigate();
   const token = searchParams.get("token");
   
+  console.log("Token capturado da URL:", token); // LOG DE TESTE
+
   const [loading, setLoading] = useState(true);
   const [validating, setValidating] = useState(false);
   const [inviteData, setInviteData] = useState<any>(null);
@@ -24,19 +26,22 @@ const ActivateAccount = () => {
   useEffect(() => {
     const validateToken = async () => {
       if (!token) {
+        console.error("Nenhum token encontrado na URL"); // LOG DE ERRO
         setLoading(false);
         return;
       }
 
+      console.log("Validando token no banco:", token); // LOG DE TESTE
+
       const { data, error } = await supabase
         .from('patient_access')
-        .select('*, patients(full_name, email)')
+        .select('*, patients!inner(full_name, email)')
         .eq('invite_token', token)
         .eq('status', 'invited')
         .maybeSingle();
 
       if (error || !data) {
-        showError("Convite inválido ou já utilizado.");
+        showError("Convite inválido ou paciente não encontrado.");
         setLoading(false);
         return;
       }
@@ -91,7 +96,7 @@ const ActivateAccount = () => {
 
   if (loading) return <div className="h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-indigo-600" /></div>;
 
-  if (!inviteData) {
+  if (!inviteData || !inviteData.patients) {
     return (
       <div className="h-screen flex items-center justify-center p-4 bg-slate-50">
         <Card className="max-w-md w-full text-center p-6 rounded-[32px]">
@@ -100,7 +105,7 @@ const ActivateAccount = () => {
               <ShieldCheck className="h-6 w-6" />
             </div>
             <CardTitle>Link Inválido</CardTitle>
-            <CardDescription>Este link de convite expirou ou não é mais válido. Entre em contato com seu psicólogo.</CardDescription>
+            <CardDescription>Este link de convite expirou ou os dados do paciente não foram encontrados. Entre em contato com seu psicólogo.</CardDescription>
           </CardHeader>
           <Button onClick={() => navigate("/login")} variant="outline" className="mt-4 rounded-2xl">Voltar para Login</Button>
         </Card>
@@ -118,7 +123,7 @@ const ActivateAccount = () => {
           </div>
           <CardTitle className="text-2xl font-black text-slate-900">Ative seu Portal</CardTitle>
           <CardDescription className="font-medium">
-            Olá, <span className="text-indigo-600 font-bold">{inviteData.patients.full_name}</span>. 
+            Olá, <span className="text-indigo-600 font-bold">{inviteData.patients?.full_name || 'Paciente'}</span>. 
             Crie sua senha para acessar seu espaço terapêutico.
           </CardDescription>
         </CardHeader>
@@ -126,7 +131,7 @@ const ActivateAccount = () => {
           <form onSubmit={handleActivate} className="space-y-4">
             <div className="space-y-2">
               <Label>E-mail de Acesso</Label>
-              <Input value={inviteData.patients.email} disabled className="bg-slate-50 rounded-xl" />
+              <Input value={inviteData.patients?.email || ''} disabled className="bg-slate-50 rounded-xl" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="pass">Criar Senha</Label>
