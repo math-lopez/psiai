@@ -12,9 +12,13 @@ serve(async (req) => {
   }
 
   try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? ''
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    const resendApiKey = Deno.env.get('RESEND_API_KEY') // Você deve configurar este segredo no console do Supabase
+    
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '', // Usando service role para criar usuários
+      supabaseUrl,
+      supabaseServiceKey,
       { auth: { persistSession: false } }
     )
 
@@ -24,6 +28,52 @@ serve(async (req) => {
     const finalPassword = password || Math.random().toString(36).substring(2, 10) + "!"
 
     console.log(`[create-patient-user] Ação: ${action || 'create'} | Paciente: ${patientName || patientId} | Email: ${email} | Senha Gerada: ${finalPassword}`);
+
+    // Função auxiliar para enviar e-mail via Resend
+    const sendWelcomeEmail = async (toEmail: string, name: string, pass: string) => {
+      if (!resendApiKey) {
+        console.warn("[create-patient-user] RESEND_API_KEY não configurada. E-mail não enviado.");
+        return;
+      }
+
+      try {
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${resendApiKey}`,
+          },
+          body: JSON.stringify({
+            from: 'PsiAI <onboarding@resend.dev>', // Em produção, use seu domínio verificado
+            to: [toEmail],
+            subject: 'Seu acesso ao Portal Terapêutico está pronto!',
+            html: `
+              <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px;">
+                <h2 style="color: #4f46e5;">Olá, ${name}!</h2>
+                <p>Seu psicólogo liberou seu acesso ao nosso portal. Agora você pode acompanhar seu diário e atividades entre as sessões.</p>
+                <div style="background-color: #f8fafc; padding: 20px; border-radius: 12px; margin: 20px 0;">
+                  <p style="margin: 0; font-size: 14px; color: #64748b;">Seus dados de acesso:</p>
+                  <p style="margin: 10px 0 5px 0;"><strong>E-mail:</strong> ${toEmail}</p>
+                  <p style="margin: 0;"><strong>Senha Temporária:</strong> <span style="color: #4f46e5; font-weight: bold; font-family: monospace; font-size: 18px;">${pass}</span></p>
+                </div>
+                <p>Recomendamos que você altere sua senha após o primeiro acesso para sua total segurança.</p>
+                <a href="${req.headers.get('origin') || 'http://localhost:32109'}/login" 
+                   style="display: inline-block; background-color: #4f46e5; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: bold; margin-top: 10px;">
+                   Acessar Meu Portal
+                </a>
+                <p style="font-size: 12px; color: #94a3b8; margin-top: 30px; border-top: 1px solid #f1f5f9; padding-top: 20px;">
+                  Este é um e-mail automático. Se você não esperava este convite, por favor desconsidere.
+                </p>
+              </div>
+            `,
+          }),
+        });
+        const data = await res.json();
+        console.log(`[create-patient-user] Resposta Resend:`, data);
+      } catch (err) {
+        console.error(`[create-patient-user] Erro ao enviar e-mail:`, err.message);
+      }
+    };
 
     if (action === 'reset_password') {
       // 1. Localizar o usuário pelo email
@@ -40,10 +90,12 @@ serve(async (req) => {
       )
       if (resetError) throw resetError
 
-      // Log da nova senha no console do servidor para o psicólogo conferir se necessário
+      // Envia e-mail de nova senha se o Resend estiver ativo
+      await sendWelcomeEmail(email, patientName || "Paciente", finalPassword);
+
       console.log(`[create-patient-user] Senha REDEFINIDA para: ${finalPassword}`);
 
-      return new Response(JSON.stringify({ success: true, message: "Senha redefinida.", password: finalPassword }), {
+      return new Response(JSON.stringify({ success: true, message: "Senha redefinida e e-mail enviado.", password: finalPassword }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       })
@@ -97,6 +149,9 @@ serve(async (req) => {
       }, { onConflict: 'patient_id' })
 
     if (accessError) throw accessError
+
+    // 3. ENVIAR E-MAIL DE BOAS-VINDAS COM A SENHA
+    await sendWelcomeEmail(email, patientName || "Paciente", finalPassword);
 
     return new Response(JSON.stringify({ 
       success: true, 
