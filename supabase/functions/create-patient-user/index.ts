@@ -18,10 +18,32 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     )
 
-    const { email, password, patientId } = await req.json()
+    const { email, password, patientId, action } = await req.json()
 
-    console.log(`[create-patient-user] Criando usuário para paciente ${patientId} com email ${email}`);
+    console.log(`[create-patient-user] Ação: ${action || 'create'} para paciente ${patientId} com email ${email}`);
 
+    if (action === 'reset_password') {
+      // 1. Localizar o usuário pelo email
+      const { data: { users }, error: listError } = await supabaseClient.auth.admin.listUsers()
+      if (listError) throw listError
+      
+      const user = users.find(u => u.email === email)
+      if (!user) throw new Error("Usuário não encontrado para este e-mail.")
+
+      // 2. Atualizar a senha do usuário
+      const { error: resetError } = await supabaseClient.auth.admin.updateUserById(
+        user.id,
+        { password: password }
+      )
+      if (resetError) throw resetError
+
+      return new Response(JSON.stringify({ success: true, message: "Senha redefinida com sucesso." }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    }
+
+    // Fluxo padrão de criação (se não for reset)
     // 1. Criar o usuário no Auth (já confirmado)
     const { data: authUser, error: authError } = await supabaseClient.auth.admin.createUser({
       email: email,

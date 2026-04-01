@@ -35,11 +35,24 @@ export const accessService = {
    */
   activateDirectly: async (patientId: string, email: string, password: string): Promise<void> => {
     const { data, error } = await supabase.functions.invoke('create-patient-user', {
-      body: { patientId, email, password }
+      body: { patientId, email, password, action: 'create' }
     });
     
     if (error || (data && !data.success)) {
       throw new Error(data?.error || "Erro ao ativar conta do paciente.");
+    }
+  },
+
+  /**
+   * RESET DE SENHA: Pelo psicólogo via Edge Function
+   */
+  resetPasswordDirectly: async (patientId: string, email: string, password: string): Promise<void> => {
+    const { data, error } = await supabase.functions.invoke('create-patient-user', {
+      body: { patientId, email, password, action: 'reset_password' }
+    });
+    
+    if (error || (data && !data.success)) {
+      throw new Error(data?.error || "Erro ao redefinir senha do paciente.");
     }
   },
 

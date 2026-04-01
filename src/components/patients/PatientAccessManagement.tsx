@@ -38,6 +38,7 @@ export const PatientAccessManagement = ({ patientId, patientEmail }: PatientAcce
   const [copied, setCopied] = useState(false);
   const [initialPassword, setInitialPassword] = useState("");
   const [showDirectActivation, setShowDirectActivation] = useState(false);
+  const [showResetForm, setShowResetForm] = useState(false);
 
   const fetchAccess = async () => {
     try {
@@ -82,6 +83,25 @@ export const PatientAccessManagement = ({ patientId, patientEmail }: PatientAcce
       fetchAccess();
     } catch (e: any) {
       showError(e.message || "Erro ao ativar conta.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!initialPassword || initialPassword.length < 6) {
+      showError("A nova senha deve ter no mínimo 6 caracteres.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await accessService.resetPasswordDirectly(patientId, patientEmail, initialPassword);
+      showSuccess(`Senha de ${patientEmail} redefinida com sucesso!`);
+      setShowResetForm(false);
+      setInitialPassword("");
+    } catch (e: any) {
+      showError(e.message || "Erro ao redefinir senha.");
     } finally {
       setSubmitting(false);
     }
@@ -235,32 +255,64 @@ export const PatientAccessManagement = ({ patientId, patientEmail }: PatientAcce
 
                 <div className="p-6 rounded-3xl bg-indigo-50 border border-indigo-100 space-y-4">
                   <p className="text-[10px] font-black uppercase text-indigo-400 tracking-widest flex items-center gap-2">
-                    <ExternalLink className="h-3 w-3" /> {currentStatus === 'active' ? 'Status da Conta' : 'Link de Acesso'}
+                    <ExternalLink className="h-3 w-3" /> {currentStatus === 'active' ? 'Gerenciamento de Acesso' : 'Link de Acesso'}
                   </p>
-                  <div className="flex items-center gap-2">
-                    <div className="flex-1 bg-white border border-indigo-100 rounded-xl px-4 py-2 text-xs font-mono text-indigo-600 truncate">
-                      {currentStatus === 'active' 
-                        ? 'Conta ativada pelo paciente' 
-                        : access?.invite_token 
-                          ? `${window.location.origin}/portal/ativar?token=...` 
-                          : 'Gerando...'}
-                    </div>
-                    {currentStatus === 'invited' && access?.invite_token && (
-                      <Button 
-                        variant="secondary" 
-                        size="icon" 
-                        className="bg-white hover:bg-indigo-100 text-indigo-600 border border-indigo-100 rounded-xl shrink-0"
-                        onClick={copyInviteLink}
-                      >
-                        {copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                      </Button>
-                    )}
-                    {currentStatus === 'active' && (
-                      <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
-                        <Lock className="h-4 w-4" />
+                  
+                  {!showResetForm ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 bg-white border border-indigo-100 rounded-xl px-4 py-2 text-xs font-mono text-indigo-600 truncate">
+                          {currentStatus === 'active' 
+                            ? 'Conta ativada e pronta para uso' 
+                            : access?.invite_token 
+                              ? `${window.location.origin}/portal/ativar?token=...` 
+                              : 'Gerando...'}
+                        </div>
+                        {currentStatus === 'active' && (
+                          <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+                            <Lock className="h-4 w-4" />
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
+                      
+                      {currentStatus === 'active' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setShowResetForm(true)}
+                          className="w-full rounded-xl border-indigo-100 text-indigo-600 hover:bg-indigo-100 hover:border-indigo-200 text-[10px] font-black uppercase h-9"
+                        >
+                          Redefinir Senha do Paciente
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <Input 
+                        type="password"
+                        placeholder="Nova senha (mín 6 car.)"
+                        value={initialPassword}
+                        onChange={(e) => setInitialPassword(e.target.value)}
+                        className="rounded-xl h-10 text-xs bg-white border-indigo-100"
+                      />
+                      <div className="flex gap-2">
+                        <Button 
+                          onClick={handleResetPassword} 
+                          disabled={submitting}
+                          className="flex-1 bg-indigo-600 hover:bg-indigo-700 rounded-xl h-10 text-[10px] font-black uppercase"
+                        >
+                          {submitting ? <Loader2 className="h-3 w-3 animate-spin" /> : "Salvar Senha"}
+                        </Button>
+                        <Button 
+                          variant="ghost"
+                          onClick={() => {setShowResetForm(false); setInitialPassword("");}}
+                          className="rounded-xl h-10 text-[10px] font-black uppercase text-slate-500"
+                        >
+                          X
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
