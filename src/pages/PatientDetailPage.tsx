@@ -14,7 +14,8 @@ import {
   BookOpen,
   Lock,
   Clock,
-  Files
+  Files,
+  RefreshCcw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +33,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { patientService } from "@/services/patientService";
 import { sessionService } from "@/services/sessionService";
+import { accessService } from "@/services/accessService";
 import { useAuth } from "@/contexts/AuthContext";
 import { Patient, Session } from "@/types";
 import { PatientTimeline } from "@/components/patients/PatientTimeline";
@@ -57,6 +59,22 @@ const PatientDetailPage = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const handleResetPassword = async () => {
+    if (!id || !patient?.email) return;
+    if (!confirm("Tem certeza que deseja redefinir a senha do paciente? Uma nova senha aleatória será gerada e enviada por e-mail.")) return;
+
+    setResetting(true);
+    try {
+      const newPass = await accessService.resetPasswordDirectly(id, patient.email, undefined);
+      showSuccess(`Nova senha gerada e enviada: ${newPass}`);
+    } catch (err: any) {
+      showError(err.message || "Erro ao redefinir senha.");
+    } finally {
+      setResetting(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -211,6 +229,19 @@ const PatientDetailPage = () => {
                     <p className="text-sm font-bold text-slate-700">{format(new Date(patient.birth_date), "dd/MM/yyyy")}</p>
                   </div>
                 </div>
+
+                <div className="pt-4 mt-4 border-t border-slate-50">
+                   <Button 
+                     variant="ghost" 
+                     size="sm"
+                     onClick={handleResetPassword}
+                     disabled={resetting}
+                     className="w-full justify-start gap-2 h-10 px-4 rounded-xl text-indigo-600 hover:bg-indigo-50 font-black text-[9px] uppercase tracking-widest"
+                   >
+                     {resetting ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCcw className="h-3 w-3" />}
+                     Redefinir Senha do Portal
+                   </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -275,13 +306,6 @@ const PatientDetailPage = () => {
               >
                 Parecer <Clock className="h-3 w-3" />
               </TabsTrigger>
-              <TabsTrigger 
-                value="access" 
-                data-tour="tab-access"
-                className="rounded-2xl px-6 py-3 font-black text-sm data-[state=active]:bg-white data-[state=active]:shadow-lg data-[state=active]:text-indigo-600 transition-all flex gap-2"
-              >
-                Acesso <Lock className="h-4 w-4" />
-              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="overview" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
@@ -305,10 +329,6 @@ const PatientDetailPage = () => {
 
             <TabsContent value="documents" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
               <AttachmentModule patientId={id!} psychologistId={user?.id!} role="psychologist" />
-            </TabsContent>
-
-            <TabsContent value="access" className="animate-in fade-in-50 duration-700 focus-visible:outline-none">
-              <PatientAccessManagement patientId={id!} patientEmail={patient.email} />
             </TabsContent>
           </Tabs>
         </div>
