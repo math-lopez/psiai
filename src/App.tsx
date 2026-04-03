@@ -30,10 +30,48 @@ import PortalDashboard from "./pages/portal/PortalDashboard";
 import PatientDiaryPage from "./pages/portal/PatientDiaryPage";
 
 const queryClient = new QueryClient();
+const ROLE_LOOKUP_TIMEOUT_MS = 8000;
+
+type UserRole = 'psychologist' | 'patient' | 'unknown';
+
+const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
+  return await Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error(message)), timeoutMs);
+    }),
+  ]);
+};
+
+export const resolveUserRole = async (userId: string): Promise<UserRole> => {
+  const { data: patientData } = await withTimeout(
+    supabase
+      .from('patient_access')
+      .select('id')
+      .eq('user_id', userId)
+      .maybeSingle(),
+    ROLE_LOOKUP_TIMEOUT_MS,
+    'Timed out while checking patient access',
+  );
+
+  if (patientData) return 'patient';
+
+  const { data: profileData } = await withTimeout(
+    supabase
+      .from('profiles')
+      .select('crp')
+      .eq('id', userId)
+      .maybeSingle(),
+    ROLE_LOOKUP_TIMEOUT_MS,
+    'Timed out while checking psychologist profile',
+  );
+
+  return profileData?.crp ? 'psychologist' : 'unknown';
+};
 
 const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactNode, requiredRole: 'psychologist' | 'patient' }) => {
   const { session, loading: authLoading, signOut } = useAuth();
-  const [userRole, setUserRole] = useState<'psychologist' | 'patient' | 'unknown' | null>(null);
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
@@ -44,30 +82,10 @@ const RoleProtectedRoute = ({ children, requiredRole }: { children: React.ReactN
       }
 
       try {
-        const { data: patientData } = await supabase
-          .from('patient_access')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-
-        if (patientData) {
-          setUserRole('patient');
-          setChecking(false);
-          return;
-        }
-
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('crp')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        if (profileData && profileData.crp) {
-          setUserRole('psychologist');
-        } else {
-          setUserRole('unknown');
-        }
+        const role = await resolveUserRole(session.user.id);
+        setUserRole(role);
       } catch (err) {
+        console.error('[RoleProtectedRoute] Failed to identify user role:', err);
         setUserRole('unknown');
       } finally {
         setChecking(false);

@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2 } from "lucide-react";
+import { resolveUserRole } from "@/App";
 
 const Index = () => {
   const { session, loading: authLoading } = useAuth();
@@ -21,17 +22,22 @@ const Index = () => {
 
       try {
         console.log("[Index] Verificando identidade do usuário:", session.user.id);
-        
-        // 1. Verifica se é um Paciente e se está Ativo
-        const { data: accessData } = await supabase
-          .from('patient_access')
-          .select('id, patients(status)')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
 
-        if (accessData) {
+        const role = await resolveUserRole(session.user.id);
+
+        if (role === "patient") {
+          const { data: accessData } = await supabase
+            .from('patient_access')
+            .select('id, patients(status)')
+            .eq('user_id', session.user.id)
+            .maybeSingle();
+
+          if (!accessData) {
+            throw new Error("Patient access record not found during redirect.");
+          }
+
           const patientStatus = (accessData.patients as any)?.status;
-          
+
           if (patientStatus === 'inativo') {
             console.log("[Index] Paciente inativo detectado.");
             await supabase.auth.signOut();
@@ -44,20 +50,12 @@ const Index = () => {
           return;
         }
 
-        // 2. Verifica se é um Psicólogo (tem CRP no perfil)
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('crp')
-          .eq('id', session.user.id)
-          .maybeSingle();
-
-        if (profile && profile.crp) {
+        if (role === "psychologist") {
           console.log("[Index] Identificado como Psicólogo. Indo para /dashboard");
           navigate("/dashboard", { replace: true });
           return;
         }
 
-        // 3. Usuário sem papel (Órfão)
         console.warn("[Index] Usuário sem permissões detectado.");
         await supabase.auth.signOut();
         navigate("/login?error=no-access", { replace: true });

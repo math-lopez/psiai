@@ -1,123 +1,60 @@
-import { supabase } from "@/integrations/supabase/client";
-import { PatientLog, PatientLogPrompt, LogType, PromptStatus } from "@/types/diary";
+import { PatientLog, PatientLogPrompt } from "@/types/diary";
+import { api } from "@/lib/api";
 
 export const diaryService = {
-  // Retorna os IDs necessários para o portal do paciente
-  getPatientContext: async (): Promise<{ patientId: string; psychologistId: string } | null> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+  // --- Portal do Paciente ---
 
-    const { data, error } = await supabase
-      .from('patient_access')
-      .select('patient_id, psychologist_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    
-    if (error || !data) {
-      console.error("Erro ao buscar contexto do paciente:", error);
-      return null;
-    }
-
-    return {
-      patientId: data.patient_id,
-      psychologistId: data.psychologist_id
-    };
-  },
+  getPatientContext: (): Promise<{ patientId: string; psychologistId: string } | null> =>
+    api.get<{ data: { patientId: string; psychologistId: string } }>("/v1/diary/me/context")
+      .then((r) => r.data)
+      .catch(() => null),
 
   getMyPatientId: async (): Promise<string | null> => {
-    const context = await diaryService.getPatientContext();
-    return context?.patientId || null;
+    const ctx = await diaryService.getPatientContext();
+    return ctx?.patientId ?? null;
   },
 
-  // Logs / Registros
-  listLogs: async (patientId: string): Promise<PatientLog[]> => {
-    const { data, error } = await supabase
-      .from('patient_logs')
-      .select('*, attachments:patient_log_attachments(*)')
-      .eq('patient_id', patientId)
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return data || [];
-  },
+  listMyLogs: (): Promise<PatientLog[]> =>
+    api.get<{ data: PatientLog[] }>("/v1/diary/me/logs").then((r) => r.data),
 
-  createLog: async (log: Partial<PatientLog>): Promise<PatientLog> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Não autenticado");
+  createMyLog: (log: Partial<PatientLog>): Promise<PatientLog> =>
+    api.post<{ data: PatientLog }>("/v1/diary/me/logs", log).then((r) => r.data),
 
-    const logData = {
-      ...log,
-      psychologist_id: log.psychologist_id || user.id
-    };
+  updateMyLog: (id: string, updates: Partial<PatientLog>): Promise<PatientLog> =>
+    api.put<{ data: PatientLog }>(`/v1/diary/me/logs/${id}`, updates).then((r) => r.data),
 
-    const { data, error } = await supabase
-      .from('patient_logs')
-      .insert([logData])
-      .select()
-      .maybeSingle(); // Usando maybeSingle para evitar erro PGRST116
+  deleteMyLog: (id: string): Promise<void> =>
+    api.delete(`/v1/diary/me/logs/${id}`),
 
-    if (error) throw error;
-    return data;
-  },
+  listMyPrompts: (): Promise<PatientLogPrompt[]> =>
+    api.get<{ data: PatientLogPrompt[] }>("/v1/diary/me/prompts").then((r) => r.data),
 
-  updateLog: async (id: string, updates: Partial<PatientLog>): Promise<PatientLog> => {
-    const { data, error } = await supabase
-      .from('patient_logs')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .maybeSingle();
-    
-    if (error) throw error;
-    return data;
-  },
+  updateMyPrompt: (id: string, updates: Partial<PatientLogPrompt>): Promise<PatientLogPrompt> =>
+    api.patch<{ data: PatientLogPrompt }>(`/v1/diary/me/prompts/${id}`, updates).then((r) => r.data),
 
-  deleteLog: async (id: string): Promise<void> => {
-    const { error } = await supabase.from('patient_logs').delete().eq('id', id);
-    if (error) throw error;
-  },
+  // --- Psicólogo ---
 
-  // Prompts / Tarefas
-  listPrompts: async (patientId: string): Promise<PatientLogPrompt[]> => {
-    const { data, error } = await supabase
-      .from('patient_log_prompts')
-      .select('*')
-      .eq('patient_id', patientId)
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return data || [];
-  },
+  listLogs: (patientId: string): Promise<PatientLog[]> =>
+    api.get<{ data: PatientLog[] }>(`/v1/patients/${patientId}/diary/logs`).then((r) => r.data),
 
-  createPrompt: async (prompt: Partial<PatientLogPrompt>): Promise<PatientLogPrompt> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Não autenticado");
+  createLog: (log: Partial<PatientLog>): Promise<PatientLog> =>
+    api.post<{ data: PatientLog }>(`/v1/patients/${log.patient_id}/diary/logs`, log).then((r) => r.data),
 
-    const { data, error } = await supabase
-      .from('patient_log_prompts')
-      .insert([{ ...prompt, psychologist_id: user.id }])
-      .select()
-      .maybeSingle();
-    
-    if (error) throw error;
-    return data;
-  },
+  updateLog: (id: string, updates: Partial<PatientLog>): Promise<PatientLog> =>
+    api.put<{ data: PatientLog }>(`/v1/diary/logs/${id}`, updates).then((r) => r.data),
 
-  updatePrompt: async (id: string, updates: Partial<PatientLogPrompt>): Promise<PatientLogPrompt> => {
-    // Atualização de prompt pode falhar se o RLS não permitir ao paciente
-    const { data, error } = await supabase
-      .from('patient_log_prompts')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .maybeSingle(); // maybeSingle não quebra se retornar 0 linhas
+  deleteLog: (id: string): Promise<void> =>
+    api.delete(`/v1/diary/logs/${id}`),
 
-    if (error) throw error;
-    return data;
-  },
+  listPrompts: (patientId: string): Promise<PatientLogPrompt[]> =>
+    api.get<{ data: PatientLogPrompt[] }>(`/v1/patients/${patientId}/diary/prompts`).then((r) => r.data),
 
-  deletePrompt: async (id: string): Promise<void> => {
-    const { error } = await supabase.from('patient_log_prompts').delete().eq('id', id);
-    if (error) throw error;
-  }
+  createPrompt: (prompt: Partial<PatientLogPrompt>): Promise<PatientLogPrompt> =>
+    api.post<{ data: PatientLogPrompt }>(`/v1/patients/${prompt.patient_id}/diary/prompts`, prompt).then((r) => r.data),
+
+  updatePrompt: (id: string, updates: Partial<PatientLogPrompt>): Promise<PatientLogPrompt> =>
+    api.put<{ data: PatientLogPrompt }>(`/v1/patients/${(updates as any).patient_id}/diary/prompts/${id}`, updates).then((r) => r.data),
+
+  deletePrompt: (patientId: string, id: string): Promise<void> =>
+    api.delete(`/v1/patients/${patientId}/diary/prompts/${id}`),
 };

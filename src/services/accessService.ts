@@ -1,59 +1,18 @@
-import { supabase } from "@/integrations/supabase/client";
 import { PatientAccess, AccessStatus } from "@/types/access";
+import { api } from "@/lib/api";
 
 export const accessService = {
-  getAccessByPatientId: async (patientId: string): Promise<PatientAccess | null> => {
-    const { data, error } = await supabase
-      .from('patient_access')
-      .select('*')
-      .eq('patient_id', patientId)
-      .maybeSingle();
-    
-    if (error) throw error;
-    return data;
-  },
+  getAccessByPatientId: (patientId: string): Promise<PatientAccess | null> =>
+    api.get<{ data: PatientAccess | null }>(`/v1/patients/${patientId}/access`)
+      .then((r) => r.data),
 
-  createInvite: async (patientId: string): Promise<PatientAccess> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Não autenticado");
+  createInvite: (patientId: string): Promise<PatientAccess> =>
+    api.post<{ data: PatientAccess }>(`/v1/patients/${patientId}/access/invite`)
+      .then((r) => r.data),
 
-    const inviteToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    
-    const { data, error } = await supabase
-      .from('patient_access')
-      .upsert({
-        patient_id: patientId,
-        psychologist_id: user.id, // Agora gravamos o psicólogo aqui para segurança e performance
-        status: 'invited',
-        invite_token: inviteToken,
-        invited_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'patient_id' })
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
+  updateStatus: (patientId: string, status: AccessStatus): Promise<void> =>
+    api.patch(`/v1/patients/${patientId}/access/status`, { status }),
 
-  updateStatus: async (patientId: string, status: AccessStatus): Promise<void> => {
-    const { error } = await supabase
-      .from('patient_access')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('patient_id', patientId);
-    
-    if (error) throw error;
-  },
-
-  revokeAccess: async (patientId: string): Promise<void> => {
-    const { error } = await supabase
-      .from('patient_access')
-      .update({ 
-        status: 'suspended', 
-        updated_at: new Date().toISOString() 
-      })
-      .eq('patient_id', patientId);
-    
-    if (error) throw error;
-  }
+  revokeAccess: (patientId: string): Promise<void> =>
+    api.post(`/v1/patients/${patientId}/access/revoke`),
 };

@@ -116,7 +116,7 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
     setSubmitting(true);
     try {
       if (editingGoal) {
-        await treatmentService.updateGoal(editingGoal.id, {
+        await treatmentService.updateGoal(patientId, editingGoal.treatment_plan_id, editingGoal.id, {
           title: goalForm.title,
           description: goalForm.description,
           priority: goalForm.priority,
@@ -146,8 +146,9 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
   };
 
   const handleUpdateGoalStatus = async (id: string, status: GoalStatus) => {
+    if (!activePlan) return;
     try {
-      await treatmentService.updateGoal(id, { status });
+      await treatmentService.updateGoal(patientId, activePlan.id, id, { status });
       fetchData();
     } catch (e) {
       showError("Erro ao atualizar status.");
@@ -155,8 +156,9 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
   };
 
   const handleDeleteGoal = async (id: string) => {
+    if (!activePlan) return;
     try {
-      await treatmentService.deleteGoal(id);
+      await treatmentService.deleteGoal(patientId, activePlan.id, id);
       showSuccess("Objetivo removido.");
       fetchData();
     } catch (e) {
@@ -167,7 +169,7 @@ export const TreatmentPlanModule = ({ patientId }: TreatmentPlanModuleProps) => 
   const handleFinishPlan = async () => {
     if (!activePlan) return;
     try {
-      await treatmentService.updatePlan(activePlan.id, { status: 'completed', end_date: new Date().toISOString() });
+      await treatmentService.updatePlan(patientId, activePlan.id, { status: 'completed', end_date: new Date().toISOString() });
       showSuccess("Plano concluído com sucesso!");
       fetchData();
     } catch (e) {

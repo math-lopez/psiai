@@ -1,109 +1,38 @@
-import { supabase } from "@/integrations/supabase/client";
-import { TreatmentPlan, TreatmentGoal, PlanStatus, GoalStatus } from "@/types/treatment";
+import { TreatmentPlan, TreatmentGoal } from "@/types/treatment";
+import { api } from "@/lib/api";
 
 export const treatmentService = {
-  // Planos
-  listPlans: async (patientId: string): Promise<TreatmentPlan[]> => {
-    const { data, error } = await supabase
-      .from('treatment_plans')
-      .select('*, goals:treatment_goals(*)')
-      .eq('patient_id', patientId)
-      .order('created_at', { ascending: false });
-    
-    if (error) throw error;
-    return data || [];
-  },
+  listPlans: (patientId: string): Promise<TreatmentPlan[]> =>
+    api.get<{ data: TreatmentPlan[] }>(`/v1/patients/${patientId}/treatment/plans`)
+      .then((r) => r.data),
 
-  getActivePlan: async (patientId: string): Promise<TreatmentPlan | null> => {
-    const { data, error } = await supabase
-      .from('treatment_plans')
-      .select('*, goals:treatment_goals(*)')
-      .eq('patient_id', patientId)
-      .eq('status', 'active')
-      .maybeSingle();
-    
-    if (error) throw error;
-    return data;
-  },
+  getActivePlan: (patientId: string): Promise<TreatmentPlan | null> =>
+    api.get<{ data: TreatmentPlan | null }>(`/v1/patients/${patientId}/treatment/plans/active`)
+      .then((r) => r.data),
 
-  createPlan: async (plan: Partial<TreatmentPlan>): Promise<TreatmentPlan> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Não autenticado");
+  createPlan: (plan: Partial<TreatmentPlan>): Promise<TreatmentPlan> =>
+    api.post<{ data: TreatmentPlan }>(`/v1/patients/${plan.patient_id}/treatment/plans`, plan)
+      .then((r) => r.data),
 
-    // Se o novo plano for ativo, desativar outros ativos do mesmo paciente
-    if (plan.status === 'active') {
-      await supabase
-        .from('treatment_plans')
-        .update({ status: 'archived' })
-        .eq('patient_id', plan.patient_id)
-        .eq('status', 'active');
-    }
+  updatePlan: (patientId: string, id: string, updates: Partial<TreatmentPlan>): Promise<TreatmentPlan> =>
+    api.put<{ data: TreatmentPlan }>(`/v1/patients/${patientId}/treatment/plans/${id}`, updates)
+      .then((r) => r.data),
 
-    const { data, error } = await supabase
-      .from('treatment_plans')
-      .insert([{ ...plan, psychologist_id: user.id }])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
+  deletePlan: (patientId: string, id: string): Promise<void> =>
+    api.delete(`/v1/patients/${patientId}/treatment/plans/${id}`),
 
-  updatePlan: async (id: string, updates: Partial<TreatmentPlan>): Promise<TreatmentPlan> => {
-    const { data, error } = await supabase
-      .from('treatment_plans')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
+  createGoal: (goal: Partial<TreatmentGoal>): Promise<TreatmentGoal> =>
+    api.post<{ data: TreatmentGoal }>(
+      `/v1/patients/${goal.patient_id}/treatment/plans/${goal.treatment_plan_id}/goals`,
+      goal
+    ).then((r) => r.data),
 
-  deletePlan: async (id: string): Promise<void> => {
-    const { error } = await supabase
-      .from('treatment_plans')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
-  },
+  updateGoal: (patientId: string, planId: string, id: string, updates: Partial<TreatmentGoal>): Promise<TreatmentGoal> =>
+    api.put<{ data: TreatmentGoal }>(
+      `/v1/patients/${patientId}/treatment/plans/${planId}/goals/${id}`,
+      updates
+    ).then((r) => r.data),
 
-  // Objetivos
-  createGoal: async (goal: Partial<TreatmentGoal>): Promise<TreatmentGoal> => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("Não autenticado");
-
-    const { data, error } = await supabase
-      .from('treatment_goals')
-      .insert([{ ...goal, psychologist_id: user.id }])
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
-
-  updateGoal: async (id: string, updates: Partial<TreatmentGoal>): Promise<TreatmentGoal> => {
-    const { data, error } = await supabase
-      .from('treatment_goals')
-      .update({
-        ...updates,
-        completed_at: updates.status === 'completed' ? new Date().toISOString() : null
-      })
-      .eq('id', id)
-      .select()
-      .single();
-    
-    if (error) throw error;
-    return data;
-  },
-
-  deleteGoal: async (id: string): Promise<void> => {
-    const { error } = await supabase
-      .from('treatment_goals')
-      .delete()
-      .eq('id', id);
-    if (error) throw error;
-  }
+  deleteGoal: (patientId: string, planId: string, id: string): Promise<void> =>
+    api.delete(`/v1/patients/${patientId}/treatment/plans/${planId}/goals/${id}`),
 };

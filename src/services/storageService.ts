@@ -1,48 +1,20 @@
-import { supabase } from "@/integrations/supabase/client";
-import { sanitizeFileName } from "@/lib/file-utils";
-
-const BUCKET_NAME = 'session-files';
+import { api } from "@/lib/api";
 
 export const storageService = {
   uploadSessionAudio: async (
-    userId: string,
-    patientId: string,
+    _userId: string,
+    _patientId: string,
     sessionId: string,
     file: File
   ): Promise<{ path: string; name: string }> => {
-    const timestamp = Date.now();
-    const sanitizedName = sanitizeFileName(file.name);
-    const filePath = `${userId}/${patientId}/${sessionId}/${timestamp}-${sanitizedName}`;
-
-    const { error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false
-      });
-
-    if (error) throw error;
-
-    return {
-      path: filePath,
-      name: file.name
-    };
+    const form = new FormData();
+    form.append("file", file);
+    return api.upload(`/v1/sessions/${sessionId}/audio`, form);
   },
 
-  deleteFile: async (path: string): Promise<void> => {
-    const { error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .remove([path]);
+  deleteFile: (sessionId: string): Promise<void> =>
+    api.delete(`/v1/sessions/${sessionId}/audio`),
 
-    if (error) throw error;
-  },
-
-  getSignedUrl: async (path: string): Promise<string> => {
-    const { data, error } = await supabase.storage
-      .from(BUCKET_NAME)
-      .createSignedUrl(path, 3600); // 1 hora de validade
-
-    if (error) throw error;
-    return data.signedUrl;
-  }
+  getSignedUrl: (sessionId: string): Promise<string> =>
+    api.get<{ url: string }>(`/v1/sessions/${sessionId}/audio-url`).then((r) => r.url),
 };

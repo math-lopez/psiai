@@ -1,25 +1,11 @@
-import { supabase } from "@/integrations/supabase/client";
-import { PatientAIAnalysis, AnalysisStatus } from "@/types/analysis";
+import { PatientAIAnalysis } from "@/types/analysis";
+import { api } from "@/lib/api";
 
 export const analysisService = {
-  getLatestAnalysis: async (patientId: string): Promise<PatientAIAnalysis | null> => {
-    const { data, error } = await supabase
-      .from('patient_ai_analyses')
-      .select('*')
-      .eq('patient_id', patientId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    
-    if (error) throw error;
-    return data;
-  },
+  getLatestAnalysis: (patientId: string): Promise<PatientAIAnalysis | null> =>
+    api.get<{ data: PatientAIAnalysis | null }>(`/v1/patients/${patientId}/analysis/latest`)
+      .then((r) => r.data),
 
-  requestAnalysis: async (patientId: string): Promise<void> => {
-    const { error } = await supabase.functions.invoke('process-patient-analysis', {
-      body: { patientId }
-    });
-    
-    if (error) throw error;
-  }
+  requestAnalysis: (patientId: string): Promise<void> =>
+    api.post(`/v1/patients/${patientId}/analysis/request`),
 };
